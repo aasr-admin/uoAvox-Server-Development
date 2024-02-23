@@ -230,7 +230,7 @@ namespace Server.Items
 			var from = state.Mobile;
 
 			int packetID = pvSrc.ReadByte();
-			var board = World.FindItem(pvSrc.ReadInt32()) as BaseBulletinBoard;
+			var board = pvSrc.ReadItem() as BaseBulletinBoard;
 
 			if (board == null || !board.CheckRange(from))
 			{
@@ -248,7 +248,7 @@ namespace Server.Items
 
 		public static void BBRequestContent(Mobile from, BaseBulletinBoard board, PacketReader pvSrc)
 		{
-			var msg = World.FindItem(pvSrc.ReadInt32()) as BulletinMessage;
+			var msg = pvSrc.ReadItem() as BulletinMessage;
 
 			if (msg == null || msg.Parent != board)
 			{
@@ -260,7 +260,7 @@ namespace Server.Items
 
 		public static void BBRequestHeader(Mobile from, BaseBulletinBoard board, PacketReader pvSrc)
 		{
-			var msg = World.FindItem(pvSrc.ReadInt32()) as BulletinMessage;
+			var msg = pvSrc.ReadItem() as BulletinMessage;
 
 			if (msg == null || msg.Parent != board)
 			{
@@ -272,7 +272,7 @@ namespace Server.Items
 
 		public static void BBPostMessage(Mobile from, BaseBulletinBoard board, PacketReader pvSrc)
 		{
-			var thread = World.FindItem(pvSrc.ReadInt32()) as BulletinMessage;
+			var thread = pvSrc.ReadItem() as BulletinMessage;
 
 			if (thread != null && thread.Parent != board)
 			{
@@ -329,7 +329,7 @@ namespace Server.Items
 
 		public static void BBRemoveMessage(Mobile from, BaseBulletinBoard board, PacketReader pvSrc)
 		{
-			var msg = World.FindItem(pvSrc.ReadInt32()) as BulletinMessage;
+			var msg = pvSrc.ReadItem() as BulletinMessage;
 
 			if (msg == null || msg.Parent != board)
 			{

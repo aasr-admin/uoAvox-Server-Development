@@ -13,7 +13,7 @@ namespace Server
 		{
 			if (Enabled)
 			{
-				EventSink.ClientVersionReceived += new ClientVersionReceivedHandler(delegate (ClientVersionReceivedArgs args)
+				EventSink.ClientVersionReceived += args =>
 				{
 					var pm = args.State.Mobile as PlayerMobile;
 
@@ -21,7 +21,7 @@ namespace Server
 					{
 						Timer.DelayCall(TimeSpan.Zero, pm.ResendBuffs);
 					}
-				});
+				};
 			}
 		}
 

@@ -3,6 +3,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
 using System.Net;
 using System.Text;
@@ -19,18 +20,116 @@ namespace Server
 		void Deserialize(GenericReader reader);
 	}
 
+	public readonly struct UID : IComparable, IComparable<UID>
+	{
+		private readonly long m_UID;
+
+		public static readonly UID MinusOne = new(-1L);
+		public static readonly UID Zero = new(0L);
+
+		public UID(long uid)
+		{
+			m_UID = uid;
+		}
+
+		public long Value => m_UID;
+
+		public bool IsValid => m_UID > 0;
+
+		public override int GetHashCode()
+		{
+			return m_UID.GetHashCode();
+		}
+
+		public int CompareTo(UID other)
+		{
+			return m_UID.CompareTo(other.m_UID);
+		}
+
+		public int CompareTo(object other)
+		{
+			if (other is UID u)
+			{
+				return CompareTo(u);
+			}
+
+			if (other == null)
+			{
+				return -1;
+			}
+
+			return 0;
+		}
+
+		public override bool Equals(object o)
+		{
+			if (o == null || o is not UID s)
+			{
+				return false;
+			}
+
+			return s.m_UID == m_UID;
+		}
+
+		public static bool operator ==(UID l, UID r)
+		{
+			return l.m_UID == r.m_UID;
+		}
+
+		public static bool operator !=(UID l, UID r)
+		{
+			return l.m_UID != r.m_UID;
+		}
+
+		public static bool operator >(UID l, UID r)
+		{
+			return l.m_UID > r.m_UID;
+		}
+
+		public static bool operator <(UID l, UID r)
+		{
+			return l.m_UID < r.m_UID;
+		}
+
+		public static bool operator >=(UID l, UID r)
+		{
+			return l.m_UID >= r.m_UID;
+		}
+
+		public static bool operator <=(UID l, UID r)
+		{
+			return l.m_UID <= r.m_UID;
+		}
+
+		public override string ToString()
+		{
+			return $"0x{m_UID:X8}";
+		}
+
+		public static implicit operator long(UID uid)
+		{
+			return uid.m_UID;
+		}
+
+		public static implicit operator UID(long uid)
+		{
+			return new UID(uid);
+		}
+	}
+
 	public struct Serial : IComparable, IComparable<Serial>
 	{
-		private readonly int m_Serial;
-
-		private static Serial m_LastMobile = Zero;
-		private static Serial m_LastItem = 0x40000000;
-
-		public static Serial LastMobile => m_LastMobile;
-		public static Serial LastItem => m_LastItem;
-
 		public static readonly Serial MinusOne = new(-1);
 		public static readonly Serial Zero = new(0);
+
+		public static readonly Serial MinValue = new(0x00000000);
+		public static readonly Serial MaxValue = new(0x7FFFFFFF);
+
+		public static readonly Serial FirstMobile = new(0x00000001);
+		public static readonly Serial FirstItem = new(0x40000001);
+
+		private static Serial m_LastMobile = new(0x00000000);
+		private static Serial m_LastItem = new(0x40000000);
 
 		public static Serial NewMobile
 		{
@@ -38,7 +137,7 @@ namespace Server
 			{
 				do
 				{
-					++m_LastMobile;
+					++m_LastMobile.m_Serial;
 				}
 				while (World.FindMobile(m_LastMobile) != null);
 
@@ -52,7 +151,7 @@ namespace Server
 			{
 				do
 				{
-					++m_LastItem;
+					++m_LastItem.m_Serial;
 				}
 				while (World.FindItem(m_LastItem) != null);
 
@@ -60,30 +159,37 @@ namespace Server
 			}
 		}
 
+		private int m_Serial;
+
+		public readonly int Value => m_Serial;
+
+		public readonly bool IsMobile => m_Serial > 0 && m_Serial < 0x40000000;
+
+		public readonly bool IsItem => m_Serial >= 0x40000000 && m_Serial <= 0x7FFFFFFF;
+
+		public readonly bool IsValid => m_Serial > 0;
+
 		public Serial(int serial)
 		{
 			m_Serial = serial;
 		}
 
-		public int Value => m_Serial;
+		public override readonly string ToString()
+		{
+			return $"0x{m_Serial:X8}";
+		}
 
-		public bool IsMobile => (m_Serial > 0 && m_Serial < 0x40000000);
-
-		public bool IsItem => (m_Serial >= 0x40000000 && m_Serial <= 0x7FFFFFFF);
-
-		public bool IsValid => (m_Serial > 0);
-
-		public override int GetHashCode()
+		public override readonly int GetHashCode()
 		{
 			return m_Serial;
 		}
 
-		public int CompareTo(Serial other)
+		public readonly int CompareTo(Serial other)
 		{
 			return m_Serial.CompareTo(other.m_Serial);
 		}
 
-		public int CompareTo(object other)
+		public readonly int CompareTo(object other)
 		{
 			if (other is Serial s)
 			{
@@ -98,7 +204,7 @@ namespace Server
 			return 0;
 		}
 
-		public override bool Equals(object o)
+		public override readonly bool Equals(object o)
 		{
 			if (o == null || o is not Serial s)
 			{
@@ -138,19 +244,9 @@ namespace Server
 			return l.m_Serial <= r.m_Serial;
 		}
 
-		public override string ToString()
+		public static implicit operator int(Serial serial)
 		{
-			return String.Format("0x{0:X8}", m_Serial);
-		}
-
-		public static implicit operator int(Serial a)
-		{
-			return a.m_Serial;
-		}
-
-		public static implicit operator Serial(int a)
-		{
-			return new Serial(a);
+			return serial.m_Serial;
 		}
 	}
 
@@ -178,6 +274,8 @@ namespace Server
 		public abstract Enum ReadEnum();
 		public abstract T ReadEnum<T>() where T : struct, Enum;
 
+		public abstract Color ReadColor();
+
 		public abstract decimal ReadDecimal();
 		public abstract long ReadLong();
 		public abstract ulong ReadULong();
@@ -193,6 +291,7 @@ namespace Server
 		public abstract bool ReadBool();
 
 		public abstract byte[] ReadBytes();
+		public abstract MemoryStream ReadStream();
 
 		public abstract Point3D ReadPoint3D();
 		public abstract Point2D ReadPoint2D();
@@ -202,6 +301,7 @@ namespace Server
 		public abstract Poly3D ReadPoly3D();
 		public abstract Map ReadMap();
 
+		public abstract UID ReadUID();
 		public abstract Serial ReadSerial();
 
 		public abstract IEntity ReadEntity();
@@ -423,7 +523,20 @@ namespace Server
 
 		public override T ReadEnum<T>()
 		{
-			return (T)ReadEnum();
+			try { return (T)ReadEnum(); }
+			catch { return default; }
+		}
+
+		public override Color ReadColor()
+		{
+			return ReadByte() switch
+			{
+				0 => Color.Empty,
+				1 => Color.FromKnownColor(ReadEnum<KnownColor>()),
+				2 => Color.FromName(ReadString()),
+				3 => Color.FromArgb(ReadEncodedInt()),
+				_ => Color.Empty,
+			};
 		}
 
 		public override decimal ReadDecimal()
@@ -503,6 +616,18 @@ namespace Server
 			return null;
 		}
 
+		public override MemoryStream ReadStream()
+		{
+			var length = ReadEncodedInt();
+
+			if (length >= 0)
+			{
+				return new MemoryStream(m_File.ReadBytes(length));
+			}
+
+			return null;
+		}
+
 		public override Point3D ReadPoint3D()
 		{
 			return new Point3D(ReadInt(), ReadInt(), ReadInt());
@@ -555,9 +680,14 @@ namespace Server
 			return Map.Maps[ReadByte()];
 		}
 
+		public override UID ReadUID()
+		{
+			return ReadLong();
+		}
+
 		public override Serial ReadSerial()
 		{
-			return ReadInt();
+			return new Serial(ReadInt());
 		}
 
 		public override IEntity ReadEntity()
@@ -893,6 +1023,7 @@ namespace Server
 		public abstract void Write(TimeSpan value);
 		public abstract void Write(IPAddress value);
 		public abstract void Write(Enum value);
+		public abstract void Write(Color value);
 
 		public abstract void Write(decimal value);
 		public abstract void Write(long value);
@@ -909,6 +1040,10 @@ namespace Server
 		public abstract void Write(bool value);
 
 		public abstract void Write(byte[] value);
+		public abstract void Write(byte[] value, int offset, int length);
+
+		public abstract void Write(MemoryStream stream);
+		public abstract void Write(MemoryStream stream, int offset, int length);
 
 		public abstract void Write(Point3D value);
 		public abstract void Write(Point2D value);
@@ -918,6 +1053,7 @@ namespace Server
 		public abstract void Write(Poly3D value);
 		public abstract void Write(Map value);
 
+		public abstract void Write(UID value);
 		public abstract void Write(Serial value);
 
 		public abstract void Write(IEntity value);
@@ -1273,6 +1409,29 @@ namespace Server
 			}
 		}
 
+		public override void Write(Color value)
+		{
+			if (value.IsEmpty)
+			{
+				Write((byte)0);
+			}
+			else if (value.IsKnownColor)
+			{
+				Write((byte)1);
+				Write(value.ToKnownColor());
+			}
+			else if (value.IsNamedColor)
+			{
+				Write((byte)2);
+				Write(value.Name);
+			}
+			else
+			{
+				Write((byte)3);
+				WriteEncodedInt(value.ToArgb());
+			}
+		}
+
 		public override void Write(decimal value)
 		{
 			var bits = Decimal.GetBits(value);
@@ -1466,13 +1625,72 @@ namespace Server
 
 		public override void Write(byte[] value)
 		{
+			Write(value, 0, value?.Length ?? 0);
+		}
+
+		public override void Write(byte[] value, int offset, int length)
+		{
 			if (value != null)
 			{
-				WriteEncodedInt(value.Length);
+				WriteEncodedInt(length);
 
-				for (var i = 0; i < value.Length; i++)
+				if (length > 0)
 				{
-					Write(value[i]);
+					length += offset;
+
+					for (var i = offset; i < length; i++)
+					{
+						Write(value[i]);
+					}
+				}
+			}
+			else
+			{
+				WriteEncodedInt(-1);
+			}
+		}
+
+		public override void Write(MemoryStream value)
+		{
+			Write(value, 0, (int)(value?.Length ?? 0));
+		}
+
+		public override void Write(MemoryStream value, int offset, int length)
+		{
+			if (value != null)
+			{
+				WriteEncodedInt(length);
+
+				if (length > 0)
+				{
+					var pos = value.Position;
+
+					value.Position = offset;
+
+					var count = 0;
+
+					while (count < length)
+					{
+						var read = value.ReadByte();
+
+						if (read >= 0)
+						{
+							Write((byte)read);
+
+							++count;
+						}
+						else
+						{
+							break;
+						}
+					}
+
+					if (count > 0)
+					{
+						Flush();
+					}
+
+					value.Position = pos;
 				}
 			}
 			else
@@ -1551,6 +1769,11 @@ namespace Server
 			{
 				Write((byte)0xFF);
 			}
+		}
+
+		public override void Write(UID value)
+		{
+			Write(value.Value);
 		}
 
 		public override void Write(Serial value)
@@ -2108,6 +2331,29 @@ namespace Server
 			}
 		}
 
+		public override void Write(Color value)
+		{
+			if (value.IsEmpty)
+			{
+				Write((byte)0);
+			}
+			else if (value.IsKnownColor)
+			{
+				Write((byte)1);
+				Write(value.ToKnownColor());
+			}
+			else if (value.IsNamedColor)
+			{
+				Write((byte)2);
+				Write(value.Name);
+			}
+			else
+			{
+				Write((byte)3);
+				WriteEncodedInt(value.ToArgb());
+			}
+		}
+
 		public override void Write(decimal value)
 		{
 			m_Bin.Write(value);
@@ -2188,12 +2434,66 @@ namespace Server
 
 		public override void Write(byte[] value)
 		{
+			Write(value, 0, value?.Length ?? 0);
+		}
+
+		public override void Write(byte[] value, int offset, int length)
+		{
 			if (value != null)
 			{
-				WriteEncodedInt(value.Length);
+				WriteEncodedInt(length);
 
-				m_Bin.Write(value, 0, value.Length);
+				m_Bin.Write(value, offset, length);
 				OnWrite();
+			}
+			else
+			{
+				WriteEncodedInt(-1);
+			}
+		}
+
+		public override void Write(MemoryStream value)
+		{
+			Write(value, 0, (int)(value?.Length ?? 0));
+		}
+
+		public override void Write(MemoryStream value, int offset, int length)
+		{
+			if (value != null)
+			{
+				WriteEncodedInt(length);
+
+				if (length > 0)
+				{
+					var pos = value.Position;
+
+					value.Position = offset;
+
+					var count = 0;
+
+					while (count < length)
+					{
+						var read = value.ReadByte();
+
+						if (read >= 0)
+						{
+							m_Bin.Write((byte)read);
+
+							++count;
+						}
+						else
+						{
+							break;
+						}
+					}
+
+					if (count > 0)
+					{
+						OnWrite();
+					}
+
+					value.Position = pos;
+				}
 			}
 			else
 			{
@@ -2271,6 +2571,11 @@ namespace Server
 			{
 				Write((byte)0xFF);
 			}
+		}
+
+		public override void Write(UID value)
+		{
+			Write(value.Value);
 		}
 
 		public override void Write(Serial value)

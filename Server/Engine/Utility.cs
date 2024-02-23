@@ -2,8 +2,10 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
@@ -622,6 +624,11 @@ namespace Server
 			return t;
 		}
 
+		public static Serial ToSerial(string value)
+		{
+			return new Serial(ToInt32(value));
+		}
+
 		public static int ToInt32(string value)
 		{
 			int i;
@@ -656,6 +663,11 @@ namespace Server
 
 				return defaultValue;
 			}
+		}
+
+		public static Serial GetXMLSerial(string intString, int defaultValue)
+		{
+			return new Serial(GetXMLInt32(intString, defaultValue));
 		}
 
 		public static int GetXMLInt32(string intString, int defaultValue)
@@ -869,53 +881,6 @@ namespace Server
 			}
 		}
 
-		/* Should probably be rewritten to use an ITile interface
-
-		public static bool CanMobileFit( int z, StaticTile[] tiles )
-		{
-			int checkHeight = 15;
-			int checkZ = z;
-
-			for ( int i = 0; i < tiles.Length; ++i )
-			{
-				StaticTile tile = tiles[i];
-
-				if ( ((checkZ + checkHeight) > tile.Z && checkZ < (tile.Z + tile.Height))*//* || (tile.Z < (checkZ + checkHeight) && (tile.Z + tile.Height) > checkZ)*//* )
-				{
-					return false;
-				}
-				else if ( checkHeight == 0 && tile.Height == 0 && checkZ == tile.Z )
-				{
-					return false;
-				}
-			}
-
-			return true;
-		}
-
-		public static bool IsInContact( StaticTile check, StaticTile[] tiles )
-		{
-			int checkHeight = check.Height;
-			int checkZ = check.Z;
-
-			for ( int i = 0; i < tiles.Length; ++i )
-			{
-				StaticTile tile = tiles[i];
-
-				if ( ((checkZ + checkHeight) > tile.Z && checkZ < (tile.Z + tile.Height))*//* || (tile.Z < (checkZ + checkHeight) && (tile.Z + tile.Height) > checkZ)*//* )
-				{
-					return true;
-				}
-				else if ( checkHeight == 0 && tile.Height == 0 && checkZ == tile.Z )
-				{
-					return true;
-				}
-			}
-
-			return false;
-		}
-		*/
-
 		public static object GetArrayCap(Array array, int index)
 		{
 			return GetArrayCap(array, index, null);
@@ -943,6 +908,7 @@ namespace Server
 		}
 
 		#region Random
+
 		//4d6+8 would be: Utility.Dice( 4, 6, 8 )
 		public static int Dice(int numDice, int numSides, int bonus)
 		{
@@ -1020,7 +986,7 @@ namespace Server
 
 			if (values.Length == 0)
 			{
-				return default(TEnum);
+				return default;
 			}
 
 			int curIdx = -1, minIdx = -1, maxIdx = -1;
@@ -1087,9 +1053,7 @@ namespace Server
 		{
 			if (min > max)
 			{
-				var copy = min;
-				min = max;
-				max = copy;
+				(max, min) = (min, max);
 			}
 			else if (min == max)
 			{
@@ -1115,18 +1079,17 @@ namespace Server
 
 		public static int Random(int from, int count)
 		{
-			if (count == 0)
-			{
-				return from;
-			}
-			else if (count > 0)
+			if (count > 0)
 			{
 				return from + Random(count);
 			}
-			else
+
+			if (count < 0)
 			{
 				return from - Random(-count);
 			}
+
+			return from;
 		}
 
 		public static int Random(int count)
@@ -1143,6 +1106,7 @@ namespace Server
 		{
 			return RandomImpl.NextDouble();
 		}
+
 		#endregion
 
 		#region Random Hues
@@ -1345,100 +1309,43 @@ namespace Server
 
 		#endregion
 
-		private static readonly SkillName[] m_AllSkills = new SkillName[]
-			{
-				SkillName.Alchemy,
-				SkillName.Anatomy,
-				SkillName.AnimalLore,
-				SkillName.ItemID,
-				SkillName.ArmsLore,
-				SkillName.Parry,
-				SkillName.Begging,
-				SkillName.Blacksmith,
-				SkillName.Fletching,
-				SkillName.Peacemaking,
-				SkillName.Camping,
-				SkillName.Carpentry,
-				SkillName.Cartography,
-				SkillName.Cooking,
-				SkillName.DetectHidden,
-				SkillName.Discordance,
-				SkillName.EvalInt,
-				SkillName.Healing,
-				SkillName.Fishing,
-				SkillName.Forensics,
-				SkillName.Herding,
-				SkillName.Hiding,
-				SkillName.Provocation,
-				SkillName.Inscribe,
-				SkillName.Lockpicking,
-				SkillName.Magery,
-				SkillName.MagicResist,
-				SkillName.Tactics,
-				SkillName.Snooping,
-				SkillName.Musicianship,
-				SkillName.Poisoning,
-				SkillName.Archery,
-				SkillName.SpiritSpeak,
-				SkillName.Stealing,
-				SkillName.Tailoring,
-				SkillName.AnimalTaming,
-				SkillName.TasteID,
-				SkillName.Tinkering,
-				SkillName.Tracking,
-				SkillName.Veterinary,
-				SkillName.Swords,
-				SkillName.Macing,
-				SkillName.Fencing,
-				SkillName.Wrestling,
-				SkillName.Lumberjacking,
-				SkillName.Mining,
-				SkillName.Meditation,
-				SkillName.Stealth,
-				SkillName.RemoveTrap,
-				SkillName.Necromancy,
-				SkillName.Focus,
-				SkillName.Chivalry,
-				SkillName.Bushido,
-				SkillName.Ninjitsu,
-				SkillName.Spellweaving
-			};
+		private static readonly SkillName[] m_AllSkills = EnumCache<SkillName>.Values;
 
 		private static readonly SkillName[] m_CombatSkills = new SkillName[]
-			{
-				SkillName.Archery,
-				SkillName.Swords,
-				SkillName.Macing,
-				SkillName.Fencing,
-				SkillName.Wrestling
-			};
+		{
+			SkillName.Archery,
+			SkillName.Swords,
+			SkillName.Macing,
+			SkillName.Fencing,
+			SkillName.Wrestling
+		};
 
 		private static readonly SkillName[] m_CraftSkills = new SkillName[]
-			{
-				SkillName.Alchemy,
-				SkillName.Blacksmith,
-				SkillName.Fletching,
-				SkillName.Carpentry,
-				SkillName.Cartography,
-				SkillName.Cooking,
-				SkillName.Inscribe,
-				SkillName.Tailoring,
-				SkillName.Tinkering
-			};
+		{
+			SkillName.Alchemy,
+			SkillName.Blacksmith,
+			SkillName.Fletching,
+			SkillName.Carpentry,
+			SkillName.Cartography,
+			SkillName.Cooking,
+			SkillName.Inscribe,
+			SkillName.Tailoring,
+			SkillName.Tinkering
+		};
 
 		public static SkillName RandomSkill()
 		{
-			return m_AllSkills[Utility.Random(m_AllSkills.Length - (Core.ML ? 0 : Core.SE ? 1 : Core.AOS ? 3 : 6))];
+			return m_AllSkills[Random(m_AllSkills.Length - (Core.ML ? 0 : Core.SE ? 1 : Core.AOS ? 3 : 6))];
 		}
 
 		public static SkillName RandomCombatSkill()
 		{
-			return m_CombatSkills[Utility.Random(m_CombatSkills.Length)];
+			return m_CombatSkills[Random(m_CombatSkills.Length)];
 		}
 
 		public static SkillName RandomCraftSkill()
 		{
-			return m_CraftSkills[Utility.Random(m_CraftSkills.Length)];
+			return m_CraftSkills[Random(m_CraftSkills.Length)];
 		}
 
 		public static void FixPoints(ref Point2D top, ref Point2D bottom)
@@ -1586,6 +1493,110 @@ namespace Server
 			}
 		}
 
+		public static string FormatDate(DateTime date)
+		{
+			return FormatDate(date, date.Kind == DateTimeKind.Utc);
+		}
+
+		public static string FormatDate(DateTime date, bool utc)
+		{
+			return FormatDate(date, utc, false);
+		}
+
+		public static string FormatDate(DateTime date, bool utc, bool absolute)
+		{
+			return FormatDate(date, utc, absolute, true, true);
+		}
+
+		public static string FormatDate(DateTime date, bool utc, bool absolute, bool prefixed, bool suffixed)
+		{
+			DateTime now;
+
+			if (utc)
+			{
+				now = DateTime.UtcNow;
+
+				if (date.Kind != DateTimeKind.Utc)
+				{
+					date = date.ToUniversalTime();
+				}
+			}
+			else
+			{
+				now = DateTime.Now;
+
+				if (date.Kind != DateTimeKind.Local)
+				{
+					date = date.ToLocalTime();
+				}
+			}
+
+			string prefix = null, format = suffixed ? "h:mmtt" : "HH:mm";
+
+			if (absolute || date > now)
+			{
+				format = $"YYYY-MM-dd {format}";
+			}
+			else if (prefixed)
+			{
+				switch (now.DayOfYear - date.DayOfYear)
+				{
+					case 0: prefix = "Today at "; break;
+					case 1: prefix = "Yesterday at "; break;
+					default:
+						{
+							if (date.Year < now.Year)
+							{
+								format = $"YYYY-MM-dd {format}";
+							}
+							else
+							{
+								format = $"MM-dd {format}";
+							}
+						}
+						break;
+				}
+			}
+			else
+			{
+				if (date.Year < now.Year)
+				{
+					format = $"YYYY-MM-dd {format}";
+				}
+				else if (date.Month < now.Month)
+				{
+					format = $"MM-dd {format}";
+				}
+				else if (date.Day < now.Day)
+				{
+					format = $"MM-dd {format}";
+				}
+			}
+
+			format = date.ToString(format, CultureInfo.InvariantCulture);
+			format = format.Replace("YYYY", $"{date.Year:D4}");
+
+			if (prefixed)
+			{
+				format = format.Replace('-', '/');
+				format = format.Replace("    ", " at ");
+			}
+
+			if (suffixed)
+			{
+				if (date.TimeOfDay.Hours < 12)
+				{
+					format = format.Replace("AM", "am");
+				}
+				else
+				{
+					format = format.Replace("PM", "pm");
+				}
+			}
+
+			return $"{prefix}{format}";
+		}
+
 		private static readonly Stack<ConsoleColor> m_ConsoleColors = new();
 
 		public static void PushColor(ConsoleColor color)
@@ -1609,6 +1620,93 @@ namespace Server
 			catch
 			{
 			}
+		}
+
+		public static double Interpolate(double min, double max, double from, double to)
+		{
+			var prog = min / max;
+
+			if (Double.IsNaN(prog) || Double.IsInfinity(prog))
+			{
+				if (Double.IsNegativeInfinity(prog))
+				{
+					return from;
+				}
+
+				if (Double.IsPositiveInfinity(prog))
+				{
+					return to;
+				}
+
+				return 0;
+			}
+
+			return from + ((to - from) * (min / max));
+		}
+
+		public static int Interpolate(double min, double max, Color from, Color to, out Color color)
+		{
+			var prog = min / max;
+
+			if (Double.IsNaN(prog) || Double.IsInfinity(prog))
+			{
+				if (Double.IsNegativeInfinity(prog))
+				{
+					color = from;
+				}
+				else if (Double.IsPositiveInfinity(prog))
+				{
+					color = to;
+				}
+				else
+				{
+					color = Color.Empty;
+				}
+			}
+			else
+			{
+				color = Color.FromArgb
+				(
+					Math.Clamp((int)Interpolate(min, max, from.A, to.A), 0, 255),
+					Math.Clamp((int)Interpolate(min, max, from.R, to.R), 0, 255),
+					Math.Clamp((int)Interpolate(min, max, from.G, to.G), 0, 255),
+					Math.Clamp((int)Interpolate(min, max, from.B, to.B), 0, 255)
+				);
+			}
+
+			return color.ToArgb();
+		}
+
+		public static void ConvertColor(Color color, out short out16)
+		{
+			ConvertColor(color.ToArgb(), out out16);
+		}
+
+		public static void ConvertColor(Color color, out int out32)
+		{
+			out32 = color.ToArgb();
+		}
+
+		public static void ConvertColor(int in32, out short out16)
+		{
+			in32 &= 0x00FFFFFF;
+
+			var r = ((in32 >> 16) & 0xFF) >> 3;
+			var g = ((in32 >> 08) & 0xFF) >> 3;
+			var b = ((in32 >> 00) & 0xFF) >> 3;
+
+			out16 = (short)((r << 16) | (g << 08) | (b << 00));
+		}
+
+		public static void ConvertColor(short in16, out int out32)
+		{
+			in16 &= 0x7FFF;
+
+			var r = ((in16 >> 10) & 0x1F) << 3;
+			var g = ((in16 >> 05) & 0x1F) << 3;
+			var b = ((in16 >> 00) & 0x1F) << 3;
+
+			out32 = (r << 16) | (g << 08) | (b << 00);
 		}
 
 		public static bool NumberBetween(double num, int bound1, int bound2, double allowance)
@@ -1782,6 +1880,358 @@ namespace Server
 			}
 
 			return true;
+		}
+
+		private static BindingFlags GetBindingFlags(object obj, out Type type)
+		{
+			type = obj as Type ?? obj.GetType();
+
+			var flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
+
+			if (type.IsSealed && type.IsAbstract)
+			{
+				flags &= ~BindingFlags.Instance;
+			}
+
+			return flags;
+		}
+
+		public static FieldInfo GetEventField(object obj, EventInfo eventInfo)
+		{
+			var flags = GetBindingFlags(obj, out var type);
+
+			return type.GetField(eventInfo.Name, flags) ?? type.GetField($"EVENT_{eventInfo.Name.ToUpper()}", flags);
+		}
+
+		public static FieldInfo GetEventField(object obj, string eventName)
+		{
+			var flags = GetBindingFlags(obj, out var type);
+
+			return GetEventField(obj, type.GetEvent(eventName, flags));
+		}
+
+		public static void ClearAllEventDelegates(object obj)
+		{
+			var flags = GetBindingFlags(obj, out var type);
+
+			foreach (var e in type.GetEvents(flags))
+			{
+				ClearEventDelegates(type, e);
+			}
+		}
+
+		public static void ClearEventDelegates(object obj, EventInfo eventInfo)
+		{
+			var eventField = GetEventField(obj, eventInfo);
+
+			eventField?.SetValue(obj is Type ? null : obj, null);
+		}
+
+		public static void ClearEventDelegates(object obj, string eventName)
+		{
+			var flags = GetBindingFlags(obj, out var type);
+
+			ClearEventDelegates(obj, type.GetEvent(eventName, flags));
+		}
+
+		public static Delegate[] GetEventDelegates(object obj, EventInfo eventInfo)
+		{
+			var eventField = GetEventField(obj, eventInfo);
+
+			if (eventField?.GetValue(obj is Type ? null : obj) is Delegate eventHandler)
+			{
+				return eventHandler.GetInvocationList();
+			}
+
+			return Array.Empty<Delegate>();
+		}
+
+		public static Delegate[] GetEventDelegates(object obj, string eventName)
+		{
+			var flags = GetBindingFlags(obj, out var type);
+
+			return GetEventDelegates(obj, type.GetEvent(eventName, flags));
+		}
+
+		public static MethodInfo[] GetEventMethods(object obj, EventInfo eventInfo)
+		{
+			var delegates = GetEventDelegates(obj, eventInfo);
+
+			if (delegates.Length > 0)
+			{
+				var methods = new MethodInfo[delegates.Length];
+
+				for (var i = 0; i < methods.Length; i++)
+				{
+					methods[i] = delegates[i].Method;
+				}
+
+				return methods;
+			}
+
+			return Array.Empty<MethodInfo>();
+		}
+
+		public static MethodInfo[] GetEventMethods(object obj, string eventName)
+		{
+			var flags = GetBindingFlags(obj, out var type);
+
+			return GetEventMethods(obj, type.GetEvent(eventName, flags));
+		}
+
+		public static object CreateInstance(Type type, params object[] args)
+		{
+			try { return Activator.CreateInstance(type, args); }
+			catch { return null; }
+		}
+
+		public static T CreateInstance<T>(Type type, params object[] args)
+		{
+			if (type?.IsAssignableTo(typeof(T)) == true)
+			{
+				return (T)CreateInstance(type, args);
+			}
+
+			return default;
+		}
+
+		public static Range[] ConvertToRangedArray(int[] ranges)
+		{
+			var output = new Range[ranges.Length / 2];
+
+			var i = -1;
+			var j = -1;
+
+			while (++i < output.Length)
+			{
+				output[i] = ranges[++j]..ranges[++j];
+			}
+
+			return output;
+		}
+
+		public static int[] ConvertToRangedArray(Range[] ranges)
+		{
+			var output = new int[ranges.Length * 2];
+
+			var i = -1;
+			var j = -1;
+
+			while (++i < ranges.Length)
+			{
+				output[++j] = ranges[i].Start.Value;
+				output[++j] = ranges[i].End.Value;
+			}
+
+			return output;
+		}
+
+		public static int[] ConvertToSequentialArray(Range[] ranges)
+		{
+			var output = new SortedSet<int>();
+
+			foreach (var r in ranges)
+			{
+				var id = r.Start.Value;
+
+				while (id <= r.End.Value)
+				{
+					output.Add(id++);
+				}
+			}
+
+			return output.ToArray();
+		}
+	}
+
+	public static class WaterUtility
+	{
+		public static Range[] AllWaterTiles { get; set; } =
+		{
+			0x00A8..0x00AB,
+			0x0136..0x0137,
+
+			// static tiles require the 0x4000 offset
+			// 0x5797 == 0x1798 | 0x4000
+
+			0x5797..0x579C,
+			0x746E..0x7485,
+			0x7490..0x74AB,
+			0x74B5..0x75D5,
+		};
+
+		public static Range[] DeepWaterLandTiles { get; set; } =
+		{
+			0x00A8..0x00AB,
+			0x0136..0x0137,
+		};
+
+		public static Range[] DeepWaterStaticTiles { get; set; } =
+		{
+		};
+
+		public static Range[] ShallowWaterLandTiles { get; set; } =
+		{
+		};
+
+		public static Range[] ShallowWaterStaticTiles { get; set; } =
+		{
+			0x1797..0x179C,
+		};
+
+		public static Range[] FreshWaterLandTiles { get; set; } =
+		{
+		};
+
+		public static Range[] FreshWaterStaticTiles { get; set; } =
+		{
+		};
+
+		public static bool ValidateWater(Range[] waterValidation, Range[] freshValidation, Map map, Point3D target, int tileID, ref int z, out bool fresh)
+		{
+			var water = fresh = false;
+
+			for (var i = 0; !water && i < waterValidation.Length; i++)
+			{
+				water = tileID >= waterValidation[i].Start.Value && tileID <= waterValidation[i].End.Value;
+			}
+
+			for (var i = 0; !fresh && i < freshValidation.Length; i++)
+			{
+				fresh = tileID >= freshValidation[i].Start.Value && tileID <= freshValidation[i].End.Value;
+			}
+
+			if (!water && fresh)
+			{
+				water = true;
+			}
+
+			if (water)
+			{
+				z = target.Z;
+			}
+
+			return water;
+		}
+
+		public static bool ValidateWater(Map map, object target, ref int z, out bool fresh)
+		{
+			return ValidateDeepWater(map, target, ref z, out fresh) || ValidateShallowWater(map, target, ref z, out fresh);
+		}
+
+		public static bool ValidateDeepWater(Map map, object target, ref int z, out bool fresh)
+		{
+			fresh = false;
+
+			if (target is IEntity e)
+			{
+				if (e is Item i)
+				{
+					target = new LandTarget(i.WorldLocation, map);
+				}
+				else
+				{
+					target = new LandTarget(e.Location, map);
+				}
+			}
+
+			if (target is LandTarget lt)
+			{
+				return ValidateDeepWater(map, lt, ref z, out fresh);
+			}
+
+			if (target is StaticTarget st)
+			{
+				return ValidateDeepWater(map, st, ref z, out fresh);
+			}
+
+			return false;
+		}
+
+		public static bool ValidateShallowWater(Map map, object target, ref int z, out bool fresh)
+		{
+			fresh = false;
+
+			if (target is IEntity e)
+			{
+				if (e is Item i)
+				{
+					target = new LandTarget(i.WorldLocation, map);
+				}
+				else
+				{
+					target = new LandTarget(e.Location, map);
+				}
+			}
+
+			if (target is LandTarget lt)
+			{
+				return ValidateShallowWater(map, lt, ref z, out fresh);
+			}
+
+			if (target is StaticTarget st)
+			{
+				return ValidateShallowWater(map, st, ref z, out fresh);
+			}
+
+			return false;
+		}
+
+		public static bool ValidateDeepWater(Map map, LandTarget target, ref int z, out bool fresh)
+		{
+			return ValidateWater(DeepWaterLandTiles, FreshWaterLandTiles, map, target.Location, target.TileID, ref z, out fresh);
+		}
+
+		public static bool ValidateShallowWater(Map map, LandTarget target, ref int z, out bool fresh)
+		{
+			return ValidateWater(ShallowWaterLandTiles, FreshWaterLandTiles, map, target.Location, target.TileID, ref z, out fresh);
+		}
+
+		public static bool ValidateDeepWater(Map map, StaticTarget target, ref int z, out bool fresh)
+		{
+			return ValidateWater(DeepWaterStaticTiles, FreshWaterStaticTiles, map, target.Location, target.ItemID, ref z, out fresh);
+		}
+
+		public static bool ValidateShallowWater(Map map, StaticTarget target, ref int z, out bool fresh)
+		{
+			return ValidateWater(ShallowWaterStaticTiles, FreshWaterStaticTiles, map, target.Location, target.ItemID, ref z, out fresh);
+		}
+
+		public static bool FullDeepValidation(Map map, Point3D loc, ref int z, out bool fresh)
+		{
+			return FullDeepValidation(map, loc, ref z, 5, out fresh);
+		}
+
+		public static bool FullDeepValidation(Map map, Point3D loc, ref int z, int range, out bool fresh)
+		{
+			var land = new LandTarget(loc, map);
+
+			var valid = ValidateDeepWater(map, land, ref z, out fresh);
+
+			loc.X -= range;
+			loc.Y -= range;
+
+			var endX = loc.X + (range * 2);
+			var endY = loc.Y + (range * 2);
+			var endZ = loc.Z;
+
+			while (valid && loc.X <= endX)
+			{
+				while (valid && loc.Y <= endY)
+				{
+					loc.Z = map.GetAverageZ(loc.X, loc.Y);
+
+					land = new LandTarget(loc, map);
+
+					valid = ValidateDeepWater(map, land, ref endZ, out _);
+
+					++loc.Y;
+				}
+
+				++loc.X;
+			}
+
+			return valid;
 		}
 	}
 }

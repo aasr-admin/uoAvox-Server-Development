@@ -1,0 +1,372 @@
+/* This is the original version but is now obsolete and may not contain updates found in the current working version */
+
+
+
+
+
+using Server;
+using Server.Commands;
+using Server.Gumps;
+using Server.Engines.Harvest;
+using Server.Network;
+using Server.Targeting;
+using System;
+using Server.Items;
+using Server.Mobiles;
+using Server.Engines.Harvest;
+
+
+/*
+
+so the idea is this:  the close button, the red button is start/stop macro, the arrow is target fishingpole and then the water, the auto is to keep the process automated by relative location (ie you could be sailing and moving and still the fishing would occur because the target is a relative water tile. and finally Manual automated but makes a player physically target the water (specific locations) after a duration (delay = 1000 millisecs)
+example of how it works:
+red button starts and stops the system (a system toggle)
+the arrow is pressed next
+this finds the fishing pole and allows player to target the water
+
+if a player presses auto, the system will change from where the player targeted to find a relative location based on water tiles and begin fishing 
+automatically continuing to target the waters relative location with a 1000- 10000 millisecond delay between casts....
+
+if a player presses manual, the system will cast, a delay will be between 1000-10000milliseconds before the target cursor reappears will occur... 
+then the player will have to retarget the cursor which will prompt the pole to cast again... this is for specific locations only
+
+if a player presses the red button gain the system should stop regardless of whether or not its set to auto or manual... this is an on/off toggle
+pressing this button will make it turn green
+i dont know how to do it
+but you could make it so when the system is active the button stays green
+and when its toggled off
+the button stays red
+red is the normal state and green is the pressed state
+...
+when you press the arrow you could make the target cursor this image
+
+*/
+
+namespace Server.Gumps
+{
+    public class FishingGump : Gump
+    {
+        Mobile caller;
+        Creel m_creel;
+        
+
+/*         public static void Initialize()
+        {
+            CommandSystem.Register("FishingConsole", AccessLevel.Administrator, new CommandEventHandler(FishingConsole_OnCommand));
+        }
+
+        [Usage("[FishingConsole")]
+        [Description("Makes a call to your custom gump.")]
+        public static void FishingConsole_OnCommand(CommandEventArgs e)
+        {
+            if (e.Mobile.HasGump(typeof(FishingGump)))
+                e.Mobile.CloseGump(typeof(FishingGump));
+            e.Mobile.SendGump(new FishingGump(e.Mobile ));
+        } */
+
+        public FishingGump(Mobile from, Creel creel) : base( 0, 0 )
+        {
+            caller = from;
+            m_creel = creel;
+
+            this.Closable=true;
+			this.Disposable=true;
+			this.Dragable=true;
+			this.Resizable=false;
+
+			AddPage(0);
+
+            AddImageTiled(272, 200, 225, 150, 2624);
+            AddAlphaRegion(272, 200, 225, 150);
+
+			AddImage(341, 214, 1417);
+        
+			AddItem(367, 250, 3519);
+			AddItem(272, 250, 3520);
+
+            AddButton(329, 241, 2360, 2361, (int)Buttons.Target, GumpButtonType.Reply, 0);
+
+            AddButton(387, 299, 2116, 2114, (int)Buttons.ManualFish, GumpButtonType.Reply, 0);
+            AddButton(315, 299, 2113, 2111, (int)Buttons.AutoFish, GumpButtonType.Reply, 0);
+
+            if( m_creel.Active)
+                AddButton(429, 241, 2361, 2361, (int)Buttons.StartStop, GumpButtonType.Reply, 0);
+
+            if( !m_creel.Active)
+                AddButton(429, 241, 2360, 2360, (int)Buttons.StartStop, GumpButtonType.Reply, 0);
+
+            AddButton(350, 224, 5565, 5566, (int)Buttons.FishingContainer, GumpButtonType.Reply, 0);
+
+            AddButton(450, 278, 22150, 22151, (int)Buttons.Close, GumpButtonType.Reply, 0);
+        }
+
+        public enum Buttons
+		{
+            Target,
+            ManualFish,
+            AutoFish,
+            StartStop,
+            FishingContainer,
+            Close
+        }
+
+        public override void OnResponse(NetState sender, RelayInfo info)
+        {
+            Mobile from = sender.Mobile;
+
+            switch(info.ButtonID)
+            {
+                case (int)Buttons.Target:
+                {
+                    from.Target = new Creel.FishingGumpTarget(m_creel);
+                    break;
+                }
+                case (int)Buttons.ManualFish:
+				{
+                    /*
+                    if a player presses manual, the system will cast, a delay will be between 1000-10000 milliseconds before the target cursor reappears will occur... 
+                    then the player will have to retarget the cursor which will prompt the pole to cast again... this is for specific locations only
+                    */
+
+                    if ( from.Player && from.FindItemOnLayer(Layer.TwoHanded) is FishingPole )
+                        Fish(from, m_creel, false); 
+
+                    else
+                        from.SendMessage("You must first equip a fishing pole.");
+                    
+
+                    from.SendGump(new FishingGump(from, m_creel));
+
+					break;
+				}
+				case (int)Buttons.AutoFish:
+				{
+                    /*
+                    if a player presses auto, the system will change from where the player targeted to find a relative location based on water tiles and begin fishing 
+                    automatically continuing to target the waters relative location with a 1000- 10000 millisecond delay between casts....
+                    */
+
+                    // first, target relative location
+                    from.Target = new Creel.FishingGumpTarget(m_creel);
+
+                    Point3D p = m_creel.point3D;
+                    m_creel.relativeLocation = new Point3D( (from.X - p.X), (from.Y - p.Y), p.Z );
+
+                    Fish(from, m_creel, true); 
+
+                    from.SendGump(new FishingGump(from, m_creel));
+
+                    // m_System.StartHarvesting(from, m_Tool, targeted);
+
+					break;
+				}
+                case (int)Buttons.StartStop:
+                {
+                    if( m_creel.Active )
+                        m_creel.Active = false;
+                    else
+                        m_creel.Active = true;
+
+                    from.SendGump(new FishingGump(from, m_creel));
+
+                    break;
+                }
+                case (int)Buttons.FishingContainer:
+                {
+                    if(m_creel != null && !m_creel.Deleted && m_creel.RootParent == from)
+                        m_creel.Open(from);
+
+                    from.SendGump(new FishingGump(from, m_creel));
+
+					break;
+				}
+				case (int)Buttons.Close:
+				{
+
+					break;
+				}
+            }
+        }
+
+        private void Fish(Mobile from, Creel creel, bool automatic)
+        {
+            // from.ShieldArmor is calling Server/Mobile.cs > [public Item ShieldArmor] which finds the item equipped on Layer.TwoHanded and returns that item
+            // Since we have already confirmed the item equipped on that layer is a FishingPole, we can force double click it for targeting
+
+            if( !automatic )
+                from.ShieldArmor.OnDoubleClick(from); 
+            else
+            {
+                if ( from.Player && from.FindItemOnLayer(Layer.TwoHanded) is FishingPole )
+                {
+                    Item tool = from.ShieldArmor;
+                    Map map = from.Map;
+                    Point3D loc = new Point3D( from.X - creel.relativeLocation.X, from.Y - creel.relativeLocation.Y, creel.relativeLocation.Z);
+                    from.SendMessage("{0}", loc);
+                    HarvestBank bank = Fishing.System.Definition.GetBank(map, loc.X, loc.Y);
+                    bool available = (bank != null && bank.Current >= Fishing.System.Definition.ConsumedPerHarvest);
+
+                    if (!available)
+                    {
+                        from.SendLocalizedMessage(503172); // The fish don't seem to be biting here.
+                        /* Fish(from, creel, automatic);
+                        return; */
+                    }
+                    
+                    else if (bank == null || bank.Current < Fishing.System.Definition.ConsumedPerHarvest)
+                    {   
+                        from.SendLocalizedMessage(503171); // You fish a while, but fail to catch anything.
+                        //Fish(from, creel, automatic);
+                    }
+                    else
+                    {
+                        HarvestVein vein = bank.Vein;
+
+                        if (vein == null)
+                        {    
+                            from.SendLocalizedMessage(500976); // You need to be closer to the water to fish!
+                            //Fish(from, creel, automatic);
+                        }
+
+                        HarvestResource primary = vein.PrimaryResource;
+                        HarvestResource fallback = Fishing.System.Definition.Resources[0];
+                        HarvestResource resource = Fishing.System.MutateResource(from, null, Fishing.System.Definition, map, loc, vein, primary, fallback);
+                        double skillBase = from.Skills[Fishing.System.Definition.Skill].Base;
+
+                        Type type = null;   
+
+                        from.Animate(11, 5, 1, true, false, 0);
+
+                        Timer.DelayCall(TimeSpan.FromSeconds(0.7),
+                            delegate
+                            {
+                                Effects.SendLocationEffect(loc, from.Map, 0x352D, 16, 4); //water splash
+                                Effects.PlaySound(loc, from.Map, 0x364);
+                            });
+
+                        if (skillBase >= resource.ReqSkill && from.CheckSkill(Fishing.System.Definition.Skill, resource.MinSkill, resource.MaxSkill))
+                        {
+                            type = Fishing.System.GetResourceType(from, null, Fishing.System.Definition, map, loc, resource);
+
+                            if (type != null)
+                                type = Fishing.System.MutateType(type, from, null, Fishing.System.Definition, map, loc, resource);
+
+                            if (type != null)
+                            {
+                                Item itemHarvested = Fishing.System.Construct(type, from);
+
+                                if (itemHarvested == null)
+                                {
+                                    type = null;
+                                }
+                                else
+                                {
+                                    if (itemHarvested.Stackable)
+                                    {
+                                        int amount = Fishing.System.Definition.ConsumedPerHarvest;
+                                        int feluccaAmount = Fishing.System.Definition.ConsumedPerFeluccaHarvest;
+
+                                        bool inFelucca = (map == Map.Felucca);
+
+                                        if (inFelucca)
+                                            itemHarvested.Amount = feluccaAmount;
+                                        else
+                                            itemHarvested.Amount = amount;
+                                    }
+
+                                    bank.Consume(itemHarvested.Amount, from);
+
+                                    //Container pack = from.Backpack;
+
+                                    if (creel == null || creel.Deleted || creel.RootParent != from )
+                                    {
+                                        from.SendMessage("Hmm, you seem to have lost your Creel");
+                                        return;
+                                    }
+
+                                    /* if( from.Backpack.TotalWeight >= from.Backpack.MaxWeight )
+                                    {
+                                        from.SendLocalizedMessage(503176); // You do not have room in your backpack for a fish.
+                                        //Fish(from, creel, automatic);
+                                    } */
+
+                                    Timer.DelayCall(TimeSpan.FromSeconds(4.0),
+                                        delegate
+                                        {
+                                            creel.TryDropItem(from, itemHarvested, false);
+                                            Fishing.System.SendSuccessTo(from, itemHarvested, resource);
+                                        });
+                                    
+
+                                    // Harvest bark fragment, amber, etc
+                                    BonusHarvestResource bonus = Fishing.System.Definition.GetBonusResource();
+
+                                    if (bonus != null && bonus.Type != null && skillBase >= bonus.ReqSkill)
+                                    {
+                                        Item bonusItem = Fishing.System.Construct(bonus.Type, from);
+
+                                        Timer.DelayCall(TimeSpan.FromSeconds(4.0),
+                                            delegate
+                                            {
+                                                creel.TryDropItem(from, bonusItem, false);
+                                                bonus.SendSuccessTo(from);
+                                            });
+
+                                        
+                                    }
+
+                                    /* if (tool is IUsesRemaining)
+                                    {
+                                        IUsesRemaining toolWithUses = (IUsesRemaining)tool;
+
+                                        toolWithUses.ShowUsesRemaining = true;
+
+                                        if (toolWithUses.UsesRemaining > 0)
+                                            --toolWithUses.UsesRemaining;
+
+                                        if (toolWithUses.UsesRemaining < 1)
+                                        {
+                                            tool.Delete();
+                                            def.SendMessageTo(from, def.ToolBrokeMessage);
+                                        }
+                                    } */
+                                }
+                            }
+                        }
+                    }
+                }
+                         
+                
+
+            }
+                
+
+            if(creel.Active)
+            {
+                Timer.DelayCall( TimeSpan.FromSeconds( 7.0 ), 
+                    delegate 
+                    {
+                        if(creel.Active)
+                            Fish(from, creel, automatic);
+                    } );
+            }
+        }
+
+        /* private static GetDefinition(int tileID)
+		{
+			HarvestDefinition def = null;
+
+			for (int i = 0; def == null && i < HarvestSystem.Definitions.Count; ++i)
+			{
+				HarvestDefinition check = HarvestSystem.Definitions[i];
+
+				if (check.Validate(tileID))
+					def = check;
+			}
+
+			return def;
+		} */
+
+
+    }
+}

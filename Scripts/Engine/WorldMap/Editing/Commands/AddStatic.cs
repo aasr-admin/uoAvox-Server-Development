@@ -64,7 +64,7 @@ namespace Server.Engine.Facet
 					newZ = e.GetInt32(2);
 				}
 
-				new AddStatic(e.Mobile.Map.MapID, newID, newZ, location.X, location.Y, newHue).DoOperation();
+				new AddStatic(e.Mobile.Map.MapID, (ushort)newID, (sbyte)newZ, location.X, location.Y, (ushort)newHue).DoOperation();
 			}
 		}
 	}

@@ -128,6 +128,26 @@ namespace Server.Commands
 			return m_Arguments[index];
 		}
 
+		public IEntity GetEntity(int index)
+		{
+			return World.FindEntity(GetSerial(index));
+		}
+
+		public Item GetItem(int index)
+		{
+			return World.FindItem(GetSerial(index));
+		}
+
+		public Mobile GetMobile(int index)
+		{
+			return World.FindMobile(GetSerial(index));
+		}
+
+		public Serial GetSerial(int index)
+		{
+			return new Serial(GetInt32(index));
+		}
+
 		public int GetInt32(int index)
 		{
 			if (index < 0 || index >= m_Arguments.Length)

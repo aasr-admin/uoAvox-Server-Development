@@ -435,9 +435,10 @@ namespace Server.Factions
 
 			m_Faction = Faction.ReadReference(reader);
 		}
-		#region ICraftable Members
 
-		public int OnCraft(int quality, bool makersMark, Mobile from, CraftSystem craftSystem, Type typeRes, BaseTool tool, CraftItem craftItem, int resHue)
+		#region ICraftable
+
+		public virtual int OnCraft(int quality, bool makersMark, Mobile from, ICraftSystem craftSystem, Type typeRes, ICraftTool tool, ICraftItem craftItem, int resHue)
 		{
 			ItemID = 0x14F0;
 			Faction = Faction.Find(from);

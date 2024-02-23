@@ -38,12 +38,12 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 			/// This Tree Has Two Sets Of Leaves That Are Possible
 			foreach (int treeTrunkId in SmallTreeTrunkGraphics)
 			{
-				BaseAssetSets.Add(new GraphicAsset[] { new GraphicAsset(treeTrunkId, 0, 0) });
+				BaseAssetSets.Add(new HarvestGraphicAsset[] { new HarvestGraphicAsset(treeTrunkId, 0, 0) });
 			}
 
 			foreach (int leafId in SmallTreeLeafGraphics)
 			{
-				LeafSets.Add(new GraphicAsset[] { new GraphicAsset(leafId, 0, 0) });
+				LeafSets.Add(new HarvestGraphicAsset[] { new HarvestGraphicAsset(leafId, 0, 0) });
 			}
 		}
 	}

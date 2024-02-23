@@ -1,10 +1,8 @@
-﻿using Server.Engines.Craft;
-
-using System;
+﻿using System;
 
 namespace Server.Items
 {
-	public class BaseQuiver : Container, ICraftable
+	public class BaseQuiver : Container, ICraftable, IQuality
 	{
 		public override int DefaultGumpID => 0x108;
 		public override int DefaultMaxItems => 1;
@@ -53,7 +51,7 @@ namespace Server.Items
 		}
 
 		private Mobile m_Crafter;
-		private ClothingQuality m_Quality;
+		private ItemQuality m_Quality;
 
 		[CommandProperty(AccessLevel.GameMaster)]
 		public Mobile Crafter
@@ -63,7 +61,7 @@ namespace Server.Items
 		}
 
 		[CommandProperty(AccessLevel.GameMaster)]
-		public ClothingQuality Quality
+		public ItemQuality Quality
 		{
 			get => m_Quality;
 			set { m_Quality = value; InvalidateProperties(); }
@@ -236,7 +234,7 @@ namespace Server.Items
 				list.Add(1050043, m_Crafter.Name); // crafted by ~1_NAME~
 			}
 
-			if (m_Quality == ClothingQuality.Exceptional)
+			if (m_Quality == ItemQuality.Exceptional)
 			{
 				list.Add(1063341); // exceptional
 			}
@@ -553,7 +551,7 @@ namespace Server.Items
 
 			if (GetSaveFlag(flags, SaveFlag.Quality))
 			{
-				m_Quality = (ClothingQuality)reader.ReadInt();
+				m_Quality = (ItemQuality)reader.ReadInt();
 			}
 
 			if (GetSaveFlag(flags, SaveFlag.Capacity))
@@ -578,9 +576,9 @@ namespace Server.Items
 
 		#region ICraftable
 
-		public virtual int OnCraft(int quality, bool makersMark, Mobile from, CraftSystem craftSystem, Type typeRes, BaseTool tool, CraftItem craftItem, int resHue)
+		public virtual int OnCraft(int quality, bool makersMark, Mobile from, ICraftSystem craftSystem, Type typeRes, ICraftTool tool, ICraftItem craftItem, int resHue)
 		{
-			Quality = (ClothingQuality)quality;
+			Quality = (ItemQuality)quality;
 
 			if (makersMark)
 			{

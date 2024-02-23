@@ -4,100 +4,101 @@ using Server.Network;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace Server
 {
 	public static class MultiData
 	{
-		public static Dictionary<int, MultiComponentList> Components { get; private set; }
-
-		private static readonly BinaryReader m_IndexReader;
-		private static readonly BinaryReader m_StreamReader;
+		public static Dictionary<int, MultiComponentList> Components { get; } = new();
 
 		public static bool UsingUOPFormat { get; private set; }
 
-		public static MultiComponentList GetComponents(int multiID)
-		{
-			MultiComponentList mcl;
+		public static bool PostHSFormat { get; private set; }
 
-			multiID &= 0x3FFF; // The value of the actual multi is shifted by 0x4000, so this is left alone.
-
-			if (Components.ContainsKey(multiID))
-			{
-				mcl = Components[multiID];
-			}
-			else if (!UsingUOPFormat)
-			{
-				Components[multiID] = mcl = Load(multiID);
-			}
-			else
-			{
-				mcl = MultiComponentList.Empty;
-			}
-
-			return mcl;
-		}
-
-		public static MultiComponentList Load(int multiID)
+		static MultiData()
 		{
 			try
 			{
-				m_IndexReader.BaseStream.Seek(multiID * 12, SeekOrigin.Begin);
-
-				var lookup = m_IndexReader.ReadInt32();
-				var length = m_IndexReader.ReadInt32();
-
-				if (lookup < 0 || length <= 0)
+				if (LoadUOP() || LoadMUL())
 				{
-					return MultiComponentList.Empty;
+					Utility.PushColor(ConsoleColor.Green);
+					Console.WriteLine($"MultiData: loaded ({Components.Count} entries)");
+					Utility.PopColor();
+
+					if (LoadVerdata())
+					{
+						Utility.PushColor(ConsoleColor.Blue);
+						Console.WriteLine("MultiData: patched using verdata.mul");
+						Utility.PopColor();
+					}
+
+					return;
 				}
-
-				m_StreamReader.BaseStream.Seek(lookup, SeekOrigin.Begin);
-
-				return new MultiComponentList(m_StreamReader, length / (MultiComponentList.PostHSFormat ? 16 : 12));
 			}
-			catch
+			catch (Exception e)
 			{
-				return MultiComponentList.Empty;
+				if (Core.Debug)
+				{
+					Utility.PushColor(ConsoleColor.Red);
+					Console.WriteLine("MultiData: fatal exception");
+					Console.WriteLine(e);
+					Utility.PopColor();
+				}
 			}
+
+			Utility.PushColor(ConsoleColor.Yellow);
+			Console.WriteLine("MultiData: entries could not be loaded");
+			Utility.PopColor();
 		}
 
-		public static void UOPLoad(string path)
+		private static bool LoadUOP()
 		{
-			var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-			var streamReader = new BinaryReader(stream);
+			var multicollectionPath = Core.FindDataFile("MultiCollection.uop");
+
+			if (!File.Exists(multicollectionPath))
+			{
+				return false;
+			}
+
+			using var stream = new FileStream(multicollectionPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+			using var streamReader = new BinaryReader(stream);
 
 			// Head Information Start
 			if (streamReader.ReadInt32() != 0x0050594D) // Not a UOP Files
 			{
-				return;
+				return false;
 			}
 
 			if (streamReader.ReadInt32() > 5) // Bad Version
 			{
-				return;
+				return false;
 			}
 
-			// Multi ID List Array Start
-			var chunkIds = new Dictionary<ulong, int>();
-			var chunkIds2 = new Dictionary<ulong, int>();
+			UsingUOPFormat = true;
 
-			UOPHash.BuildChunkIDs(ref chunkIds, ref chunkIds2);
-			// Multi ID List Array End
+			var chunkIds = new Dictionary<ulong, int>(0x10000);
 
-			streamReader.ReadUInt32();                      // format timestamp? 0xFD23EC43
+			for (var i = 0; i < 0x10000; ++i)
+			{
+				chunkIds[UOPHash.Compute($"build/multicollection/{i:D6}.bin")] = i;
+			}
+
+			_ = streamReader.ReadUInt32(); // format timestamp? 0xFD23EC43
+
 			var startAddress = streamReader.ReadInt64();
 
-			var blockSize = streamReader.ReadInt32();       // files in each block
-			var totalSize = streamReader.ReadInt32();       // Total File Count
+			_ = streamReader.ReadInt32(); // files in each block
+			_ = streamReader.ReadInt32(); // Total File Count
 
-			stream.Seek(startAddress, SeekOrigin.Begin);    // Head Information End
+			_ = stream.Seek(startAddress, SeekOrigin.Begin); // Head Information End
 
 			long nextBlock;
 
 			do
 			{
 				var blockFileCount = streamReader.ReadInt32();
+
 				nextBlock = streamReader.ReadInt64();
 
 				var index = 0;
@@ -106,13 +107,15 @@ namespace Server
 				{
 					var offset = streamReader.ReadInt64();
 
-					var headerSize = streamReader.ReadInt32();          // header length
-					var compressedSize = streamReader.ReadInt32();      // compressed size
-					var decompressedSize = streamReader.ReadInt32();    // decompressed size
+					var headerSize = streamReader.ReadInt32(); // header length
+					var compressedSize = streamReader.ReadInt32(); // compressed size
+					var decompressedSize = streamReader.ReadInt32(); // decompressed size
 
-					var filehash = streamReader.ReadUInt64();         // filename hash (HashLittle2)
-					var datablockhash = streamReader.ReadUInt32();     // data hash (Adler32)
-					var flag = streamReader.ReadInt16();              // compression method (0 = none, 1 = zlib)
+					var filehash = streamReader.ReadUInt64(); // filename hash (HashLittle2)
+
+					_ = streamReader.ReadUInt32(); // data hash (Adler32)
+
+					var cmp = streamReader.ReadInt16(); // compression method (0 = none, 1 = zlib)
 
 					index++;
 
@@ -121,23 +124,15 @@ namespace Server
 						continue;
 					}
 
-					// Multi ID Search Start
-					var chunkID = -1;
-
-					if (!chunkIds.TryGetValue(filehash, out chunkID))
+					if (!chunkIds.TryGetValue(filehash, out var chunkID))
 					{
-
-						if (chunkIds2.TryGetValue(filehash, out var tmpChunkID))
-						{
-							chunkID = tmpChunkID;
-						}
+						continue;
 					}
-					// Multi ID Search End                        
 
 					var positionpoint = stream.Position;  // save current position
 
 					// Decompress Data Start
-					stream.Seek(offset + headerSize, SeekOrigin.Begin);
+					_ = stream.Seek(offset + headerSize, SeekOrigin.Begin);
 
 					var sourceData = new byte[compressedSize];
 
@@ -148,11 +143,11 @@ namespace Server
 
 					byte[] data;
 
-					if (flag == 1)
+					if (cmp == 1)
 					{
 						var destData = new byte[decompressedSize];
-						/*ZLibError error = */
-						Compression.Compressor.Decompress(destData, ref decompressedSize, sourceData, compressedSize);
+
+						_ = Compression.Compressor.Decompress(destData, ref decompressedSize, sourceData, compressedSize);
 
 						data = destData;
 					}
@@ -164,360 +159,353 @@ namespace Server
 
 					var tileList = new List<MultiTileEntry>();
 
-					using (var fs = new MemoryStream(data))
+					using var fs = new MemoryStream(data);
+					using var reader = new BinaryReader(fs);
+
+					var a = reader.ReadUInt32();
+					var count = reader.ReadUInt32();
+
+					for (uint i = 0; i < count; i++)
 					{
-						using (var reader = new BinaryReader(fs))
+						var id = reader.ReadUInt16();
+						var x = reader.ReadInt16();
+						var y = reader.ReadInt16();
+						var z = reader.ReadInt16();
+
+						var flag = reader.ReadUInt16();
+
+						var clilocsCount = reader.ReadUInt32();
+
+						if (clilocsCount != 0)
 						{
-							var a = reader.ReadUInt32();
-							var count = reader.ReadUInt32();
-
-							for (uint i = 0; i < count; i++)
-							{
-								var ItemId = reader.ReadUInt16();
-								var x = reader.ReadInt16();
-								var y = reader.ReadInt16();
-								var z = reader.ReadInt16();
-
-								var flagint = reader.ReadUInt16();
-
-								TileFlag flagg;
-
-								switch (flagint)
-								{
-									default:
-									case 0:
-										flagg = TileFlag.Background;
-										break;
-									case 1:
-										flagg = TileFlag.None;
-										break;
-									case 257:
-										flagg = TileFlag.Generic;
-										break;
-								}
-
-								var clilocsCount = reader.ReadUInt32();
-
-								if (clilocsCount != 0)
-								{
-									fs.Seek(fs.Position + (clilocsCount * 4), SeekOrigin.Begin); // binary block bypass
-								}
-
-								tileList.Add(new MultiTileEntry(ItemId, x, y, z, flagg));
-							}
-
-							reader.Close();
+							_ = fs.Seek(fs.Position + (clilocsCount * 4), SeekOrigin.Begin); // binary block bypass
 						}
+
+						tileList.Add(new MultiTileEntry(id, x, y, z, flag switch
+						{
+							0x001 => TileFlag.None,
+							0x101 => TileFlag.Generic,
+							_ => TileFlag.Background,
+						}));
 					}
+
+					reader.Close();
 
 					Components[chunkID] = new MultiComponentList(tileList);
 
-					stream.Seek(positionpoint, SeekOrigin.Begin); // back to position
+					_ = stream.Seek(positionpoint, SeekOrigin.Begin); // back to position
 				}
 				while (index < blockFileCount);
 			}
 			while (stream.Seek(nextBlock, SeekOrigin.Begin) != 0);
 
 			chunkIds.Clear();
-			chunkIds2.Clear();
+
+			return true;
 		}
 
-		static MultiData()
+		private static bool LoadMUL()
 		{
-			Components = new Dictionary<int, MultiComponentList>();
+			var idxPath = Core.FindDataFile("multi.idx");
 
-			var multicollectionPath = Core.FindDataFile("MultiCollection.uop");
-
-			if (File.Exists(multicollectionPath))
+			if (!File.Exists(idxPath))
 			{
-				UOPLoad(multicollectionPath);
-				UsingUOPFormat = true;
+				return false;
 			}
-			else
+
+			var mulPath = Core.FindDataFile("multi.mul");
+
+			if (!File.Exists(mulPath))
 			{
-				var idxPath = Core.FindDataFile("multi.idx");
-				var mulPath = Core.FindDataFile("multi.mul");
+				return false;
+			}
 
-				if (File.Exists(idxPath) && File.Exists(mulPath))
+			using var idx = new FileStream(idxPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+			using var idxReader = new BinaryReader(idx);
+
+			using var mul = new FileStream(mulPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+			using var mulReader = new BinaryReader(mul);
+
+			PostHSFormat = idx.Length % 16 == 0;
+
+			var count = idx.Length / 12;
+			var size = PostHSFormat ? 16 : 12;
+
+			for (var i = 0; i < count; i++)
+			{
+				var lookup = idxReader.ReadInt32();
+				var length = idxReader.ReadInt32();
+
+				_ = idxReader.ReadInt32();
+
+				if (lookup >= 0 && length > 0)
 				{
-					var idx = new FileStream(idxPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-					m_IndexReader = new BinaryReader(idx);
+					mul.Seek(lookup, SeekOrigin.Begin);
 
-					var stream = new FileStream(mulPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-					m_StreamReader = new BinaryReader(stream);
+					var entries = ReadEntries(mulReader, length / 12);
 
-					var vdPath = Core.FindDataFile("verdata.mul");
-
-					if (File.Exists(vdPath))
-					{
-						using (var fs = new FileStream(vdPath, FileMode.Open, FileAccess.Read, FileShare.Read))
-						{
-							var bin = new BinaryReader(fs);
-
-							var count = bin.ReadInt32();
-
-							for (var i = 0; i < count; ++i)
-							{
-								var file = bin.ReadInt32();
-								var index = bin.ReadInt32();
-								var lookup = bin.ReadInt32();
-								var length = bin.ReadInt32();
-								/*int extra = */
-								bin.ReadInt32();
-
-								if (file == 14 && index >= 0 && lookup >= 0 && length > 0)
-								{
-									bin.BaseStream.Seek(lookup, SeekOrigin.Begin);
-
-									Components[index] = new MultiComponentList(bin, length / 12);
-
-									bin.BaseStream.Seek(24 + (i * 20), SeekOrigin.Begin);
-								}
-							}
-
-							bin.Close();
-						}
-					}
-				}
-				else
-				{
-					Console.WriteLine("Warning: Multi data files not found!");
+					Components[i] = new MultiComponentList(entries);
 				}
 			}
+
+			return true;
+		}
+
+		private static bool LoadVerdata()
+		{
+			var vdPath = Core.FindDataFile("verdata.mul");
+
+			if (!File.Exists(vdPath))
+			{
+				return false;
+			}
+
+			using var fs = new FileStream(vdPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+			using var bin = new BinaryReader(fs);
+
+			var count = bin.ReadInt32();
+
+			for (var i = 0; i < count; ++i)
+			{
+				var file = bin.ReadInt32();
+				var index = bin.ReadInt32();
+				var lookup = bin.ReadInt32();
+				var length = bin.ReadInt32();
+
+				_ = bin.ReadInt32();
+
+				if (file == 14 && index >= 0 && lookup >= 0 && length > 0)
+				{
+					_ = bin.BaseStream.Seek(lookup, SeekOrigin.Begin);
+
+					var entries = ReadEntries(bin, length / 12);
+
+					Components[index] = new MultiComponentList(entries);
+
+					_ = bin.BaseStream.Seek(24 + (i * 20), SeekOrigin.Begin);
+				}
+			}
+
+			bin.Close();
+
+			return true;
+		}
+
+		private static IEnumerable<MultiTileEntry> ReadEntries(BinaryReader reader, int count)
+		{
+			while (--count >= 0)
+			{
+				yield return new MultiTileEntry(reader);
+			}
+		}
+
+		public static MultiComponentList GetComponents(int multiID)
+		{
+			multiID &= 0x3FFF; // The value of the actual multi is shifted by 0x4000, so this is left alone.
+
+			Components.TryGetValue(multiID, out var mcl);
+
+			return mcl ?? MultiComponentList.Empty;
 		}
 	}
 
 	public struct MultiTileEntry
 	{
-		public ushort m_ItemID;
-		public short m_OffsetX, m_OffsetY, m_OffsetZ;
-		public TileFlag m_Flags;
+		public ushort ItemID;
+		public short OffsetX, OffsetY, OffsetZ;
+		public TileFlag Flags;
+
+		public readonly int Height => TileData.ItemTable[ItemID & TileData.MaxItemValue].Height;
 
 		public MultiTileEntry(ushort itemID, short xOffset, short yOffset, short zOffset, TileFlag flags)
 		{
-			m_ItemID = itemID;
-			m_OffsetX = xOffset;
-			m_OffsetY = yOffset;
-			m_OffsetZ = zOffset;
-			m_Flags = flags;
+			ItemID = itemID;
+			OffsetX = xOffset;
+			OffsetY = yOffset;
+			OffsetZ = zOffset;
+			Flags = flags;
+		}
+
+		internal MultiTileEntry(BinaryReader reader)
+		{
+			ItemID = reader.ReadUInt16();
+			OffsetX = reader.ReadInt16();
+			OffsetY = reader.ReadInt16();
+			OffsetZ = reader.ReadInt16();
+
+			if (MultiData.PostHSFormat)
+			{
+				Flags = (TileFlag)reader.ReadUInt64();
+			}
+			else
+			{
+				Flags = (TileFlag)reader.ReadUInt32();
+			}
+		}
+
+		public readonly void Serialize(GenericWriter writer)
+		{
+			writer.Write(0);
+
+			writer.Write(ItemID);
+			writer.Write(OffsetX);
+			writer.Write(OffsetY);
+			writer.Write(OffsetZ);
+			writer.Write(Flags);
+		}
+
+		public void Deserialize(GenericReader reader)
+		{
+			_ = reader.ReadInt();
+
+			ItemID = reader.ReadUShort();
+			OffsetX = reader.ReadShort();
+			OffsetY = reader.ReadShort();
+			OffsetZ = reader.ReadShort();
+			Flags = reader.ReadEnum<TileFlag>();
+		}
+
+		public override readonly string ToString()
+		{
+			return $"({ItemID}, {OffsetX}, {OffsetY}, {OffsetZ}, 0x{(ulong)Flags:X8})";
 		}
 	}
 
 	public sealed class MultiComponentList
 	{
-		public static bool PostHSFormat { get; set; }
+		public static readonly MultiComponentList Empty = new();
 
-		private Point2D m_Min, m_Max, m_Center;
-		private MultiTileEntry[] m_List;
+		public static bool PostHSFormat => MultiData.PostHSFormat;
 
-		public static readonly MultiComponentList Empty = new MultiComponentList();
+		private Point3D m_Min, m_Max, m_Center;
 
-		public Point2D Min => m_Min;
-		public Point2D Max => m_Max;
+		public Point3D Min => m_Min;
+		public Point3D Max => m_Max;
 
-		public Point2D Center => m_Center;
+		public Point3D Center => m_Center;
 
-		public int Width { get; private set; }
-		public int Height { get; private set; }
+		public int Width => m_Max.m_X - m_Min.m_X + 1;
+		public int Height => m_Max.m_Y - m_Min.m_Y + 1;
+		public int Depth => m_Max.m_Z - m_Min.m_Z + 1;
 
 		public StaticTile[][][] Tiles { get; private set; }
-		public MultiTileEntry[] List => m_List;
+		public MultiTileEntry[] List { get; private set; }
 
-		public void Add(int itemID, int x, int y, int z)
+		private MultiComponentList()
 		{
-			itemID &= TileData.MaxItemValue;
-			itemID |= 0x10000;
-
-			var vx = x + m_Center.m_X;
-			var vy = y + m_Center.m_Y;
-
-			if (vx >= 0 && vx < Width && vy >= 0 && vy < Height)
+			List = new[]
 			{
-				var oldTiles = Tiles[vx][vy];
+				new MultiTileEntry(0, 0, 0, 0, TileFlag.Background)
+			};
 
-				for (var i = oldTiles.Length - 1; i >= 0; --i)
+			InvalidateTiles(false);
+		}
+
+		public MultiComponentList(IEnumerable<MultiTileEntry> list)
+		{
+			List = list?.ToArray();
+
+			if (List?.Length > 0)
+			{
+				InvalidateTiles(true);
+			}
+			else
+			{
+				List = new[]
 				{
-					var data = TileData.ItemTable[itemID & TileData.MaxItemValue];
+					new MultiTileEntry(0, 0, 0, 0, 0)
+				};
 
-					if (oldTiles[i].Z == z && (oldTiles[i].Height > 0 == data.Height > 0))
-					{
-						var newIsRoof = (data.Flags & TileFlag.Roof) != 0;
-						var oldIsRoof = (TileData.ItemTable[oldTiles[i].ID & TileData.MaxItemValue].Flags & TileFlag.Roof) != 0;
-
-						if (newIsRoof == oldIsRoof)
-						{
-							Remove(oldTiles[i].ID, x, y, z);
-						}
-					}
-				}
-
-				oldTiles = Tiles[vx][vy];
-
-				var newTiles = new StaticTile[oldTiles.Length + 1];
-
-				for (var i = 0; i < oldTiles.Length; ++i)
-				{
-					newTiles[i] = oldTiles[i];
-				}
-
-				newTiles[oldTiles.Length] = new StaticTile((ushort)itemID, (sbyte)z);
-
-				Tiles[vx][vy] = newTiles;
-
-				var oldList = m_List;
-				var newList = new MultiTileEntry[oldList.Length + 1];
-
-				for (var i = 0; i < oldList.Length; ++i)
-				{
-					newList[i] = oldList[i];
-				}
-
-				newList[oldList.Length] = new MultiTileEntry((ushort)itemID, (short)x, (short)y, (short)z, TileFlag.Background);
-
-				m_List = newList;
-
-				if (x < m_Min.m_X)
-				{
-					m_Min.m_X = x;
-				}
-
-				if (y < m_Min.m_Y)
-				{
-					m_Min.m_Y = y;
-				}
-
-				if (x > m_Max.m_X)
-				{
-					m_Max.m_X = x;
-				}
-
-				if (y > m_Max.m_Y)
-				{
-					m_Max.m_Y = y;
-				}
+				InvalidateTiles(false);
 			}
 		}
 
-		public void RemoveXYZH(int x, int y, int z, int minHeight)
+		public MultiComponentList(MultiComponentList toCopy)
+			: this(toCopy?.List)
 		{
-			var vx = x + m_Center.m_X;
-			var vy = y + m_Center.m_Y;
-
-			if (vx >= 0 && vx < Width && vy >= 0 && vy < Height)
-			{
-				var oldTiles = Tiles[vx][vy];
-
-				for (var i = 0; i < oldTiles.Length; ++i)
-				{
-					var tile = oldTiles[i];
-
-					if (tile.Z == z && tile.Height >= minHeight)
-					{
-						var newTiles = new StaticTile[oldTiles.Length - 1];
-
-						for (var j = 0; j < i; ++j)
-						{
-							newTiles[j] = oldTiles[j];
-						}
-
-						for (var j = i + 1; j < oldTiles.Length; ++j)
-						{
-							newTiles[j - 1] = oldTiles[j];
-						}
-
-						Tiles[vx][vy] = newTiles;
-
-						break;
-					}
-				}
-
-				var oldList = m_List;
-
-				for (var i = 0; i < oldList.Length; ++i)
-				{
-					var tile = oldList[i];
-
-					if (tile.m_OffsetX == (short)x && tile.m_OffsetY == (short)y && tile.m_OffsetZ == (short)z &&
-						TileData.ItemTable[tile.m_ItemID & TileData.MaxItemValue].Height >= minHeight)
-					{
-						var newList = new MultiTileEntry[oldList.Length - 1];
-
-						for (var j = 0; j < i; ++j)
-						{
-							newList[j] = oldList[j];
-						}
-
-						for (var j = i + 1; j < oldList.Length; ++j)
-						{
-							newList[j - 1] = oldList[j];
-						}
-
-						m_List = newList;
-
-						break;
-					}
-				}
-			}
 		}
 
-		public void Remove(int itemID, int x, int y, int z)
+		public MultiComponentList(GenericReader reader)
 		{
-			var vx = x + m_Center.m_X;
-			var vy = y + m_Center.m_Y;
+			Deserialize(reader);
+		}
 
-			if (vx >= 0 && vx < Width && vy >= 0 && vy < Height)
+		private void ResolveDimensions(int x, int y, int z, int h)
+		{
+			m_Min.m_X = Math.Min(m_Min.m_X, x);
+			m_Min.m_Y = Math.Min(m_Min.m_Y, y);
+			m_Min.m_Z = Math.Min(m_Min.m_Z, z);
+
+			m_Max.m_X = Math.Max(m_Max.m_X, x);
+			m_Max.m_Y = Math.Max(m_Max.m_Y, y);
+			m_Max.m_Z = Math.Max(m_Max.m_Z, z + h);
+		}
+
+		private void ResolveDimensions(MultiTileEntry e)
+		{
+			ResolveDimensions(e.OffsetX, e.OffsetY, e.OffsetZ, e.Height);
+		}
+
+		private void InvalidateDimensions()
+		{
+			m_Min = m_Max = m_Center = Point3D.Zero;
+
+			foreach (var e in List)
 			{
-				var oldTiles = Tiles[vx][vy];
+				ResolveDimensions(e);
+			}
 
-				for (var i = 0; i < oldTiles.Length; ++i)
+			m_Center.m_X = -m_Min.m_X;// + ((Width - 1) / 2);
+			m_Center.m_Y = -m_Min.m_Y;// + ((Height - 1) / 2);
+			m_Center.m_Z = -m_Min.m_Z;// + ((Depth - 1) / 2);
+		}
+
+		private void InvalidateTiles(bool resize)
+		{
+			if (resize)
+			{
+				InvalidateDimensions();
+			}
+
+			var width = Width;
+			var height = Height;
+
+			var tiles = new TileList[width][];
+
+			Tiles = new StaticTile[width][][];
+
+			for (var x = 0; x < width; x++)
+			{
+				tiles[x] = new TileList[height];
+				Tiles[x] = new StaticTile[height][];
+
+				for (var y = 0; y < height; y++)
 				{
-					var tile = oldTiles[i];
-
-					if (tile.ID == itemID && tile.Z == z)
-					{
-						var newTiles = new StaticTile[oldTiles.Length - 1];
-
-						for (var j = 0; j < i; ++j)
-						{
-							newTiles[j] = oldTiles[j];
-						}
-
-						for (var j = i + 1; j < oldTiles.Length; ++j)
-						{
-							newTiles[j - 1] = oldTiles[j];
-						}
-
-						Tiles[vx][vy] = newTiles;
-
-						break;
-					}
+					tiles[x][y] = new TileList();
 				}
+			}
 
-				var oldList = m_List;
+			var i = -1;
 
-				for (var i = 0; i < oldList.Length; ++i)
+			while (++i < List.Length)
+			{
+				var e = List[i];
+
+				if (e.Flags != 0)
 				{
-					var tile = oldList[i];
+					var xOffset = e.OffsetX + m_Center.m_X;
+					var yOffset = e.OffsetY + m_Center.m_Y;
+					var zOffset = e.OffsetZ + m_Center.m_Z;
 
-					if (tile.m_ItemID == itemID && tile.m_OffsetX == (short)x && tile.m_OffsetY == (short)y &&
-						tile.m_OffsetZ == (short)z)
-					{
-						var newList = new MultiTileEntry[oldList.Length - 1];
+					tiles[xOffset][yOffset].Add(e.ItemID, (byte)xOffset, (byte)yOffset, (sbyte)zOffset);
+				}
+			}
 
-						for (var j = 0; j < i; ++j)
-						{
-							newList[j] = oldList[j];
-						}
-
-						for (var j = i + 1; j < oldList.Length; ++j)
-						{
-							newList[j - 1] = oldList[j];
-						}
-
-						m_List = newList;
-
-						break;
-					}
+			for (var x = 0; x < width; x++)
+			{
+				for (var y = 0; y < height; y++)
+				{
+					Tiles[x][y] = tiles[x][y].ToArray();
 				}
 			}
 		}
@@ -527,537 +515,177 @@ namespace Server
 			int oldWidth = Width, oldHeight = Height;
 			var oldTiles = Tiles;
 
-			var totalLength = 0;
-
-			var newTiles = new StaticTile[newWidth][][];
-
-			for (var x = 0; x < newWidth; ++x)
+			if (newWidth < oldWidth || newHeight < oldHeight)
 			{
-				newTiles[x] = new StaticTile[newHeight][];
+				List = List.Where(e => e.OffsetX + m_Center.X < newWidth && e.OffsetY + m_Center.Y < newHeight).ToArray();
 
-				for (var y = 0; y < newHeight; ++y)
-				{
-					if (x < oldWidth && y < oldHeight)
-					{
-						newTiles[x][y] = oldTiles[x][y];
-					}
-					else
-					{
-						newTiles[x][y] = new StaticTile[0];
-					}
-
-					totalLength += newTiles[x][y].Length;
-				}
+				InvalidateTiles(true);
 			}
-
-			Tiles = newTiles;
-			m_List = new MultiTileEntry[totalLength];
-			Width = newWidth;
-			Height = newHeight;
-
-			m_Min = Point2D.Zero;
-			m_Max = Point2D.Zero;
-
-			var index = 0;
-
-			for (var x = 0; x < newWidth; ++x)
+			else if (newWidth > oldWidth || newHeight > oldHeight)
 			{
-				for (var y = 0; y < newHeight; ++y)
-				{
-					var tiles = newTiles[x][y];
+				m_Max.X += newWidth - oldWidth;
+				m_Max.Y += newHeight - oldHeight;
 
-					foreach (var tile in tiles)
-					{
-						var vx = x - m_Center.X;
-						var vy = y - m_Center.Y;
-
-						if (vx < m_Min.m_X)
-						{
-							m_Min.m_X = vx;
-						}
-
-						if (vy < m_Min.m_Y)
-						{
-							m_Min.m_Y = vy;
-						}
-
-						if (vx > m_Max.m_X)
-						{
-							m_Max.m_X = vx;
-						}
-
-						if (vy > m_Max.m_Y)
-						{
-							m_Max.m_Y = vy;
-						}
-
-						m_List[index++] = new MultiTileEntry((ushort)tile.ID, (short)vx, (short)vy, (short)tile.Z, TileFlag.Background);
-					}
-				}
+				InvalidateTiles(false);
 			}
 		}
 
-		public MultiComponentList(MultiComponentList toCopy)
+		public void Add(int itemID, int x, int y, int z)
 		{
-			m_Min = toCopy.m_Min;
-			m_Max = toCopy.m_Max;
+			itemID &= TileData.MaxItemValue;
 
-			m_Center = toCopy.m_Center;
+			var vx = x + m_Center.m_X;
+			var vy = y + m_Center.m_Y;
 
-			Width = toCopy.Width;
-			Height = toCopy.Height;
-
-			Tiles = new StaticTile[Width][][];
-
-			for (var x = 0; x < Width; ++x)
+			if (vx < 0 || vx >= Width || vy < 0 || vy >= Height)
 			{
-				Tiles[x] = new StaticTile[Height][];
+				return;
+			}
 
-				for (var y = 0; y < Height; ++y)
+			var data = TileData.ItemTable[itemID];
+
+			var oldTiles = Tiles[vx][vy];
+
+			for (var i = oldTiles.Length - 1; i >= 0; i--)
+			{
+				var tile = oldTiles[i];
+
+				if (tile.Z == z && (tile.Height > 0) == (data.Height > 0))
 				{
-					Tiles[x][y] = new StaticTile[toCopy.Tiles[x][y].Length];
-
-					for (var i = 0; i < Tiles[x][y].Length; ++i)
+					if (data.Flags.HasFlag(TileFlag.Roof) == tile.Flags.HasFlag(TileFlag.Roof))
 					{
-						Tiles[x][y][i] = toCopy.Tiles[x][y][i];
+						Remove(tile.ID, x, y, z, false);
 					}
 				}
 			}
 
-			m_List = new MultiTileEntry[toCopy.m_List.Length];
+			var list = List;
 
-			for (var i = 0; i < m_List.Length; ++i)
+			Array.Resize(ref list, list.Length + 1);
+
+			list[list.Length - 1] = new MultiTileEntry((ushort)itemID, (short)x, (short)y, (short)z, TileFlag.Background);
+
+			List = list;
+
+			InvalidateTiles(false);
+		}
+
+		public void RemoveXYZH(int x, int y, int z, int minHeight)
+		{
+			RemoveXYZH(x, y, z, minHeight, false);
+		}
+
+		public void RemoveXYZH(int x, int y, int z, int minHeight, bool resize)
+		{
+			var update = false;
+			var oldList = List;
+
+			for (var i = 0; i < oldList.Length; ++i)
 			{
-				m_List[i] = toCopy.m_List[i];
+				var tile = oldList[i];
+
+				if (tile.OffsetX == x && tile.OffsetY == y && tile.OffsetZ == z && tile.Height >= minHeight)
+				{
+					var newList = new MultiTileEntry[oldList.Length - 1];
+
+					for (var j = 0; j < i; ++j)
+					{
+						newList[j] = oldList[j];
+					}
+
+					for (var j = i + 1; j < oldList.Length; ++j)
+					{
+						newList[j - 1] = oldList[j];
+					}
+
+					List = newList;
+					update = true;
+
+					break;
+				}
+			}
+
+			if (update)
+			{
+				InvalidateTiles(resize);
+			}
+		}
+
+		public void Remove(int itemID, int x, int y, int z) 
+		{
+			Remove(itemID, x, y, z, false);
+		}
+
+		public void Remove(int itemID, int x, int y, int z, bool resize)
+		{
+			var update = false;
+			var oldList = List;
+
+			for (var i = 0; i < oldList.Length; i++)
+			{
+				var tile = oldList[i];
+
+				if (tile.ItemID == itemID && tile.OffsetX == x && tile.OffsetY == y && tile.OffsetZ == z)
+				{
+					var newList = new MultiTileEntry[oldList.Length - 1];
+
+					for (var j = 0; j < i; j++)
+					{
+						newList[j] = oldList[j];
+					}
+
+					for (var j = i + 1; j < oldList.Length; j++)
+					{
+						newList[j - 1] = oldList[j];
+					}
+
+					List = newList;
+					update = true;
+
+					break;
+				}
+			}
+
+			if (update)
+			{
+				InvalidateTiles(resize);
 			}
 		}
 
 		public void Serialize(GenericWriter writer)
 		{
-			writer.Write(2); // version;
+			writer.Write(0); // version
 
 			writer.Write(m_Min);
 			writer.Write(m_Max);
 			writer.Write(m_Center);
 
-			writer.Write(Width);
-			writer.Write(Height);
+			writer.Write(List.Length);
 
-			writer.Write(m_List.Length);
-
-			foreach (var ent in m_List)
+			for (var i = 0; i < List.Length; i++)
 			{
-				writer.Write(ent.m_ItemID);
-				writer.Write(ent.m_OffsetX);
-				writer.Write(ent.m_OffsetY);
-				writer.Write(ent.m_OffsetZ);
-
-				writer.Write((ulong)ent.m_Flags);
+				List[i].Serialize(writer);
 			}
 		}
 
-		public MultiComponentList(GenericReader reader)
+		public void Deserialize(GenericReader reader)
 		{
-			var version = reader.ReadInt();
+			_ = reader.ReadInt(); // version
 
-			m_Min = reader.ReadPoint2D();
-			m_Max = reader.ReadPoint2D();
-			m_Center = reader.ReadPoint2D();
-			Width = reader.ReadInt();
-			Height = reader.ReadInt();
+			m_Min = reader.ReadPoint3D();
+			m_Max = reader.ReadPoint3D();
+			m_Center = reader.ReadPoint3D();
 
 			var length = reader.ReadInt();
 
-			var allTiles = m_List = new MultiTileEntry[length];
+			List = new MultiTileEntry[length];
 
-			if (version == 0)
+			for (var i = 0; i < length; i++)
 			{
-				for (var i = 0; i < length; ++i)
-				{
-					int id = reader.ReadShort();
-
-					if (id >= 0x4000)
-					{
-						id -= 0x4000;
-					}
-
-					allTiles[i].m_ItemID = (ushort)id;
-					allTiles[i].m_OffsetX = reader.ReadShort();
-					allTiles[i].m_OffsetY = reader.ReadShort();
-					allTiles[i].m_OffsetZ = reader.ReadShort();
-
-					allTiles[i].m_Flags = (TileFlag)reader.ReadUInt();
-				}
-			}
-			else
-			{
-				for (var i = 0; i < length; ++i)
-				{
-					allTiles[i].m_ItemID = reader.ReadUShort();
-					allTiles[i].m_OffsetX = reader.ReadShort();
-					allTiles[i].m_OffsetY = reader.ReadShort();
-					allTiles[i].m_OffsetZ = reader.ReadShort();
-
-					if (version > 1)
-					{
-						allTiles[i].m_Flags = (TileFlag)reader.ReadULong();
-					}
-					else
-					{
-						allTiles[i].m_Flags = (TileFlag)reader.ReadUInt();
-					}
-				}
+				List[i].Deserialize(reader);
 			}
 
-			var tiles = new TileList[Width][];
-
-			Tiles = new StaticTile[Width][][];
-
-			for (var x = 0; x < Width; ++x)
-			{
-				tiles[x] = new TileList[Height];
-				Tiles[x] = new StaticTile[Height][];
-
-				for (var y = 0; y < Height; ++y)
-				{
-					tiles[x][y] = new TileList();
-				}
-			}
-
-			for (var i = 0; i < allTiles.Length; ++i)
-			{
-				if (i == 0 || allTiles[i].m_Flags != 0)
-				{
-					var xOffset = allTiles[i].m_OffsetX + m_Center.m_X;
-					var yOffset = allTiles[i].m_OffsetY + m_Center.m_Y;
-					var zOffset = allTiles[i].m_OffsetZ;
-					var itemID = (allTiles[i].m_ItemID & TileData.MaxItemValue) | 0x10000;
-
-					tiles[xOffset][yOffset].Add((ushort)itemID, (byte)xOffset, (byte)yOffset, (sbyte)zOffset);
-				}
-			}
-
-			for (var x = 0; x < Width; ++x)
-			{
-				for (var y = 0; y < Height; ++y)
-				{
-					Tiles[x][y] = tiles[x][y].ToArray();
-				}
-			}
-		}
-
-		public MultiComponentList(BinaryReader reader, int count)
-		{
-			var allTiles = m_List = new MultiTileEntry[count];
-
-			for (var i = 0; i < count; ++i)
-			{
-				allTiles[i].m_ItemID = reader.ReadUInt16();
-				allTiles[i].m_OffsetX = reader.ReadInt16();
-				allTiles[i].m_OffsetY = reader.ReadInt16();
-				allTiles[i].m_OffsetZ = reader.ReadInt16();
-
-				if (PostHSFormat)
-				{
-					allTiles[i].m_Flags = (TileFlag)reader.ReadUInt64();
-				}
-				else
-				{
-					allTiles[i].m_Flags = (TileFlag)reader.ReadUInt32();
-				}
-
-				var e = allTiles[i];
-
-				if (i == 0 || e.m_Flags != 0)
-				{
-					if (e.m_OffsetX < m_Min.m_X)
-					{
-						m_Min.m_X = e.m_OffsetX;
-					}
-
-					if (e.m_OffsetY < m_Min.m_Y)
-					{
-						m_Min.m_Y = e.m_OffsetY;
-					}
-
-					if (e.m_OffsetX > m_Max.m_X)
-					{
-						m_Max.m_X = e.m_OffsetX;
-					}
-
-					if (e.m_OffsetY > m_Max.m_Y)
-					{
-						m_Max.m_Y = e.m_OffsetY;
-					}
-				}
-			}
-
-			m_Center = new Point2D(-m_Min.m_X, -m_Min.m_Y);
-			Width = m_Max.m_X - m_Min.m_X + 1;
-			Height = m_Max.m_Y - m_Min.m_Y + 1;
-
-			var tiles = new TileList[Width][];
-
-			Tiles = new StaticTile[Width][][];
-
-			for (var x = 0; x < Width; ++x)
-			{
-				tiles[x] = new TileList[Height];
-				Tiles[x] = new StaticTile[Height][];
-
-				for (var y = 0; y < Height; ++y)
-				{
-					tiles[x][y] = new TileList();
-				}
-			}
-
-			for (var i = 0; i < allTiles.Length; ++i)
-			{
-				if (i == 0 || allTiles[i].m_Flags != 0)
-				{
-					var xOffset = allTiles[i].m_OffsetX + m_Center.m_X;
-					var yOffset = allTiles[i].m_OffsetY + m_Center.m_Y;
-					var zOffset = allTiles[i].m_OffsetZ;
-					var itemID = (allTiles[i].m_ItemID & TileData.MaxItemValue) | 0x10000;
-
-					tiles[xOffset][yOffset].Add((ushort)itemID, (byte)xOffset, (byte)yOffset, (sbyte)zOffset);
-				}
-			}
-
-			for (var x = 0; x < Width; ++x)
-			{
-				for (var y = 0; y < Height; ++y)
-				{
-					Tiles[x][y] = tiles[x][y].ToArray();
-				}
-			}
-		}
-
-		public MultiComponentList(List<MultiTileEntry> list)
-		{
-			var allTiles = m_List = new MultiTileEntry[list.Count];
-
-			for (var i = 0; i < list.Count; ++i)
-			{
-				allTiles[i].m_ItemID = list[i].m_ItemID;
-				allTiles[i].m_OffsetX = list[i].m_OffsetX;
-				allTiles[i].m_OffsetY = list[i].m_OffsetY;
-				allTiles[i].m_OffsetZ = list[i].m_OffsetZ;
-
-				allTiles[i].m_Flags = list[i].m_Flags;
-
-				var e = allTiles[i];
-
-				if (i == 0 || e.m_Flags != 0)
-				{
-					if (e.m_OffsetX < m_Min.m_X)
-					{
-						m_Min.m_X = e.m_OffsetX;
-					}
-
-					if (e.m_OffsetY < m_Min.m_Y)
-					{
-						m_Min.m_Y = e.m_OffsetY;
-					}
-
-					if (e.m_OffsetX > m_Max.m_X)
-					{
-						m_Max.m_X = e.m_OffsetX;
-					}
-
-					if (e.m_OffsetY > m_Max.m_Y)
-					{
-						m_Max.m_Y = e.m_OffsetY;
-					}
-				}
-			}
-
-			m_Center = new Point2D(-m_Min.m_X, -m_Min.m_Y);
-			Width = m_Max.m_X - m_Min.m_X + 1;
-			Height = m_Max.m_Y - m_Min.m_Y + 1;
-
-			var tiles = new TileList[Width][];
-
-			Tiles = new StaticTile[Width][][];
-
-			for (var x = 0; x < Width; ++x)
-			{
-				tiles[x] = new TileList[Height];
-				Tiles[x] = new StaticTile[Height][];
-
-				for (var y = 0; y < Height; ++y)
-				{
-					tiles[x][y] = new TileList();
-				}
-			}
-
-			for (var i = 0; i < allTiles.Length; ++i)
-			{
-				if (i == 0 || allTiles[i].m_Flags != 0)
-				{
-					var xOffset = allTiles[i].m_OffsetX + m_Center.m_X;
-					var yOffset = allTiles[i].m_OffsetY + m_Center.m_Y;
-					var zOffset = allTiles[i].m_OffsetZ;
-					var itemID = (allTiles[i].m_ItemID & TileData.MaxItemValue) | 0x10000;
-
-					tiles[xOffset][yOffset].Add((ushort)itemID, (byte)xOffset, (byte)yOffset, (sbyte)zOffset);
-				}
-			}
-
-			for (var x = 0; x < Width; ++x)
-			{
-				for (var y = 0; y < Height; ++y)
-				{
-					Tiles[x][y] = tiles[x][y].ToArray();
-				}
-			}
-		}
-
-		private MultiComponentList()
-		{
-			Tiles = new StaticTile[0][][];
-			m_List = new MultiTileEntry[0];
-		}
-	}
-
-	public class UOPHash
-	{
-		public static void BuildChunkIDs(ref Dictionary<ulong, int> chunkIds, ref Dictionary<ulong, int> chunkIds2)
-		{
-
-			var formats = GetHashFormat(0, out var maxId);
-
-			for (var i = 0; i < maxId; ++i)
-			{
-				chunkIds[HashLittle2(String.Format(formats[0], i))] = i;
-			}
-
-			if (formats[1] != "")
-			{
-				for (var i = 0; i < maxId; ++i)
-				{
-					chunkIds2[HashLittle2(String.Format(formats[1], i))] = i;
-				}
-			}
-		}
-
-		private static string[] GetHashFormat(int typeIndex, out int maxId)
-		{
-			/*
-			 * MaxID is only used for constructing a lookup table.
-			 * Decrease to save some possibly unneeded computation.
-			 */
-			maxId = 0x10000;
-
-			return new string[] { "build/multicollection/{0:000000}.bin", "" };
-		}
-
-		public static ulong HashLittle2(string s)
-		{
-			var length = s.Length;
-
-			uint a, b, c;
-			a = b = c = 0xDEADBEEF + (uint)length;
-
-			var k = 0;
-
-			while (length > 12)
-			{
-				a += s[k];
-				a += ((uint)s[k + 1]) << 8;
-				a += ((uint)s[k + 2]) << 16;
-				a += ((uint)s[k + 3]) << 24;
-				b += s[k + 4];
-				b += ((uint)s[k + 5]) << 8;
-				b += ((uint)s[k + 6]) << 16;
-				b += ((uint)s[k + 7]) << 24;
-				c += s[k + 8];
-				c += ((uint)s[k + 9]) << 8;
-				c += ((uint)s[k + 10]) << 16;
-				c += ((uint)s[k + 11]) << 24;
-
-				a -= c;
-				a ^= (c << 4) | (c >> 28);
-				c += b;
-				b -= a;
-				b ^= (a << 6) | (a >> 26);
-				a += c;
-				c -= b;
-				c ^= (b << 8) | (b >> 24);
-				b += a;
-				a -= c;
-				a ^= (c << 16) | (c >> 16);
-				c += b;
-				b -= a;
-				b ^= (a << 19) | (a >> 13);
-				a += c;
-				c -= b;
-				c ^= (b << 4) | (b >> 28);
-				b += a;
-
-				length -= 12;
-				k += 12;
-			}
-
-			if (length != 0)
-			{
-				switch (length)
-				{
-					case 12:
-						c += ((uint)s[k + 11]) << 24;
-						goto case 11;
-					case 11:
-						c += ((uint)s[k + 10]) << 16;
-						goto case 10;
-					case 10:
-						c += ((uint)s[k + 9]) << 8;
-						goto case 9;
-					case 9:
-						c += s[k + 8];
-						goto case 8;
-					case 8:
-						b += ((uint)s[k + 7]) << 24;
-						goto case 7;
-					case 7:
-						b += ((uint)s[k + 6]) << 16;
-						goto case 6;
-					case 6:
-						b += ((uint)s[k + 5]) << 8;
-						goto case 5;
-					case 5:
-						b += s[k + 4];
-						goto case 4;
-					case 4:
-						a += ((uint)s[k + 3]) << 24;
-						goto case 3;
-					case 3:
-						a += ((uint)s[k + 2]) << 16;
-						goto case 2;
-					case 2:
-						a += ((uint)s[k + 1]) << 8;
-						goto case 1;
-					case 1:
-						a += s[k];
-						break;
-				}
-
-				c ^= b;
-				c -= (b << 14) | (b >> 18);
-				a ^= c;
-				a -= (c << 11) | (c >> 21);
-				b ^= a;
-				b -= (a << 25) | (a >> 7);
-				c ^= b;
-				c -= (b << 16) | (b >> 16);
-				a ^= c;
-				a -= (c << 4) | (c >> 28);
-				b ^= a;
-				b -= (a << 14) | (a >> 18);
-				c ^= b;
-				c -= (b << 24) | (b >> 8);
-			}
-
-			return ((ulong)b << 32) | c;
+			InvalidateTiles(false);
 		}
 	}
 }

@@ -18,6 +18,7 @@ using Server.Targeting;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Text;
 
 namespace Server.Engines.ConPVP
@@ -4420,9 +4421,9 @@ namespace Server.Engines.ConPVP
 
 				GumpWidth = 300;
 				GumpHeight = 150;
-				MessageColor = 0xFFC000;
+				MessageColor = Color.White;
 				MessageString = "Are you sure you wish to spectate this duel?";
-				TitleColor = 0x7800;
+				TitleColor = Color.OrangeRed;
 				TitleNumber = 1062051; // Gate Warning
 
 				_ = Timer.DelayCall(TimeSpan.FromSeconds(10.0), Delete);

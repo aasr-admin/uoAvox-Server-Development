@@ -105,18 +105,17 @@ namespace Server.Items
 			}
 		}
 
-		public override int OnCraft(int quality, bool makersMark, Mobile from, CraftSystem craftSystem, Type typeRes, BaseTool tool, CraftItem craftItem, int resHue)
+		public override int OnCraft(int quality, bool makersMark, Mobile from, ICraftSystem craftSystem, Type typeRes, ICraftTool tool, ICraftItem craftItem, int resHue)
 		{
-			Quality = (ClothingQuality)quality;
+			Quality = (ItemQuality)quality;
 
-			if (Quality == ClothingQuality.Exceptional)
+			if (Quality == ItemQuality.Exceptional)
 			{
-				DistributeBonuses((tool is BaseRunicTool ? 6 : (Core.SE ? 15 : 14)));   //BLAME OSI. (We can't confirm it's an OSI bug yet.)
+				DistributeBonuses(tool is BaseRunicTool ? 6 : (Core.SE ? 15 : 14));   //BLAME OSI. (We can't confirm it's an OSI bug yet.)
 			}
 
 			return base.OnCraft(quality, makersMark, from, craftSystem, typeRes, tool, craftItem, resHue);
 		}
-
 	}
 
 	/// BaseOuterTorso

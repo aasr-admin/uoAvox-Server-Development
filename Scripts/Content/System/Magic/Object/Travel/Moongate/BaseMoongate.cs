@@ -5,6 +5,7 @@ using Server.Regions;
 using Server.Spells;
 
 using System;
+using System.Drawing;
 
 namespace Server.Items
 {
@@ -250,9 +251,9 @@ namespace Server.Items
 				return false;
 			}
 
-			var reg = (GuardedRegion)Region.Find(p, map).GetRegion(typeof(GuardedRegion));
+			var reg = Region.Find(p, map).GetRegion<GuardedRegion>();
 
-			return (reg != null && !reg.IsDisabled());
+			return reg != null && !reg.Disabled;
 		}
 
 		private class DelayTimer : Timer
@@ -280,8 +281,8 @@ namespace Server.Items
 		private int m_GumpWidth;
 		private int m_GumpHeight;
 
-		private int m_TitleColor;
-		private int m_MessageColor;
+		private Color m_TitleColor;
+		private Color m_MessageColor;
 
 		private int m_TitleNumber;
 		private int m_MessageNumber;
@@ -303,14 +304,14 @@ namespace Server.Items
 		}
 
 		[CommandProperty(AccessLevel.GameMaster)]
-		public int TitleColor
+		public Color TitleColor
 		{
 			get => m_TitleColor;
 			set => m_TitleColor = value;
 		}
 
 		[CommandProperty(AccessLevel.GameMaster)]
-		public int MessageColor
+		public Color MessageColor
 		{
 			get => m_MessageColor;
 			set => m_MessageColor = value;
@@ -364,7 +365,11 @@ namespace Server.Items
 			if (m_GumpWidth > 0 && m_GumpHeight > 0 && m_TitleNumber > 0 && (m_MessageNumber > 0 || m_MessageString != null))
 			{
 				from.CloseGump(typeof(WarningGump));
-				from.SendGump(new WarningGump(m_TitleNumber, m_TitleColor, m_MessageString == null ? m_MessageNumber : m_MessageString, m_MessageColor, m_GumpWidth, m_GumpHeight, new WarningGumpCallback(Warning_Callback), from));
+
+				Utility.ConvertColor(m_TitleColor, out short title16);
+				Utility.ConvertColor(m_MessageColor, out int message32);
+
+				from.SendGump(new WarningGump(m_TitleNumber, title16, m_MessageString == null ? m_MessageNumber : m_MessageString, message32, m_GumpWidth, m_GumpHeight, new WarningGumpCallback(Warning_Callback), from));
 			}
 			else
 			{
@@ -381,8 +386,8 @@ namespace Server.Items
 			writer.WriteEncodedInt(m_GumpWidth);
 			writer.WriteEncodedInt(m_GumpHeight);
 
-			writer.WriteEncodedInt(m_TitleColor);
-			writer.WriteEncodedInt(m_MessageColor);
+			writer.WriteEncodedInt(m_TitleColor.ToArgb());
+			writer.WriteEncodedInt(m_MessageColor.ToArgb());
 
 			writer.WriteEncodedInt(m_TitleNumber);
 			writer.WriteEncodedInt(m_MessageNumber);
@@ -403,8 +408,8 @@ namespace Server.Items
 						m_GumpWidth = reader.ReadEncodedInt();
 						m_GumpHeight = reader.ReadEncodedInt();
 
-						m_TitleColor = reader.ReadEncodedInt();
-						m_MessageColor = reader.ReadEncodedInt();
+						m_TitleColor = Color.FromArgb(reader.ReadEncodedInt());
+						m_MessageColor = Color.FromArgb(reader.ReadEncodedInt());
 
 						m_TitleNumber = reader.ReadEncodedInt();
 						m_MessageNumber = reader.ReadEncodedInt();

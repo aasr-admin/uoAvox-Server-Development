@@ -16,7 +16,7 @@
 
 	<!-- Exe Specific -->
 	<PropertyGroup>
-		<OutputPath>../.</OutputPath>
+		<OutputPath>..\</OutputPath>
 		<StartupObject>Server.uoAvos</StartupObject>
 		<ApplicationIcon>uoAvos.ico</ApplicationIcon>
 		<NoWin32Manifest>true</NoWin32Manifest>

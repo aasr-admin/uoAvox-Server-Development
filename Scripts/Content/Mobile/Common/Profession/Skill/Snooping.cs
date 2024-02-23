@@ -29,9 +29,9 @@ namespace Server.SkillHandlers
 				return true; // felucca you can snoop anybody
 			}
 
-			var reg = (GuardedRegion)to.Region.GetRegion(typeof(GuardedRegion));
+			var reg = to.Region.GetRegion<GuardedRegion>();
 
-			if (reg == null || reg.IsDisabled())
+			if (reg == null || reg.Disabled)
 			{
 				return true; // not in town? we can snoop any npc
 			}

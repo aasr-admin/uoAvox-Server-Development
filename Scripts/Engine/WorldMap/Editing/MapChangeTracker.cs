@@ -1,30 +1,27 @@
-﻿using Server;
-using Server.Engines.Facet;
-using Server.Misc;
+﻿using Server.Engines.Facet;
 
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Net;
 
 namespace Server.Engine.Facet
 {
 	#region Developer Notations
 
-    /// Map Change Format
-    /// -----------------------
-    /// 2 bytes      Map Index
-    /// 2 bytes      X block number
-    /// 2 bytes      Y block number
-    /// 192 bytes    landblocks[land block count] 
-    /// 
-    /// Statics Change Format 
-    /// 2 bytes      Map Index
-    /// 4 bytes      X block number
-    /// 4 bytes      Y block number
-    /// 4 bytes      Number of statics
-    /// 7 bytes      Static[Number of statics]
+	/// Map Change Format
+	/// -----------------------
+	/// 2 bytes      Map Index
+	/// 2 bytes      X block number
+	/// 2 bytes      Y block number
+	/// 192 bytes    landblocks[land block count] 
+	/// 
+	/// Statics Change Format 
+	/// 2 bytes      Map Index
+	/// 4 bytes      X block number
+	/// 4 bytes      Y block number
+	/// 4 bytes      Number of statics
+	/// 7 bytes      Static[Number of statics]
 
 	#endregion
 
@@ -38,9 +35,7 @@ namespace Server.Engine.Facet
 			m_LandChanges = new Hashtable[256];
 			m_StaticsChanges = new Hashtable[256];
 
-			/// foreach (KeyValuePair<int, MapRegistry.MapDefinition> kvp in MapRegistry.Definitions)
-
-			for (int i = 0; i < 256; i++)
+			for (var i = 0; i < 256; i++)
 			{
 				m_LandChanges[i] = new Hashtable();
 				m_StaticsChanges[i] = new Hashtable();
@@ -72,15 +67,15 @@ namespace Server.Engine.Facet
 
 			if (!Directory.Exists(FacetEditingSettings.LiveRealTimeChangesSavePath))
 			{
-				Directory.CreateDirectory(FacetEditingSettings.LiveRealTimeChangesSavePath);
+				_ = Directory.CreateDirectory(FacetEditingSettings.LiveRealTimeChangesSavePath);
 			}
 
-			string[] filePaths = Directory.GetFiles(FacetEditingSettings.LiveRealTimeChangesSavePath, "*.live");
+			var filePaths = Directory.GetFiles(FacetEditingSettings.LiveRealTimeChangesSavePath, "*.live");
 
-			List<string> staticsPaths = new List<string>();
-			List<string> landPaths = new List<string>();
+			var staticsPaths = new List<string>();
+			var landPaths = new List<string>();
 
-			foreach (string s in filePaths)
+			foreach (var s in filePaths)
 			{
 				if (s.Contains("map"))
 				{
@@ -95,40 +90,40 @@ namespace Server.Engine.Facet
 			landPaths.Sort();
 
 			/// Read Map Blocks And Apply Them In Order
-			foreach (string s in landPaths)
+			foreach (var s in landPaths)
 			{
-				BinaryReader reader = new BinaryReader(File.Open(Path.Combine(Core.BaseDirectory, s), FileMode.Open));
+				var reader = new BinaryReader(File.Open(Path.Combine(Core.BaseDirectory, s), FileMode.Open));
 
 				try
 				{
-					reader.BaseStream.Seek(0, SeekOrigin.Begin);
+					_ = reader.BaseStream.Seek(0, SeekOrigin.Begin);
 
 					int MapNumber = reader.ReadUInt16();
 
 					while (reader.BaseStream.Position < reader.BaseStream.Length)
 					{
-						int x = (int)reader.ReadInt16();
-						int y = (int)reader.ReadInt16();
+						var x = (int)reader.ReadInt16();
+						var y = (int)reader.ReadInt16();
 
-						LandTile[] blocktiles = new LandTile[64];
+						var blocktiles = new LandTile[64];
 
-						for (int j = 0; j < 64; j++)
+						for (var j = 0; j < 64; j++)
 						{
-							short id = reader.ReadInt16();
-							sbyte z = reader.ReadSByte();
+							var id = reader.ReadUInt16();
+							var z = reader.ReadSByte();
 
-							LandTile lt = new LandTile(id, z);
+							var lt = new LandTile(id, z);
 
 							blocktiles[j] = lt;
 						}
 
 						HashSet<int> associated;
-						MapRegistry.MapAssociations.TryGetValue(MapNumber, out associated);
+						_ = MapRegistry.Associations.TryGetValue(MapNumber, out associated);
 
-						foreach (int integer in associated)
+						foreach (var integer in associated)
 						{
-							Map map = Map.Maps[integer];
-							TileMatrix tm = map.Tiles;
+							var map = Map.Maps[integer];
+							var tm = map.Tiles;
 
 							tm.SetLandBlock(x, y, blocktiles);
 						}
@@ -147,40 +142,40 @@ namespace Server.Engine.Facet
 			staticsPaths.Sort();
 
 			/// Read Static Blocks And Apply Them In Order
-			foreach (string s in staticsPaths)
+			foreach (var s in staticsPaths)
 			{
-				FileInfo mapFile = new FileInfo(Path.Combine(Core.BaseDirectory, s));
-				BinaryReader reader = new BinaryReader(File.Open(Path.Combine(Core.BaseDirectory, s), FileMode.Open));
+				var mapFile = new FileInfo(Path.Combine(Core.BaseDirectory, s));
+				var reader = new BinaryReader(File.Open(Path.Combine(Core.BaseDirectory, s), FileMode.Open));
 
 				try
 				{
-					reader.BaseStream.Seek(0, SeekOrigin.Begin);
+					_ = reader.BaseStream.Seek(0, SeekOrigin.Begin);
 
 					int MapNumber = reader.ReadUInt16();
 
 					while (reader.BaseStream.Position < reader.BaseStream.Length)
 					{
-						int blockX = (int)reader.ReadInt16();
-						int blockY = (int)reader.ReadInt16();
-						int staticCount = reader.ReadInt32();
+						var blockX = (int)reader.ReadInt16();
+						var blockY = (int)reader.ReadInt16();
+						var staticCount = reader.ReadInt32();
 
-						Dictionary<Point2D, List<StaticTile>> blockStatics = new Dictionary<Point2D, List<StaticTile>>();
+						var blockStatics = new Dictionary<Point2D, List<StaticTile>>();
 
-						for (int staticIndex = 0; staticIndex < staticCount; staticIndex++)
+						for (var staticIndex = 0; staticIndex < staticCount; staticIndex++)
 						{
-							UInt16 id = reader.ReadUInt16();
+							var id = reader.ReadUInt16();
 
-							byte x = reader.ReadByte();
-							byte y = reader.ReadByte();
-							sbyte z = reader.ReadSByte();
+							var x = reader.ReadByte();
+							var y = reader.ReadByte();
+							var z = reader.ReadSByte();
 
-							Int16 hue = reader.ReadInt16();
+							var hue = reader.ReadUInt16();
 
-							StaticTile st = new StaticTile(id, x, y, z, hue);
+							var st = new StaticTile(id, x, y, z, hue);
 
-							Point2D p = new Point2D(x, y);
+							var p = new Point2D(x, y);
 
-							if (!(blockStatics.ContainsKey(p)))
+							if (!blockStatics.ContainsKey(p))
 							{
 								blockStatics.Add(p, new List<StaticTile>());
 							}
@@ -188,17 +183,17 @@ namespace Server.Engine.Facet
 							blockStatics[p].Add(st);
 						}
 
-						StaticTile[][][] newblockOfTiles = new StaticTile[8][][];
+						var newblockOfTiles = new StaticTile[8][][];
 
-						for (int i = 0; i < 8; i++)
+						for (var i = 0; i < 8; i++)
 						{
 							newblockOfTiles[i] = new StaticTile[8][];
 
-							for (int j = 0; j < 8; j++)
+							for (var j = 0; j < 8; j++)
 							{
-								Point2D p = new Point2D(i, j);
+								var p = new Point2D(i, j);
 
-								int length = 0;
+								var length = 0;
 
 								if (blockStatics.ContainsKey(p))
 								{
@@ -207,7 +202,7 @@ namespace Server.Engine.Facet
 
 								newblockOfTiles[i][j] = new StaticTile[length];
 
-								for (int k = 0; k < length; k++)
+								for (var k = 0; k < length; k++)
 								{
 									if (blockStatics.ContainsKey(p))
 									{
@@ -218,12 +213,12 @@ namespace Server.Engine.Facet
 						}
 
 						HashSet<int> associated;
-						MapRegistry.MapAssociations.TryGetValue(MapNumber, out associated);
+						_ = MapRegistry.Associations.TryGetValue(MapNumber, out associated);
 
-						foreach (int integer in associated)
+						foreach (var integer in associated)
 						{
-							Map map = Map.Maps[integer];
-							TileMatrix tm = map.Tiles;
+							var map = Map.Maps[integer];
+							var tm = map.Tiles;
 
 							tm.SetStaticBlock(blockX, blockY, newblockOfTiles);
 						}
@@ -244,41 +239,41 @@ namespace Server.Engine.Facet
 		{
 			if (!Directory.Exists(FacetEditingSettings.LiveRealTimeChangesSavePath))
 			{
-				Directory.CreateDirectory(FacetEditingSettings.LiveRealTimeChangesSavePath);
+				_ = Directory.CreateDirectory(FacetEditingSettings.LiveRealTimeChangesSavePath);
 			}
 
-			DateTime now = DateTime.Now;
-			string Stamp = string.Format("{0}-{1}-{2}-{3}-{4}-{5}", now.Year, now.Month.ToString("00"), now.Day.ToString("00"), now.Hour.ToString("00"), now.Minute.ToString("00"), now.Second.ToString("00"));
-			
-			foreach (KeyValuePair<int, MapRegistry.MapDefinition> kvp in MapRegistry.Definitions) //for (int mapIndex = 0; mapIndex < Live.NumberOfMapFiles; mapIndex++)
+			var now = DateTime.Now;
+			var Stamp = $"{now.Year}-{now.Month:00}-{now.Day:00}-{now.Hour:00}-{now.Minute:00}-{now.Second:00}";
+
+			foreach (var kvp in MapRegistry.Associations)
 			{
 				try
 				{
-					Map CurrentMap = Server.Map.Maps[kvp.Key];
-					TileMatrix CurrentMatrix = CurrentMap.Tiles;
+					var CurrentMap = Server.Map.Maps[kvp.Key];
+					var CurrentMatrix = CurrentMap.Tiles;
 
-					ICollection keyColl = m_LandChanges[kvp.Key].Keys;
+					var keyColl = m_LandChanges[kvp.Key].Keys;
 
 					if (keyColl.Count > 0)
 					{
-						string filename = string.Format("map{0}-{1}.live", kvp.Key, Stamp);
+						var filename = $"map{kvp.Key}-{Stamp}.live";
 
 						Console.WriteLine(Path.Combine(FacetEditingSettings.LiveRealTimeChangesSavePath, filename));
 						GenericWriter writer = new BinaryFileWriter(Path.Combine(FacetEditingSettings.LiveRealTimeChangesSavePath, filename), true);
 
-						writer.Write((UInt16)kvp.Key);
+						writer.Write((ushort)kvp.Key);
 
 						foreach (Point2D p in keyColl)
 						{
-							writer.Write((UInt16)p.X);
-							writer.Write((UInt16)p.Y);
+							writer.Write((ushort)p.X);
+							writer.Write((ushort)p.Y);
 
-							LandTile[] blocktiles = CurrentMatrix.GetLandBlock(p.X, p.Y);
+							var blocktiles = CurrentMatrix.GetLandBlock(p.X, p.Y);
 
-							for (int j = 0; j < 64; j++)
+							for (var j = 0; j < 64; j++)
 							{
-								writer.Write((UInt16)blocktiles[j].ID);
-								writer.Write((sbyte)blocktiles[j].Z);
+								writer.Write(blocktiles[j].ID);
+								writer.Write(blocktiles[j].Z);
 							}
 						}
 
@@ -291,46 +286,52 @@ namespace Server.Engine.Facet
 
 					if (keyColl.Count > 0)
 					{
-						string filename = string.Format("statics{0}-{1}.live", kvp.Key, Stamp);
+						var filename = $"statics{kvp.Key}-{Stamp}.live";
 						GenericWriter writer = new BinaryFileWriter(Path.Combine(FacetEditingSettings.LiveRealTimeChangesSavePath, filename), true);
-						writer.Write((UInt16)kvp.Key);
+						writer.Write((ushort)kvp.Key);
 
 						foreach (Point2D p in keyColl)
 						{
-							StaticTile[][][] staticTiles = CurrentMatrix.GetStaticBlock(p.X, p.Y);
+							var staticTiles = CurrentMatrix.GetStaticBlock(p.X, p.Y);
 
-							int staticCount = 0;
+							var staticCount = 0;
 
-							for (int i = 0; i < staticTiles.Length; i++)
-								for (int j = 0; j < staticTiles[i].Length; j++)
+							for (var i = 0; i < staticTiles.Length; i++)
+							{
+								for (var j = 0; j < staticTiles[i].Length; j++)
 								{
 									staticCount += staticTiles[i][j].Length;
 								}
+							}
 
-							writer.Write((UInt16)p.X);
-							writer.Write((UInt16)p.Y);
-							writer.Write((int)staticCount);
+							writer.Write((ushort)p.X);
+							writer.Write((ushort)p.Y);
+							writer.Write(staticCount);
 
-							for (int i = 0; i < staticTiles.Length; i++)
-								for (int j = 0; j < staticTiles[i].Length; j++)
+							for (var i = 0; i < staticTiles.Length; i++)
+							{
+								for (var j = 0; j < staticTiles[i].Length; j++)
 								{
-									for (int k = 0; k < staticTiles[i][j].Length; k++)
+									for (var k = 0; k < staticTiles[i][j].Length; k++)
 									{
-										writer.Write((ushort)staticTiles[i][j][k].ID);
+										writer.Write(staticTiles[i][j][k].ID);
 										writer.Write((byte)i);
 										writer.Write((byte)j);
-										writer.Write((sbyte)staticTiles[i][j][k].Z);
+										writer.Write(staticTiles[i][j][k].Z);
 										writer.Write((short)staticTiles[i][j][k].Hue);
 									}
 								}
+							}
 						}
+
 						writer.Close();
 					}
+
 					m_StaticsChanges[kvp.Key].Clear();
 				}
 				catch
 				{
-					Console.WriteLine("Key: " + kvp.Key);
+					Console.WriteLine($"Key: {kvp.Key}");
 				}
 			}
 		}

@@ -1,10 +1,5 @@
-﻿using Server;
-using Server.Network;
-using Server.Targeting;
-
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Collections;
 
 namespace Server.Engine.Facet
 {
@@ -18,49 +13,36 @@ namespace Server.Engine.Facet
 
 	public interface IMapOperation
 	{
+		int MapNumber { get; }
+
+		int BlockNumber { get; }
+
+		Point2D Location { get; }
+
 		void DoOperation();
 
 		void DoOperation(Dictionary<int, LocalUpdateFlags> blockUpdateChain);
-
-		int BlockNumber
-		{
-			get;
-		}
-
-		int MapNumber
-		{
-			get;
-		}
-
-		Point2D Location
-		{
-			get;
-		}
 	}
 
 	public class MapOperationSeries : BaseMapOperation
 	{
-		private List<IMapOperation> m_Changes;
+		private readonly List<IMapOperation> m_Changes;
 
-		public override int BlockNumber
-		{
-			get { return -1; }
-		}
+		public override int BlockNumber => -1;
 
-		public override int MapNumber
-		{
-			get { return m_MapNumber; }
-		}
+		public override int MapNumber => m_MapNumber;
 
 		public MapOperationSeries(IMapOperation startingChange, int mapNumber) : base(-1, -1, mapNumber)
 		{
-			m_Changes = new List<IMapOperation>();
-			m_Changes.Add(startingChange);
+			m_Changes = new List<IMapOperation>
+			{
+				startingChange
+			};
 		}
 
 		public override void DoOperation(Dictionary<int, LocalUpdateFlags> blockUpdateChain)
 		{
-			bool sendoutUpdates = false;
+			var sendoutUpdates = false;
 
 			if (blockUpdateChain == null)
 			{
@@ -68,18 +50,18 @@ namespace Server.Engine.Facet
 				sendoutUpdates = true;
 			}
 
-			foreach (IMapOperation mc in m_Changes)
+			foreach (var mc in m_Changes)
 			{
 				mc.DoOperation(blockUpdateChain);
 			}
 
 			if (sendoutUpdates)
 			{
-				foreach (KeyValuePair<int, LocalUpdateFlags> kvp in blockUpdateChain)
+				foreach (var kvp in blockUpdateChain)
 				{
 					if (kvp.Key >= 0)
 					{
-						BaseMapOperation.SendOutLocalUpdates(m_MapNumber, kvp.Key, kvp.Value);
+						SendOutLocalUpdates(m_MapNumber, kvp.Key, kvp.Value);
 					}
 				}
 			}
@@ -92,7 +74,7 @@ namespace Server.Engine.Facet
 
 		public void Remove(IMapOperation mc)
 		{
-			m_Changes.Remove(mc);
+			_ = m_Changes.Remove(mc);
 		}
 	}
 
@@ -102,18 +84,18 @@ namespace Server.Engine.Facet
 
 		public static void SendOutLocalUpdates(int mapNum, int blockNumber, LocalUpdateFlags flags)
 		{
-			Map map = Map.Maps[mapNum];
-			TileMatrix tm = map.Tiles;
+			var map = Map.Maps[mapNum];
+			var tm = map.Tiles;
 
-			int x = ((blockNumber / tm.BlockHeight) * 8) + 4;
-			int y = ((blockNumber % tm.BlockHeight) * 8) + 4;
+			var x = (blockNumber / tm.BlockHeight * 8) + 4;
+			var y = (blockNumber % tm.BlockHeight * 8) + 4;
 
 			SendOutLocalUpdates(map, x, y, flags);
 		}
 
 		public static void SendOutLocalUpdates(Map map, int x, int y, LocalUpdateFlags flags)
 		{
-			List<Mobile> candidates = new List<Mobile>();
+			var candidates = new List<Mobile>();
 
 			IPooledEnumerable eable = map.GetMobilesInRange(new Point3D(x, y, 0));
 
@@ -127,16 +109,16 @@ namespace Server.Engine.Facet
 
 			eable.Free();
 
-			foreach (Mobile m in candidates)
+			foreach (var m in candidates)
 			{
 				if ((flags & LocalUpdateFlags.Terrain) == LocalUpdateFlags.Terrain)
 				{
-					m.Send(new Server.Engine.Facet.UpdateTerrainPacket(new Point2D(x >> 3, y >> 3), m));
+					_ = m.Send(new Server.Engine.Facet.UpdateTerrainPacket(new Point2D(x >> 3, y >> 3), m));
 				}
 
 				if ((flags & LocalUpdateFlags.Statics) == LocalUpdateFlags.Statics)
 				{
-					m.Send(new Server.Engine.Facet.UpdateStaticsPacket(new Point2D(x >> 3, y >> 3), m));
+					_ = m.Send(new Server.Engine.Facet.UpdateStaticsPacket(new Point2D(x >> 3, y >> 3), m));
 				}
 
 				//m.Send(new RefreshClientView());
@@ -154,20 +136,11 @@ namespace Server.Engine.Facet
 
 		#region IMapOperation
 
-		public Point2D Location
-		{
-			get { return m_Location; }
-		}
+		public Point2D Location => m_Location;
 
-		public virtual int BlockNumber
-		{
-			get { return m_BlockNumber; }
-		}
+		public virtual int BlockNumber => m_BlockNumber;
 
-		public virtual int MapNumber
-		{
-			get { return m_MapNumber; }
-		}
+		public virtual int MapNumber => m_MapNumber;
 
 		public virtual void DoOperation()
 		{
@@ -189,7 +162,7 @@ namespace Server.Engine.Facet
 			{
 				m_Map = Map.Maps[map];
 				m_Matrix = m_Map.Tiles;
-				m_BlockNumber = (((x >> 3) * m_Matrix.BlockHeight) + (y >> 3));
+				m_BlockNumber = ((x >> 3) * m_Matrix.BlockHeight) + (y >> 3);
 				m_Location = new Point2D(x, y);
 			}
 		}
@@ -216,17 +189,17 @@ namespace Server.Engine.Facet
 
 			if (m_Block == m_Matrix.GetStaticBlock(-1, -1))
 			{
-				StaticTile[][][] tempBlock = new StaticTile[8][][];
+				var tempBlock = new StaticTile[8][][];
 
-				for (int i = 0; i < 8; ++i)
+				for (var i = 0; i < 8; ++i)
 				{
 					tempBlock[i] = new StaticTile[8][];
 
-					for (int j = 0; j < 8; ++j)
-						tempBlock[i][j] = new StaticTile[0];
+					for (var j = 0; j < 8; ++j)
+					{
+						tempBlock[i][j] = Array.Empty<StaticTile>();
+					}
 				}
-
-				//public void SetStaticBlock( int x, int y, StaticTile[][][] value )
 
 				m_Matrix.SetStaticBlock(x >> 3, y >> 3, tempBlock);
 				m_Block = m_Matrix.GetStaticBlock(x >> 3, y >> 3);
@@ -245,16 +218,13 @@ namespace Server.Engine.Facet
 			{
 				SendOutLocalUpdates(m_Map, m_Location.X, m_Location.Y, LocalUpdateFlags.Statics);
 			}
+			else if (blockUpdateChain.ContainsKey(m_BlockNumber))
+			{
+				blockUpdateChain[m_BlockNumber] = blockUpdateChain[m_BlockNumber] | LocalUpdateFlags.Statics;
+			}
 			else
 			{
-				if (blockUpdateChain.ContainsKey(m_BlockNumber))
-				{
-					blockUpdateChain[m_BlockNumber] = blockUpdateChain[m_BlockNumber] | LocalUpdateFlags.Statics;
-				}
-				else
-				{
-					blockUpdateChain.Add(m_BlockNumber, LocalUpdateFlags.Statics);
-				}
+				blockUpdateChain.Add(m_BlockNumber, LocalUpdateFlags.Statics);
 			}
 		}
 	}
@@ -263,21 +233,21 @@ namespace Server.Engine.Facet
 	{
 		protected StaticTarget m_StaticTarget;
 
-		protected StaticTile[] getExistingTiles()
+		protected StaticTile[] GetExistingTiles()
 		{
 			return m_Matrix.GetStaticTiles(m_Location.X, m_Location.Y);
 		}
 
-		protected int lookupExistingStatic(ref StaticTile existingTile)
+		protected int LookupExistingStatic(ref StaticTile existingTile)
 		{
-			int tileIndex = -1;
+			var tileIndex = -1;
 
 			if (m_StaticTarget != null)
 			{
-				int z = m_StaticTarget.Z - TileData.ItemTable[m_StaticTarget.ItemID].CalcHeight;
-				StaticTile[] staticTiles = m_Matrix.GetStaticTiles(m_Location.X, m_Location.Y);
+				var z = m_StaticTarget.Z - TileData.ItemTable[m_StaticTarget.ItemID].CalcHeight;
+				var staticTiles = m_Matrix.GetStaticTiles(m_Location.X, m_Location.Y);
 
-				for (int i = 0; i < staticTiles.Length; i++)
+				for (var i = 0; i < staticTiles.Length; i++)
 				{
 					if (staticTiles[i].Z == z && staticTiles[i].ID == m_StaticTarget.ItemID)
 					{
@@ -338,11 +308,13 @@ namespace Server.Engine.Facet
 
 		public override void DoOperation(Dictionary<int, LocalUpdateFlags> blockUpdateChain)
 		{
-			StaticTile[] newTileList = new StaticTile[m_Block[Location.X & 0x7][Location.Y & 0x7].Length + 1];
-			Array.Copy(m_Block[Location.X & 0x7][Location.Y & 0x7], newTileList, m_Block[Location.X & 0x7][Location.Y & 0x7].Length);
-			newTileList[newTileList.Length - 1] = new StaticTile((ushort)m_NewID, (sbyte)m_NewAltitude);
-			newTileList[newTileList.Length - 1].Hue = m_Hue;
-			m_Block[Location.X & 0x7][Location.Y & 0x7] = newTileList;
+			var block = m_Block[Location.X & 0x7][Location.Y & 0x7];
+
+			Array.Resize(ref block, block.Length + 1);
+
+			block[block.Length - 1].Set((ushort)m_NewID, 0, 0, (sbyte)m_NewAltitude, (ushort)m_Hue);
+
+			m_Block[Location.X & 0x7][Location.Y & 0x7] = block;
 
 			base.DoOperation(blockUpdateChain);
 		}
@@ -359,19 +331,19 @@ namespace Server.Engine.Facet
 
 		public override void DoOperation(Dictionary<int, LocalUpdateFlags> blockUpdateChain)
 		{
-			StaticTile[] tiles = getExistingTiles();
+			var tiles = GetExistingTiles();
 
 			if (tiles == null || tiles.Length == 0)
 			{
 				return;
 			}
 
-			StaticTile existingTile = new StaticTile();
-			int idx = lookupExistingStatic(ref existingTile);
+			var existingTile = new StaticTile();
+			var idx = LookupExistingStatic(ref existingTile);
 
 			if (idx >= 0)
 			{
-				tiles[idx].Set((UInt16)existingTile.ID, (sbyte)(m_Change + existingTile.Z));
+				tiles[idx].Set(existingTile.ID, (sbyte)(m_Change + existingTile.Z));
 			}
 
 			base.DoOperation(blockUpdateChain);
@@ -389,19 +361,19 @@ namespace Server.Engine.Facet
 
 		public override void DoOperation(Dictionary<int, LocalUpdateFlags> blockUpdateChain)
 		{
-			StaticTile[] tiles = getExistingTiles();
+			var tiles = GetExistingTiles();
 
 			if (tiles == null || tiles.Length == 0)
 			{
 				return;
 			}
 
-			StaticTile existingTile = new StaticTile();
-			int idx = lookupExistingStatic(ref existingTile);
+			var existingTile = new StaticTile();
+			var idx = LookupExistingStatic(ref existingTile);
 
 			if (idx >= 0)
 			{
-				tiles[idx].Set((UInt16)existingTile.ID, (sbyte)(m_NewAltitude - TileData.ItemTable[existingTile.ID].CalcHeight));
+				tiles[idx].Set(existingTile.ID, (sbyte)(m_NewAltitude - TileData.ItemTable[existingTile.ID].CalcHeight));
 			}
 
 			base.DoOperation(blockUpdateChain);
@@ -419,15 +391,15 @@ namespace Server.Engine.Facet
 
 		public override void DoOperation(Dictionary<int, LocalUpdateFlags> blockUpdateChain)
 		{
-			StaticTile[] tiles = getExistingTiles();
+			var tiles = GetExistingTiles();
 
 			if (tiles == null || tiles.Length == 0)
 			{
 				return;
 			}
 
-			StaticTile existingTile = new StaticTile();
-			int idx = lookupExistingStatic(ref existingTile);
+			var existingTile = new StaticTile();
+			var idx = LookupExistingStatic(ref existingTile);
 
 			if (idx >= 0)
 			{
@@ -441,6 +413,7 @@ namespace Server.Engine.Facet
 	public class SetStaticHue : ExistingStaticOperation
 	{
 		protected int m_NewHue;
+
 		public SetStaticHue(int mapNum, StaticTarget targ, int newHue) : base(mapNum, targ)
 		{
 			m_NewHue = newHue;
@@ -448,14 +421,14 @@ namespace Server.Engine.Facet
 
 		public override void DoOperation(Dictionary<int, LocalUpdateFlags> blockUpdateChain)
 		{
-			StaticTile[] tiles = getExistingTiles();
-			StaticTile existingTile = new StaticTile();
+			var tiles = GetExistingTiles();
+			var existingTile = new StaticTile();
 
-			int idx = lookupExistingStatic(ref existingTile);
+			var idx = LookupExistingStatic(ref existingTile);
 
 			if (idx >= 0)
 			{
-				tiles[idx].Hue = m_NewHue;
+				tiles[idx].Hue = (ushort)m_NewHue;
 
 				base.DoOperation(blockUpdateChain);
 			}
@@ -475,15 +448,15 @@ namespace Server.Engine.Facet
 
 		public override void DoOperation(Dictionary<int, LocalUpdateFlags> blockUpdateChain)
 		{
-			StaticTile existingTile = new StaticTile();
+			var existingTile = new StaticTile();
 
-			int idx = lookupExistingStatic(ref existingTile);
+			var idx = LookupExistingStatic(ref existingTile);
 
 			if (idx >= 0)
 			{
-				AddStatic addStatic = new AddStatic(m_MapNumber, existingTile.ID, (sbyte)existingTile.Z, m_destinationX, m_destinationY, existingTile.Hue);
-				DeleteStatic delStatic = new DeleteStatic(m_MapNumber, m_StaticTarget);
-				MapOperationSeries moveSeries = new MapOperationSeries(addStatic, m_MapNumber);
+				var addStatic = new AddStatic(m_MapNumber, existingTile.ID, existingTile.Z, m_destinationX, m_destinationY, existingTile.Hue);
+				var delStatic = new DeleteStatic(m_MapNumber, m_StaticTarget);
+				var moveSeries = new MapOperationSeries(addStatic, m_MapNumber);
 
 				moveSeries.Add(delStatic);
 				moveSeries.DoOperation(blockUpdateChain);
@@ -499,20 +472,19 @@ namespace Server.Engine.Facet
 
 		public override void DoOperation(Dictionary<int, LocalUpdateFlags> blockUpdateChain)
 		{
-			StaticTile[] tiles = getExistingTiles();
+			var tiles = GetExistingTiles();
 
 			if (tiles == null || tiles.Length == 0)
 			{
 				return;
 			}
 
-			StaticTile existingTile = new StaticTile();
-			int idx = lookupExistingStatic(ref existingTile);
+			var existingTile = new StaticTile();
+			var idx = LookupExistingStatic(ref existingTile);
 
 			if (idx >= 0 && idx < tiles.Length)
 			{
-
-				List<StaticTile> newTileList = new List<StaticTile>(tiles);
+				var newTileList = new List<StaticTile>(tiles);
 
 				newTileList.RemoveAt(idx);
 
@@ -532,15 +504,19 @@ namespace Server.Engine.Facet
 	{
 		protected LandTile[] m_Block;
 
-		protected short m_OldID;
-		protected sbyte m_OldZ;
+		protected int m_OldID;
+		protected int m_OldZ;
 		protected int m_TileIndex;
 
 		public LandOperation(int x, int y, int mapNum) : base(x, y, mapNum)
 		{
 			m_Block = m_Matrix.GetLandBlock(x >> 3, y >> 3);
-			m_OldID = (short)m_Block[((y & 0x7) << 3) + (x & 0x7)].ID;
-			m_OldZ = (sbyte)m_Block[((y & 0x7) << 3) + (x & 0x7)].Z;
+
+			var old = m_Block[((y & 0x7) << 3) + (x & 0x7)];
+
+			m_OldID = old.ID;
+			m_OldZ = old.Z;
+
 			m_TileIndex = ((m_Location.Y & 0x7) << 3) + (m_Location.X & 0x7);
 		}
 
@@ -554,16 +530,13 @@ namespace Server.Engine.Facet
 			{
 				SendOutLocalUpdates(m_Map, m_Location.X, m_Location.Y, LocalUpdateFlags.Terrain);
 			}
+			else if (blockUpdateChain.ContainsKey(m_BlockNumber))
+			{
+				blockUpdateChain[m_BlockNumber] = blockUpdateChain[m_BlockNumber] | LocalUpdateFlags.Terrain;
+			}
 			else
 			{
-				if (blockUpdateChain.ContainsKey(m_BlockNumber))
-				{
-					blockUpdateChain[m_BlockNumber] = blockUpdateChain[m_BlockNumber] | LocalUpdateFlags.Terrain;
-				}
-				else
-				{
-					blockUpdateChain.Add(m_BlockNumber, LocalUpdateFlags.Terrain);
-				}
+				blockUpdateChain.Add(m_BlockNumber, LocalUpdateFlags.Terrain);
 			}
 		}
 	}
@@ -579,7 +552,7 @@ namespace Server.Engine.Facet
 
 		public override void DoOperation(Dictionary<int, LocalUpdateFlags> blockUpdateChain)
 		{
-			m_Block[m_TileIndex].Set(m_OldID, (sbyte)(m_Change + m_OldZ));
+			m_Block[m_TileIndex].Set((ushort)m_OldID, (sbyte)(m_Change + m_OldZ));
 
 			base.DoOperation(blockUpdateChain);
 		}
@@ -596,7 +569,7 @@ namespace Server.Engine.Facet
 
 		public override void DoOperation(Dictionary<int, LocalUpdateFlags> blockUpdateChain)
 		{
-			m_Block[m_TileIndex].Set((short)m_NewID, (sbyte)m_OldZ);
+			m_Block[m_TileIndex].Set((ushort)m_NewID, (sbyte)m_OldZ);
 
 			base.DoOperation(blockUpdateChain);
 		}
@@ -613,7 +586,7 @@ namespace Server.Engine.Facet
 
 		public override void DoOperation(Dictionary<int, LocalUpdateFlags> blockUpdateChain)
 		{
-			m_Block[m_TileIndex].Set((short)m_OldID, (sbyte)m_Altitude);
+			m_Block[m_TileIndex].Set((ushort)m_OldID, (sbyte)m_Altitude);
 
 			base.DoOperation(blockUpdateChain);
 		}

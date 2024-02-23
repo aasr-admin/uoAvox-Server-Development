@@ -46,30 +46,32 @@
 		{
 			base.DefaultInit();
 
+			Rules.CanExit = false;
+			Rules.CanEnter = false;
+
+			Rules.AllowDelayLogout = false;
+
 			Rules.AllowHouses = false;
 			Rules.AllowVehicles = false;
-		}
 
-		public override bool AllowBeneficial(Mobile from, Mobile target)
-		{
-			if (from.AccessLevel < AccessLevel.Counselor)
-			{
-				from.SendMessage("You may not do that in jail.");
-				return false;
-			}
+			Rules.AllowMount = false;
+			Rules.AllowEthereal = false;
 
-			return true;
-		}
+			Rules.AllowSkills = false;
+			Rules.AllowCombat = false;
+			Rules.AllowMagic = false;
+			Rules.AllowMelee = false;
+			Rules.AllowRanged = false;
 
-		public override bool AllowHarmful(Mobile from, Mobile target)
-		{
-			if (from.AccessLevel < AccessLevel.Counselor)
-			{
-				from.SendMessage("You may not do that in jail.");
-				return false;
-			}
+			Rules.AllowCreatureDeath = false;
+			Rules.AllowCreatureHarm = false;
+			Rules.AllowCreatureHeal = false;
+			Rules.AllowCreatureLooting = false;
 
-			return true;
+			Rules.AllowPlayerDeath = false;
+			Rules.AllowPlayerHarm = false;
+			Rules.AllowPlayerHeal = false;
+			Rules.AllowPlayerLooting = false;
 		}
 
 		public override void AlterLightLevel(Mobile m, ref int global, ref int personal)
@@ -77,33 +79,6 @@
 			base.AlterLightLevel(m, ref global, ref personal);
 
 			global = LightCycle.JailLevel;
-		}
-
-		public override bool OnBeginSpellCast(Mobile from, ISpell s)
-		{
-			if (from.AccessLevel < AccessLevel.Counselor)
-			{
-				from.SendLocalizedMessage(502629); // You cannot cast spells here.
-				return false;
-			}
-
-			return true;
-		}
-
-		public override bool OnSkillUse(Mobile from, int Skill)
-		{
-			if (from.AccessLevel < AccessLevel.Counselor)
-			{
-				from.SendMessage("You may not use skills in jail.");
-				return false;
-			}
-
-			return true;
-		}
-
-		public override bool OnCombatantChange(Mobile from, Mobile Old, Mobile New)
-		{
-			return from.AccessLevel >= AccessLevel.Counselor;
 		}
 
 		public override void Serialize(GenericWriter writer)

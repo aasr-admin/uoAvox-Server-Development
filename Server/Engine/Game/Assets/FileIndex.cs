@@ -152,7 +152,7 @@ namespace Server
 
 								for (var i = 0; i < entryCount; i++)
 								{
-									hashes[UOPHash.HashLittle2($"{root}/{i:D8}{entryExt}")] = i;
+									hashes[UOPHash.Compute($"{root}/{i:D8}{entryExt}")] = i;
 								}
 
 								stream.Seek(nextBlock, SeekOrigin.Begin);

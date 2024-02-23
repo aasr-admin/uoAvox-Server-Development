@@ -37,8 +37,8 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 		public WillowTreeSapling1()
 		  : base()
 		{
-			BaseAssetSets.Add(new GraphicAsset[] { new GraphicAsset(0x3C6B, 0, 0) });
-			LeafSets.Add(new GraphicAsset[] { new GraphicAsset(0x3C6C, 0, 0) });
+			BaseAssetSets.Add(new HarvestGraphicAsset[] { new HarvestGraphicAsset(0x3C6B, 0, 0) });
+			LeafSets.Add(new HarvestGraphicAsset[] { new HarvestGraphicAsset(0x3C6C, 0, 0) });
 		}
 	}
 
@@ -53,8 +53,8 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 		public WillowTreeSapling2()
 		  : base()
 		{
-			BaseAssetSets.Add(new GraphicAsset[] { new GraphicAsset(0x3C6D, 0, 0) });
-			LeafSets.Add(new GraphicAsset[] { new GraphicAsset(0x3C6E, 0, 0) });
+			BaseAssetSets.Add(new HarvestGraphicAsset[] { new HarvestGraphicAsset(0x3C6D, 0, 0) });
+			LeafSets.Add(new HarvestGraphicAsset[] { new HarvestGraphicAsset(0x3C6E, 0, 0) });
 		}
 	}
 
@@ -80,42 +80,42 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 			PhaseResources.Add(339, bloodwoodResource);
 			PhaseResources.Add(688, frostwoodResource);
 
-			GraphicAsset asset1 = new GraphicAsset(0x3C6F, -1, 0);
+			HarvestGraphicAsset asset1 = new HarvestGraphicAsset(0x3C6F, -1, 0);
 			asset1.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset2 = new GraphicAsset(0x3C70, -2, 0);
+			HarvestGraphicAsset asset2 = new HarvestGraphicAsset(0x3C70, -2, 0);
 			asset2.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset3 = new GraphicAsset(0x3C71, -3, 0);
+			HarvestGraphicAsset asset3 = new HarvestGraphicAsset(0x3C71, -3, 0);
 			asset3.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset4 = new GraphicAsset(0x3C72, -4, 0);
+			HarvestGraphicAsset asset4 = new HarvestGraphicAsset(0x3C72, -4, 0);
 			asset4.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset5 = new GraphicAsset(0x3C73, -5, 0);
+			HarvestGraphicAsset asset5 = new HarvestGraphicAsset(0x3C73, -5, 0);
 			asset5.HarvestResourceBaseAmount = 10;
 
-			GraphicAsset asset6 = new GraphicAsset(0x3C74, -4, -1);
+			HarvestGraphicAsset asset6 = new HarvestGraphicAsset(0x3C74, -4, -1);
 			asset6.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset7 = new GraphicAsset(0x3C75, -3, -1);
+			HarvestGraphicAsset asset7 = new HarvestGraphicAsset(0x3C75, -3, -1);
 			asset7.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset8 = new GraphicAsset(0x3C76, -2, -1);
+			HarvestGraphicAsset asset8 = new HarvestGraphicAsset(0x3C76, -2, -1);
 			asset8.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset9 = new GraphicAsset(0x3C77, -1, -1);
+			HarvestGraphicAsset asset9 = new HarvestGraphicAsset(0x3C77, -1, -1);
 			asset9.HarvestResourceBaseAmount = 10;
 
-			GraphicAsset asset10 = new GraphicAsset(0x3C78, -4, -2);
+			HarvestGraphicAsset asset10 = new HarvestGraphicAsset(0x3C78, -4, -2);
 			asset10.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset11 = new GraphicAsset(0x3C79, -3, -2);
+			HarvestGraphicAsset asset11 = new HarvestGraphicAsset(0x3C79, -3, -2);
 			asset11.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset12 = new GraphicAsset(0x3C7A, -2, -2);
+			HarvestGraphicAsset asset12 = new HarvestGraphicAsset(0x3C7A, -2, -2);
 			asset12.HarvestResourceBaseAmount = 10;
 
-			GraphicAsset asset13 = new GraphicAsset(0x3C7B, -4, 1);
+			HarvestGraphicAsset asset13 = new HarvestGraphicAsset(0x3C7B, -4, 1);
 			asset13.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset14 = new GraphicAsset(0x3C7C, -3, 1);
+			HarvestGraphicAsset asset14 = new HarvestGraphicAsset(0x3C7C, -3, 1);
 			asset14.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset15 = new GraphicAsset(0x3C7D, -2, 1);
+			HarvestGraphicAsset asset15 = new HarvestGraphicAsset(0x3C7D, -2, 1);
 			asset15.HarvestResourceBaseAmount = 10;
 
 
-			BaseAssetSets.Add(new GraphicAsset[] { asset1, asset2, asset3, asset4, asset5, asset6, asset7, asset8, asset9, asset10, asset11, asset12, asset13, asset14, asset15 });
+			BaseAssetSets.Add(new HarvestGraphicAsset[] { asset1, asset2, asset3, asset4, asset5, asset6, asset7, asset8, asset9, asset10, asset11, asset12, asset13, asset14, asset15 });
 		}
 	}
 }

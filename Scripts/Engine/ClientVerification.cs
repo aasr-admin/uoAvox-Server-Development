@@ -89,7 +89,7 @@ namespace Server.Misc
 			}
 		}
 
-		private static void EventSink_ClientVersionReceived(ClientVersionReceivedArgs e)
+		private static void EventSink_ClientVersionReceived(ClientVersionReceivedEventArgs e)
 		{
 			string kickMessage = null;
 			var state = e.State;

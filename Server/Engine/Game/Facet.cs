@@ -95,7 +95,6 @@
 
 using Server.Items;
 using Server.Network;
-using Server.Targeting;
 
 using System;
 using System.Collections;
@@ -123,6 +122,179 @@ namespace Server
 		HarmfulRestrictions = 0x0008, // Disallow performing harmful actions on innocents
 		TrammelRules = FreeMovement | BeneficialRestrictions | HarmfulRestrictions,
 		FeluccaRules = None
+	}
+
+	public readonly record struct MapWrap : IEnumerable<MapBounds>
+	{
+		public static readonly MapWrap Empty = new();
+
+		public MapBounds[] Bounds { get; }
+
+		public int Length => Bounds.Length;
+
+		public MapBounds this[int index] => Bounds[index];
+
+		public MapWrap(params MapBounds[] bounds)
+		{
+			Bounds = bounds ?? Array.Empty<MapBounds>();
+		}
+
+		public bool Contains(Point2D p)
+		{
+			return Array.Exists(Bounds, b => b.Contains(p));
+		}
+
+		public bool Contains(Point2D p, bool inclusive)
+		{
+			return Array.Exists(Bounds, b => b.Contains(p, inclusive));
+		}
+
+		public bool Contains(IPoint2D p)
+		{
+			return Array.Exists(Bounds, b => b.Contains(p));
+		}
+
+		public bool Contains(IPoint2D p, bool inclusive)
+		{
+			return Array.Exists(Bounds, b => b.Contains(p, inclusive));
+		}
+
+		public bool Contains(Point3D p)
+		{
+			return Array.Exists(Bounds, b => b.Contains(p));
+		}
+
+		public bool Contains(Point3D p, bool inclusive)
+		{
+			return Array.Exists(Bounds, b => b.Contains(p, inclusive));
+		}
+
+		public bool Contains(IPoint3D p)
+		{
+			return Array.Exists(Bounds, b => b.Contains(p));
+		}
+
+		public bool Contains(IPoint3D p, bool inclusive)
+		{
+			return Array.Exists(Bounds, b => b.Contains(p, inclusive));
+		}
+
+		public IEnumerator<MapBounds> GetEnumerator()
+		{
+			foreach (var b in Bounds)
+			{
+				yield return b;
+			}
+		}
+
+		IEnumerator IEnumerable.GetEnumerator()
+		{
+			return GetEnumerator();
+		}
+	}
+
+	[Parsable]
+	public readonly record struct MapBounds : IEquatable<Rectangle2D>
+	{
+		public static readonly MapBounds Empty = new(0, 0, 0, 0);
+
+		public static bool TryParse(string value, out MapBounds o)
+		{
+			try
+			{
+				o = Parse(value);
+				return true;
+			}
+			catch
+			{
+				o = Empty;
+				return false;
+			}
+		}
+
+		public static MapBounds Parse(string value)
+		{
+			return new MapBounds(Rectangle2D.Parse(value));
+		}
+
+		private readonly Rectangle2D _Bounds;
+
+		public readonly ushort X, Y, Width, Height;
+
+		private MapBounds(Rectangle2D bounds)
+		{
+			X = (ushort)Math.Clamp(bounds.X, UInt16.MinValue, UInt16.MaxValue);
+			Y = (ushort)Math.Clamp(bounds.Y, UInt16.MinValue, UInt16.MaxValue);
+			Width = (ushort)Math.Clamp(bounds.Width, UInt16.MinValue, UInt16.MaxValue);
+			Height = (ushort)Math.Clamp(bounds.Height, UInt16.MinValue, UInt16.MaxValue);
+
+			_Bounds.Set(X, Y, Width, Height);
+		}
+
+		public MapBounds(ushort width, ushort height)
+			: this(0, 0, width, height)
+		{
+		}
+
+		public MapBounds(ushort x, ushort y, ushort width, ushort height)
+		{
+			_Bounds = new Rectangle2D(X = x, Y = y, Width = width, Height = height);
+		}
+
+		public bool Contains(Point2D p)
+		{
+			return _Bounds.Contains(p);
+		}
+
+		public bool Contains(Point2D p, bool inclusive)
+		{
+			return _Bounds.Contains(p, inclusive);
+		}
+
+		public bool Contains(IPoint2D p)
+		{
+			return _Bounds.Contains(p);
+		}
+
+		public bool Contains(IPoint2D p, bool inclusive)
+		{
+			return _Bounds.Contains(p, inclusive);
+		}
+
+		public bool Contains(Point3D p)
+		{
+			return _Bounds.Contains(p);
+		}
+
+		public bool Contains(Point3D p, bool inclusive)
+		{
+			return _Bounds.Contains(p, inclusive);
+		}
+
+		public bool Contains(IPoint3D p)
+		{
+			return _Bounds.Contains(p);
+		}
+
+		public bool Contains(IPoint3D p, bool inclusive)
+		{
+			return _Bounds.Contains(p, inclusive);
+		}
+
+		public bool Equals(Rectangle2D r)
+		{
+			return _Bounds.Equals(r);
+		}
+
+		public override string ToString()
+		{
+			return _Bounds.ToString();
+		}
+
+		public static implicit operator Rectangle2D(MapBounds b)
+		{
+			return b._Bounds;
+		}
 	}
 
 	public interface IPooledEnumerable : IEnumerable
@@ -192,49 +364,41 @@ namespace Server
 
 		public static IEnumerable<StaticTile[]> SelectMultiTiles(Sector s, Rectangle2D bounds)
 		{
-			foreach (var o in s.Multis.Where(o => o != null && !o.Deleted))
+			foreach (var o in s.Multis.Where(o => o?.Deleted == false))
 			{
 				var c = o.Components;
 
-				int x, y, xo, yo;
-				StaticTile[] t, r;
-
-				for (x = bounds.Start.X; x < bounds.End.X; x++)
+				for (var x = bounds.Start.X; x < bounds.End.X; x++)
 				{
-					xo = x - (o.X + c.Min.X);
+					var xo = x - (o.X + c.Min.X);
 
 					if (xo < 0 || xo >= c.Width)
 					{
 						continue;
 					}
 
-					for (y = bounds.Start.Y; y < bounds.End.Y; y++)
+					for (var y = bounds.Start.Y; y < bounds.End.Y; y++)
 					{
-						yo = y - (o.Y + c.Min.Y);
+						var yo = y - (o.Y + c.Min.Y);
 
 						if (yo < 0 || yo >= c.Height)
 						{
 							continue;
 						}
 
-						t = c.Tiles[xo][yo];
+						var buffer = c.Tiles[xo][yo];
 
-						if (t.Length <= 0)
+						if (buffer.Length > 0)
 						{
-							continue;
+							var tiles = new StaticTile[buffer.Length];
+
+							for (var i = 0; i < tiles.Length; i++)
+							{
+								tiles[i].Set(buffer[i].m_ID, buffer[i].m_X, buffer[i].m_Y, (sbyte)(buffer[i].m_Z + o.Z), buffer[i].m_Hue);
+							}
+
+							yield return tiles;
 						}
-
-						r = new StaticTile[t.Length];
-
-						for (var i = 0; i < t.Length; i++)
-						{
-							r[i] = t[i];
-							r[i].X += o.X;
-							r[i].Y += o.Y;
-							r[i].Z += o.Z;
-						}
-
-						yield return r;
 					}
 				}
 			}
@@ -402,58 +566,54 @@ namespace Server
 
 		public const int SectorShift = 4;
 		public const int SectorSize = 1 << SectorShift;
-		
-		public static int SectorActiveRange = 2;
 
-		private static readonly Map[] m_Maps = new Map[0x100];
+		public static int SectorActiveRange { get; set; } = 2;
 
-		public static Map[] Maps => m_Maps;
+		public static Map[] Maps { get; set; } = new Map[0x100];
 
 		#region Facet (Map) Definitions Registry 
 
-		public static Map Felucca => m_Maps[0];
-		public static Map Trammel => m_Maps[1];
-		public static Map Ilshenar => m_Maps[2];
-		public static Map Malas => m_Maps[3];
-		public static Map Tokuno => m_Maps[4];
-		public static Map TerMur => m_Maps[5];
+		public static Map Felucca => Maps[0];
+		public static Map Trammel => Maps[1];
+		public static Map Ilshenar => Maps[2];
+		public static Map Malas => Maps[3];
+		public static Map Tokuno => Maps[4];
+		public static Map TerMur => Maps[5];
 
 		#endregion
 
-		public static Map Internal => m_Maps[0x7F];
+		public static Map Internal => Maps[0x7F];
 
-		private static readonly List<Map> m_AllMaps = new List<Map>();
-
-		public static List<Map> AllMaps => m_AllMaps;
+		public static SortedSet<Map> AllMaps { get; } = new(IndexComparer.Instance);
 
 		public static event Action<Map, Region> RegionAdded, RegionRemoved;
 
-		private readonly int m_MapID, m_MapIndex, m_FileIndex;
-
-		private readonly int m_Width, m_Height;
 		private readonly int m_SectorsWidth, m_SectorsHeight;
-		private int m_Season;
-		private readonly HashSet<Region> m_Regions;
+
 		private Region m_DefaultRegion;
 
-		public int Season { get => m_Season; set => m_Season = value; }
+		public MapBounds Bounds { get; }
+		public MapBounds Area { get; }
+
+		public MapWrap Wrap { get; }
+
+		public int Season { get; set; }
 
 		private string m_Name;
-		private MapRules m_Rules;
+
 		private readonly Sector[][] m_Sectors;
-		private readonly Sector m_InvalidSector;
 
 		private TileMatrix m_Tiles;
 
 #if Map_InternalProtection || Map_AllUpdates
 		public static string[] GetMapNames()
 		{
-			return m_Maps.Where(m => m != null).Select(m => m.Name).ToArray();
+			return Maps.Where(m => m != null).Select(m => m.Name).ToArray();
 		}
 
 		public static Map[] GetMapValues()
 		{
-			return m_Maps.Where(m => m != null).ToArray();
+			return Maps.Where(m => m != null).ToArray();
 		}
 
 		public static Map Parse(string value)
@@ -472,7 +632,7 @@ namespace Server
 
 			if (!Int32.TryParse(value, out index))
 			{
-				return m_Maps.FirstOrDefault(m => m != null && Insensitive.Equals(m.Name, value));
+				return Maps.FirstOrDefault(m => m != null && Insensitive.Equals(m.Name, value));
 			}
 
 			if (index == 127)
@@ -480,7 +640,7 @@ namespace Server
 				return Internal;
 			}
 
-			return m_Maps.FirstOrDefault(m => m != null && m.MapIndex == index);
+			return Maps.FirstOrDefault(m => m != null && m.MapIndex == index);
 		}
 
 		public override string ToString()
@@ -614,7 +774,7 @@ namespace Server
 				--v;
 			}
 
-			return (v / 2);
+			return v / 2;
 		}
 
 #if Map_NewEnumerables || Map_AllUpdates
@@ -630,7 +790,7 @@ namespace Server
 
 		public IPooledEnumerable<IEntity> GetObjectsInRange(Point3D p, int range)
 		{
-			return GetObjectsInBounds(new Rectangle2D(p.m_X - range, p.m_Y - range, range * 2 + 1, range * 2 + 1));
+			return GetObjectsInBounds(new Rectangle2D(p.m_X - range, p.m_Y - range, (range * 2) + 1, (range * 2) + 1));
 		}
 
 		public IPooledEnumerable<IEntity> GetObjectsInBounds(Rectangle2D bounds)
@@ -649,7 +809,7 @@ namespace Server
 
 		public IPooledEnumerable<NetState> GetClientsInRange(Point3D p, int range)
 		{
-			return GetClientsInBounds(new Rectangle2D(p.m_X - range, p.m_Y - range, range * 2 + 1, range * 2 + 1));
+			return GetClientsInBounds(new Rectangle2D(p.m_X - range, p.m_Y - range, (range * 2) + 1, (range * 2) + 1));
 		}
 
 		public IPooledEnumerable<NetState> GetClientsInBounds(Rectangle2D bounds)
@@ -668,7 +828,7 @@ namespace Server
 
 		public IPooledEnumerable<Item> GetItemsInRange(Point3D p, int range)
 		{
-			return GetItemsInBounds(new Rectangle2D(p.m_X - range, p.m_Y - range, range * 2 + 1, range * 2 + 1));
+			return GetItemsInBounds(new Rectangle2D(p.m_X - range, p.m_Y - range, (range * 2) + 1, (range * 2) + 1));
 		}
 
 		public IPooledEnumerable<Item> GetItemsInBounds(Rectangle2D bounds)
@@ -687,7 +847,7 @@ namespace Server
 
 		public IPooledEnumerable<Mobile> GetMobilesInRange(Point3D p, int range)
 		{
-			return GetMobilesInBounds(new Rectangle2D(p.m_X - range, p.m_Y - range, range * 2 + 1, range * 2 + 1));
+			return GetMobilesInBounds(new Rectangle2D(p.m_X - range, p.m_Y - range, (range * 2) + 1, (range * 2) + 1));
 		}
 
 		public IPooledEnumerable<Mobile> GetMobilesInBounds(Rectangle2D bounds)
@@ -860,12 +1020,12 @@ namespace Server
 
 		public bool CanFit(int x, int y, int z, int height, bool checkBlocksFit, bool checkMobiles, bool requireSurface)
 		{
-			if (this == Map.Internal)
+			if (this == Internal)
 			{
 				return false;
 			}
 
-			if (x < 0 || y < 0 || x >= m_Width || y >= m_Height)
+			if (x < 0 || y < 0 || x >= Bounds.Width || y >= Bounds.Height)
 			{
 				return false;
 			}
@@ -915,7 +1075,7 @@ namespace Server
 			{
 				var item = items[i];
 
-				if (!(item is BaseMulti) && item.ItemID <= TileData.MaxItemValue && item.AtWorldPoint(x, y))
+				if (item is not BaseMulti && item.ItemID <= TileData.MaxItemValue && item.AtWorldPoint(x, y))
 				{
 					var id = item.ItemData;
 					surface = id.Surface;
@@ -977,7 +1137,7 @@ namespace Server
 
 		private class ZComparer : IComparer<Item>
 		{
-			public static readonly ZComparer Default = new ZComparer();
+			public static readonly ZComparer Default = new();
 
 			public int Compare(Item x, Item y)
 			{
@@ -1135,7 +1295,7 @@ namespace Server
 
 			foreach (var item in eable)
 			{
-				if (!(item is BaseMulti) && item.ItemID <= TileData.MaxItemValue)
+				if (item is not BaseMulti && item.ItemID <= TileData.MaxItemValue)
 				{
 					items.Add(item);
 
@@ -1223,32 +1383,32 @@ namespace Server
 		}
 #endif
 
-		/* This could be probably be re-implemented if necessary (perhaps via an ITile interface?).
-		public List<Tile> GetTilesAt( Point2D p, bool items, bool land, bool statics )
+		public Point3D GetTopSurface(int x, int y)
 		{
-			List<Tile> list = new List<Tile>();
+			var p = new Point3D(x, y, Region.MaxZ);
+			var o = GetTopSurface(p);
 
-			if ( this == Map.Internal )
-				return list;
-
-			if ( land )
-				list.Add( Tiles.GetLandTile( p.m_X, p.m_Y ) );
-
-			if ( statics )
-				list.AddRange( Tiles.GetStaticTiles( p.m_X, p.m_Y, true ) );
-
-			if ( items )
+			if (o is LandTile lt)
 			{
-				Sector sector = GetSector( p );
+				p.m_Z = lt.m_Z;
+			}
+			else if (o is StaticTile st)
+			{
+				var id = TileData.ItemTable[st.m_ID & TileData.MaxItemValue];
 
-				foreach ( Item item in sector.Items )
-					if ( item.AtWorldPoint( p.m_X, p.m_Y ) )
-						list.Add( new StaticTile( (ushort)item.ItemID, (sbyte) item.Z ) );
+				p.m_Z = st.m_Z + id.CalcHeight;
+			}
+			else if (o is Item item)
+			{
+				p.m_Z = item.Z + item.ItemData.CalcHeight;
+			}
+			else
+			{
+				p.m_Z = 0;
 			}
 
-			return list;
+			return p;
 		}
-		*/
 
 		/// <summary>
 		/// Gets the highest surface that is lower than <paramref name="p"/>.
@@ -1257,7 +1417,7 @@ namespace Server
 		/// <returns>A surface <typeparamref name="Tile"/> or <typeparamref name="Item"/>.</returns>
 		public object GetTopSurface(Point3D p)
 		{
-			if (this == Map.Internal)
+			if (this == Internal)
 			{
 				return null;
 			}
@@ -1265,42 +1425,41 @@ namespace Server
 			object surface = null;
 			var surfaceZ = Int32.MinValue;
 
-
-			var lt = Tiles.GetLandTile(p.X, p.Y);
+			var lt = Tiles.GetLandTile(p.m_X, p.m_Y);
 
 			if (!lt.Ignored)
 			{
-				var avgZ = GetAverageZ(p.X, p.Y);
+				var avgZ = GetAverageZ(p.m_X, p.m_Y);
 
-				if (avgZ <= p.Z)
+				if (avgZ <= p.m_Z)
 				{
 					surface = lt;
 					surfaceZ = avgZ;
 
-					if (surfaceZ == p.Z)
+					if (surfaceZ == p.m_Z)
 					{
 						return surface;
 					}
 				}
 			}
 
-			var staticTiles = Tiles.GetStaticTiles(p.X, p.Y, true);
+			var staticTiles = Tiles.GetStaticTiles(p.m_X, p.m_Y, true);
 
 			for (var i = 0; i < staticTiles.Length; i++)
 			{
 				var tile = staticTiles[i];
-				var id = TileData.ItemTable[tile.ID & TileData.MaxItemValue];
+				var id = TileData.ItemTable[tile.m_ID & TileData.MaxItemValue];
 
 				if (id.Surface || (id.Flags & TileFlag.Wet) != 0)
 				{
 					var tileZ = tile.Z + id.CalcHeight;
 
-					if (tileZ > surfaceZ && tileZ <= p.Z)
+					if (tileZ > surfaceZ && tileZ <= p.m_Z)
 					{
 						surface = tile;
 						surfaceZ = tileZ;
 
-						if (surfaceZ == p.Z)
+						if (surfaceZ == p.m_Z)
 						{
 							return surface;
 						}
@@ -1308,13 +1467,13 @@ namespace Server
 				}
 			}
 
-			var sector = GetSector(p.X, p.Y);
+			var sector = GetSector(p.m_X, p.m_Y);
 
 			for (var i = 0; i < sector.Items.Count; i++)
 			{
 				var item = sector.Items[i];
 
-				if (!(item is BaseMulti) && item.ItemID <= TileData.MaxItemValue && item.AtWorldPoint(p.X, p.Y) && !item.Movable)
+				if (item is not BaseMulti && item.ItemID <= TileData.MaxItemValue && item.AtWorldPoint(p.m_X, p.m_Y) && !item.Movable)
 				{
 					var id = item.ItemData;
 
@@ -1322,12 +1481,12 @@ namespace Server
 					{
 						var itemZ = item.Z + id.CalcHeight;
 
-						if (itemZ > surfaceZ && itemZ <= p.Z)
+						if (itemZ > surfaceZ && itemZ <= p.m_Z)
 						{
 							surface = item;
 							surfaceZ = itemZ;
 
-							if (surfaceZ == p.Z)
+							if (surfaceZ == p.m_Z)
 							{
 								return surface;
 							}
@@ -1345,9 +1504,9 @@ namespace Server
 			{
 				newX = 0;
 			}
-			else if (x >= m_Width)
+			else if (x >= Bounds.Width)
 			{
-				newX = m_Width - 1;
+				newX = Bounds.Width - 1;
 			}
 			else
 			{
@@ -1358,9 +1517,9 @@ namespace Server
 			{
 				newY = 0;
 			}
-			else if (y >= m_Height)
+			else if (y >= Bounds.Height)
 			{
-				newY = m_Height - 1;
+				newY = Bounds.Height - 1;
 			}
 			else
 			{
@@ -1376,37 +1535,38 @@ namespace Server
 			{
 				x = 0;
 			}
-			else if (x >= m_Width)
+			else if (x >= Bounds.Width)
 			{
-				x = m_Width - 1;
+				x = Bounds.Width - 1;
 			}
 
 			if (y < 0)
 			{
 				y = 0;
 			}
-			else if (y >= m_Height)
+			else if (y >= Bounds.Height)
 			{
-				y = m_Height - 1;
+				y = Bounds.Height - 1;
 			}
 
 			return new Point2D(x, y);
 		}
 
-		public Map(int mapID, int mapIndex, int fileIndex, int width, int height, int season, string name, MapRules rules)
+		public Map(int mapID, int mapIndex, int fileIndex, MapBounds bounds, MapBounds area, MapWrap wrap, int season, string name, MapRules rules)
 		{
-			m_MapID = mapID;
-			m_MapIndex = mapIndex;
-			m_FileIndex = fileIndex;
-			m_Width = width;
-			m_Height = height;
-			m_Season = season;
+			MapID = mapID;
+			MapIndex = mapIndex;
+			FileIndex = fileIndex;
+			Bounds = bounds;
+			Area = area;
+			Wrap = wrap;
+			Season = season;
 			m_Name = name;
-			m_Rules = rules;
-			m_Regions = new();
-			m_InvalidSector = new Sector(0, 0, this);
-			m_SectorsWidth = width >> SectorShift;
-			m_SectorsHeight = height >> SectorShift;
+			Rules = rules;
+			Regions = new();
+			InvalidSector = new Sector(0, 0, this);
+			m_SectorsWidth = Bounds.Width >> SectorShift;
+			m_SectorsHeight = Bounds.Height >> SectorShift;
 			m_Sectors = new Sector[m_SectorsWidth][];
 		}
 
@@ -1459,7 +1619,7 @@ namespace Server
 			}
 			else
 			{
-				return m_InvalidSector;
+				return InvalidSector;
 			}
 		}
 		#endregion
@@ -1471,7 +1631,7 @@ namespace Server
 				for (var y = cy - SectorActiveRange; y <= cy + SectorActiveRange; ++y)
 				{
 					var sect = GetRealSector(x, y);
-					if (sect != m_InvalidSector)
+					if (sect != InvalidSector)
 					{
 						sect.Activate();
 					}
@@ -1486,7 +1646,7 @@ namespace Server
 				for (var y = cy - SectorActiveRange; y <= cy + SectorActiveRange; ++y)
 				{
 					var sect = GetRealSector(x, y);
-					if (sect != m_InvalidSector && !PlayersInRange(sect, SectorActiveRange))
+					if (sect != InvalidSector && !PlayersInRange(sect, SectorActiveRange))
 					{
 						sect.Deactivate();
 					}
@@ -1501,7 +1661,7 @@ namespace Server
 				for (var y = sect.Y - range; y <= sect.Y + range; ++y)
 				{
 					var check = GetRealSector(x, y);
-					if (check != m_InvalidSector && check.Players.Count > 0)
+					if (check != InvalidSector && check.Players.Count > 0)
 					{
 						return true;
 					}
@@ -1513,7 +1673,7 @@ namespace Server
 
 		public void OnClientChange(NetState oldState, NetState newState, Mobile m)
 		{
-			if (this == Map.Internal)
+			if (this == Internal)
 			{
 				return;
 			}
@@ -1523,7 +1683,7 @@ namespace Server
 
 		public void OnEnter(Mobile m)
 		{
-			if (this == Map.Internal)
+			if (this == Internal)
 			{
 				return;
 			}
@@ -1535,16 +1695,15 @@ namespace Server
 
 		public void OnEnter(Item item)
 		{
-			if (this == Map.Internal)
+			if (this == Internal)
 			{
 				return;
 			}
 
 			GetSector(item).OnEnter(item);
 
-			if (item is BaseMulti)
+			if (item is BaseMulti m)
 			{
-				var m = (BaseMulti)item;
 				var mcl = m.Components;
 
 				var start = GetMultiMinSector(item.Location, mcl);
@@ -1556,7 +1715,7 @@ namespace Server
 
 		public void OnLeave(Mobile m)
 		{
-			if (this == Map.Internal)
+			if (this == Internal)
 			{
 				return;
 			}
@@ -1568,16 +1727,15 @@ namespace Server
 
 		public void OnLeave(Item item)
 		{
-			if (this == Map.Internal)
+			if (this == Internal)
 			{
 				return;
 			}
 
 			GetSector(item).OnLeave(item);
 
-			if (item is BaseMulti)
+			if (item is BaseMulti m)
 			{
-				var m = (BaseMulti)item;
 				var mcl = m.Components;
 
 				var start = GetMultiMinSector(item.Location, mcl);
@@ -1589,7 +1747,7 @@ namespace Server
 
 		public void RemoveMulti(BaseMulti m, Sector start, Sector end)
 		{
-			if (this == Map.Internal)
+			if (this == Internal)
 			{
 				return;
 			}
@@ -1605,7 +1763,7 @@ namespace Server
 
 		public void AddMulti(BaseMulti m, Sector start, Sector end)
 		{
-			if (this == Map.Internal)
+			if (this == Internal)
 			{
 				return;
 			}
@@ -1631,7 +1789,7 @@ namespace Server
 
 		public void OnMove(Point3D oldLocation, Mobile m)
 		{
-			if (this == Map.Internal)
+			if (this == Internal)
 			{
 				return;
 			}
@@ -1648,7 +1806,7 @@ namespace Server
 
 		public void OnMove(Point3D oldLocation, Item item)
 		{
-			if (this == Map.Internal)
+			if (this == Internal)
 			{
 				return;
 			}
@@ -1662,9 +1820,8 @@ namespace Server
 				newSector.OnEnter(item);
 			}
 
-			if (item is BaseMulti)
+			if (item is BaseMulti m)
 			{
-				var m = (BaseMulti)item;
 				var mcl = m.Components;
 
 				var start = GetMultiMinSector(item.Location, mcl);
@@ -1681,7 +1838,7 @@ namespace Server
 			}
 		}
 
-		private readonly object tileLock = new object();
+		private readonly object tileLock = new();
 
 		public TileMatrix Tiles
 		{
@@ -1694,24 +1851,26 @@ namespace Server
 
 				lock (tileLock)
 				{
-					return m_Tiles ?? (m_Tiles = new TileMatrix(this, m_FileIndex, m_MapID, m_Width, m_Height));
+					return m_Tiles ??= new TileMatrix(this, FileIndex, MapID, Bounds);
 				}
 			}
 		}
 
-		public int MapID => m_MapID;
+		public int MapID { get; }
 
-		public int MapIndex => m_MapIndex;
+		public int MapIndex { get; }
 
-		public int Width => m_Width;
+		public int FileIndex { get; }
 
-		public int Height => m_Height;
+		public int Width => Bounds.Width;
 
-		public HashSet<Region> Regions => m_Regions;
+		public int Height => Bounds.Height;
+
+		public HashSet<Region> Regions { get; }
 
 		public void RegisterRegion(Region reg)
 		{
-			if (m_Regions.Add(reg))
+			if (Regions.Add(reg))
 			{
 				RegionAdded?.Invoke(this, reg);
 			}
@@ -1719,7 +1878,7 @@ namespace Server
 
 		public void UnregisterRegion(Region reg)
 		{
-			if (m_Regions.Remove(reg))
+			if (Regions.Remove(reg))
 			{
 				if (m_DefaultRegion == reg)
 				{
@@ -1741,7 +1900,7 @@ namespace Server
 
 				if (World.Loaded && !World.Loading && !World.Saving && m_DefaultRegion?.Deleted != false)
 				{
-					m_DefaultRegion = new Region(null, this, 0, Array.Empty<Poly3D>());
+					m_DefaultRegion = new MapRegion(this);
 					m_DefaultRegion.Register();
 				}
 
@@ -1750,13 +1909,9 @@ namespace Server
 			set => m_DefaultRegion = value;
 		}
 
-		public MapRules Rules
-		{
-			get => m_Rules;
-			set => m_Rules = value;
-		}
+		public MapRules Rules { get; set; }
 
-		public Sector InvalidSector => m_InvalidSector;
+		public Sector InvalidSector { get; }
 
 		public string Name
 		{
@@ -1789,7 +1944,7 @@ namespace Server
 #if Map_NewEnumerables || Map_AllUpdates
 		public class NullEnumerable<T> : IPooledEnumerable<T>
 		{
-			public static readonly NullEnumerable<T> Instance = new NullEnumerable<T>();
+			public static readonly NullEnumerable<T> Instance = new();
 
 			private readonly IEnumerable<T> _Empty;
 
@@ -1814,7 +1969,7 @@ namespace Server
 
 		public sealed class PooledEnumerable<T> : IPooledEnumerable<T>, IDisposable
 		{
-			private static readonly Queue<PooledEnumerable<T>> _Buffer = new Queue<PooledEnumerable<T>>(0x400);
+			private static readonly Queue<PooledEnumerable<T>> _Buffer = new(0x400);
 
 			public static PooledEnumerable<T> Instantiate(Map map, Rectangle2D bounds, PooledEnumeration.Selector<T> selector)
 			{
@@ -1844,7 +1999,7 @@ namespace Server
 
 			private bool _IsDisposed;
 
-			private List<T> _Pool = new List<T>(0x40);
+			private List<T> _Pool = new(0x40);
 
 			public PooledEnumerable(IEnumerable<T> pool)
 			{
@@ -2618,43 +2773,44 @@ namespace Server
 		{
 			Point3D p;
 
-			if (o is Mobile)
+			if (o is Mobile m)
 			{
-				p = ((Mobile)o).Location;
+				p = m.Location;
 				p.Z += 14;//eye ? 15 : 10;
 			}
-			else if (o is Item)
+			else if (o is Item i)
 			{
-				p = ((Item)o).GetWorldLocation();
-				p.Z += (((Item)o).ItemData.Height / 2) + 1;
+				p = i.GetWorldLocation();
+				p.Z += (i.ItemData.Height / 2) + 1;
 			}
-			else if (o is Point3D)
+			else if (o is Point3D p3d)
 			{
-				p = (Point3D)o;
+				p = p3d;
 			}
-			else if (o is LandTarget)
+			else if (o is LandTarget lt)
 			{
-				p = ((LandTarget)o).Location;
+				p = lt.Location;
 
 				int low = 0, avg = 0, top = 0;
+
 				GetAverageZ(p.X, p.Y, ref low, ref avg, ref top);
 
 				p.Z = top + 1;
 			}
-			else if (o is StaticTarget)
+			else if (o is StaticTarget st)
 			{
-				var st = (StaticTarget)o;
 				var id = TileData.ItemTable[st.ItemID & TileData.MaxItemValue];
 
 				p = new Point3D(st.X, st.Y, st.Z - id.CalcHeight + (id.Height / 2) + 1);
 			}
-			else if (o is IPoint3D)
+			else if (o is IPoint3D ip3d)
 			{
-				p = new Point3D((IPoint3D)o);
+				p = new Point3D(ip3d);
 			}
 			else
 			{
 				Console.WriteLine("Warning: Invalid object ({0}) in line of sight", o);
+
 				p = Point3D.Zero;
 			}
 
@@ -2662,34 +2818,26 @@ namespace Server
 		}
 
 		#region Line Of Sight
-		private static int m_MaxLOSDistance = 25;
 
-		public static int MaxLOSDistance
-		{
-			get => m_MaxLOSDistance;
-			set => m_MaxLOSDistance = value;
-		}
+		public static int MaxLOSDistance { get; set; } = 25;
 
 		public bool LineOfSight(Point3D org, Point3D dest)
 		{
-			if (this == Map.Internal)
+			if (this == Internal)
 			{
 				return false;
 			}
 
-			if (!Utility.InRange(org, dest, m_MaxLOSDistance))
+			if (!Utility.InRange(org, dest, MaxLOSDistance))
 			{
 				return false;
 			}
 
-			var start = org;
 			var end = dest;
 
 			if (org.X > dest.X || (org.X == dest.X && org.Y > dest.Y) || (org.X == dest.X && org.Y == dest.Y && org.Z > dest.Z))
 			{
-				var swap = org;
-				org = dest;
-				dest = swap;
+				(dest, org) = (org, dest);
 			}
 
 			double rise, run, zslp;
@@ -2716,19 +2864,19 @@ namespace Server
 			xd = dest.m_X - org.m_X;
 			yd = dest.m_Y - org.m_Y;
 			zd = dest.m_Z - org.m_Z;
-			zslp = Math.Sqrt(xd * xd + yd * yd);
+			zslp = Math.Sqrt((xd * xd) + (yd * yd));
 			if (zd != 0)
 			{
-				sq3d = Math.Sqrt(zslp * zslp + zd * zd);
+				sq3d = Math.Sqrt((zslp * zslp) + (zd * zd));
 			}
 			else
 			{
 				sq3d = zslp;
 			}
 
-			rise = ((float)yd) / sq3d;
-			run = ((float)xd) / sq3d;
-			zslp = ((float)zd) / sq3d;
+			rise = yd / sq3d;
+			run = xd / sq3d;
+			zslp = zd / sq3d;
 
 			y = org.m_Y;
 			z = org.m_Z;
@@ -2751,6 +2899,7 @@ namespace Server
 				{
 					path.Add(ix, iy, iz);
 				}
+
 				x += run;
 				y += rise;
 				z += zslp;
@@ -2799,9 +2948,9 @@ namespace Server
 				var contains = false;
 				var ltID = landTile.ID;
 
-				for (var j = 0; !contains && j < m_InvalidLandTiles.Length; ++j)
+				for (var j = 0; !contains && j < InvalidLandTiles.Length; ++j)
 				{
-					contains = (ltID == m_InvalidLandTiles[j]);
+					contains = ltID == InvalidLandTiles[j];
 				}
 
 				if (contains && statics.Length == 0)
@@ -2858,7 +3007,7 @@ namespace Server
 				}
 			}
 
-			var rect = new Rectangle2D(pTop.m_X, pTop.m_Y, (pBottom.m_X - pTop.m_X) + 1, (pBottom.m_Y - pTop.m_Y) + 1);
+			var rect = new Rectangle2D(pTop.m_X, pTop.m_Y, pBottom.m_X - pTop.m_X + 1, pBottom.m_Y - pTop.m_Y + 1);
 
 			var area = GetItemsInBounds(rect);
 
@@ -2935,11 +3084,12 @@ namespace Server
 
 		public bool LineOfSight(object from, object dest)
 		{
-			if (from == dest || (from is Mobile && ((Mobile)from).AccessLevel > AccessLevel.Player))
+			if (from == dest || (from is Mobile m && m.AccessLevel > AccessLevel.Player))
 			{
 				return true;
 			}
-			else if (dest is Item && from is Mobile && ((Item)dest).RootParent == from)
+
+			if (from is Mobile && dest is Item i && i.RootParent == from)
 			{
 				return true;
 			}
@@ -2978,32 +3128,21 @@ namespace Server
 		}
 		#endregion
 
-		private static int[] m_InvalidLandTiles = new int[] { 0x244 };
-
-		public static int[] InvalidLandTiles
-		{
-			get => m_InvalidLandTiles;
-			set => m_InvalidLandTiles = value;
-		}
+		public static int[] InvalidLandTiles { get; set; } = new int[] { 0x244 };
 
 		public int CompareTo(Map other)
 		{
-			if (other == null)
+			if (other != null)
 			{
-				return -1;
+				return MapID.CompareTo(other.MapID);
 			}
 
-			return m_MapID.CompareTo(other.m_MapID);
+			return -1;
 		}
 
 		public int CompareTo(object other)
 		{
-			if (other == null || other is Map)
-			{
-				return CompareTo(other);
-			}
-
-			throw new ArgumentException();
+			return CompareTo(other as Map);
 		}
 
 		#region Bitmap
@@ -3056,7 +3195,7 @@ namespace Server
 				bmp.MakeTransparent();
 
 				var bd = bmp.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.WriteOnly, bmp.PixelFormat);
-				
+
 				try
 				{
 					var stride = bd.Stride >> 2;
@@ -3257,7 +3396,7 @@ namespace Server
 							}
 						}
 					}
-					else 
+					else
 					{
 						while (landSrc < landEnd)
 						{
@@ -3278,6 +3417,45 @@ namespace Server
 		}
 
 		#endregion
+
+		public sealed class IndexComparer : IComparer<Map>
+		{
+			public static IndexComparer Instance { get; } = new();
+
+			private IndexComparer()
+			{
+			}
+
+			public int Compare(Map l, Map r)
+			{
+				return l.MapIndex - r.MapIndex;
+			}
+		}
+	}
+
+	public sealed class MapRegion : Region
+	{
+		public MapRegion(int id) : base(id)
+		{
+		}
+
+		public MapRegion(Map map) : base(null, map, 0, map.Bounds)
+		{
+		}
+
+		public override void Serialize(GenericWriter writer)
+		{
+			base.Serialize(writer);
+
+			writer.Write(0);
+		}
+
+		public override void Deserialize(GenericReader reader)
+		{
+			base.Deserialize(reader);
+
+			_ = reader.ReadInt();
+		}
 	}
 
 	#region TileList
@@ -3285,14 +3463,13 @@ namespace Server
 	public class TileList
 	{
 		private StaticTile[] m_Tiles;
-		private int m_Count;
 
-		public int Count => m_Count;
+		public int Count { get; private set; }
 
 		public TileList()
 		{
 			m_Tiles = new StaticTile[8];
-			m_Count = 0;
+			Count = 0;
 		}
 
 		public void AddRange(StaticTile[] tiles)
@@ -3310,37 +3487,33 @@ namespace Server
 
 		public void Add(ushort id, byte x, byte y, sbyte z)
 		{
-			if (m_Count + 1 > m_Tiles.Length)
+			if (Count + 1 > m_Tiles.Length)
 			{
-				var old = m_Tiles;
-
-				m_Tiles = new StaticTile[old.Length * 2];
-
-				Array.Copy(old, m_Tiles, old.Length);
+				Array.Resize(ref m_Tiles, m_Tiles.Length * 2);
 			}
 
-			m_Tiles[m_Count].m_ID = id;
-			m_Tiles[m_Count].m_X = x;
-			m_Tiles[m_Count].m_Y = y;
-			m_Tiles[m_Count].m_Z = z;
+			m_Tiles[Count].m_ID = id;
+			m_Tiles[Count].m_X = x;
+			m_Tiles[Count].m_Y = y;
+			m_Tiles[Count].m_Z = z;
 
-			++m_Count;
+			++Count;
 		}
 
-		private static readonly StaticTile[] m_EmptyTiles = new StaticTile[0];
+		private static readonly StaticTile[] m_EmptyTiles = Array.Empty<StaticTile>();
 
 		public StaticTile[] ToArray()
 		{
-			if (m_Count == 0)
+			if (Count == 0)
 			{
 				return m_EmptyTiles;
 			}
 
-			var tiles = new StaticTile[m_Count];
+			var tiles = new StaticTile[Count];
 
-			Array.Copy(m_Tiles, tiles, m_Count);
+			Array.Copy(m_Tiles, tiles, Count);
 
-			m_Count = 0;
+			Count = 0;
 
 			return tiles;
 		}
@@ -3349,10 +3522,10 @@ namespace Server
 	#endregion
 
 	#region TileMatrix
-	
+
 	public class TileMatrix
 	{
-		private static readonly List<TileMatrix> m_Instances = new List<TileMatrix>();
+		private static readonly List<TileMatrix> m_Instances = new();
 
 		private readonly StaticTile[][][][][] m_StaticTiles;
 		private readonly LandTile[][][] m_LandTiles;
@@ -3362,7 +3535,7 @@ namespace Server
 		private readonly UOPIndex m_MapIndex;
 
 		private readonly int m_FileIndex;
-		private readonly int m_Width, m_Height;
+		private readonly MapBounds m_Bounds;
 
 		private readonly Map m_Owner;
 		private readonly int[][] m_StaticPatches;
@@ -3381,9 +3554,9 @@ namespace Server
 
 		public bool Exists => MapStream != null && IndexStream != null && DataStream != null;
 
-		private readonly List<TileMatrix> m_FileShare = new List<TileMatrix>();
+		private readonly List<TileMatrix> m_FileShare = new();
 
-		public TileMatrix(Map owner, int fileIndex, int mapID, int width, int height)
+		public TileMatrix(Map owner, int fileIndex, int mapID, MapBounds bounds)
 		{
 			lock (m_Instances)
 			{
@@ -3408,22 +3581,17 @@ namespace Server
 			}
 
 			m_FileIndex = fileIndex;
-			m_Width = width;
-			m_Height = height;
+			m_Bounds = bounds;
 
-			BlockWidth = width >> 3;
-			BlockHeight = height >> 3;
+			BlockWidth = m_Bounds.Width >> 3;
+			BlockHeight = m_Bounds.Height >> 3;
 
 			m_Owner = owner;
 
 			if (fileIndex != 0x7F)
 			{
-				var mapPath = Core.FindDataFile($"map{fileIndex}LegacyMUL.uop") ?? Core.FindDataFile($"map{fileIndex}.mul");
-
-				if (mapPath == null)
-				{
-					throw new FileNotFoundException($"Could not load map file for {fileIndex}:{owner?.Name ?? "null"}");
-				}
+				var mapPath = (Core.FindDataFile($"map{fileIndex}LegacyMUL.uop") ?? Core.FindDataFile($"map{fileIndex}.mul"))
+							?? throw new FileNotFoundException($"Could not load map file for {fileIndex}:{owner?.Name ?? "null"}");
 
 				MapStream = new FileStream(mapPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
@@ -3458,7 +3626,7 @@ namespace Server
 
 				for (var j = 0; j < 8; ++j)
 				{
-					EmptyStaticBlock[i][j] = new StaticTile[0];
+					EmptyStaticBlock[i][j] = Array.Empty<StaticTile>();
 				}
 			}
 
@@ -3473,7 +3641,6 @@ namespace Server
 		}
 
 		public StaticTile[][][] EmptyStaticBlock { get; }
-
 
 		[MethodImpl(MethodImplOptions.Synchronized)]
 		public void SetStaticBlock(int x, int y, StaticTile[][][] value)
@@ -3546,10 +3713,7 @@ namespace Server
 					}
 				}
 
-				if (tiles == null)
-				{
-					tiles = ReadStaticBlock(x, y);
-				}
+				tiles ??= ReadStaticBlock(x, y);
 
 				m_StaticTiles[x][y] = tiles;
 			}
@@ -3564,7 +3728,7 @@ namespace Server
 			return tiles[x & 0x7][y & 0x7];
 		}
 
-		private readonly TileList m_TilesList = new TileList();
+		private readonly TileList m_TilesList = new();
 
 		[MethodImpl(MethodImplOptions.Synchronized)]
 		public StaticTile[] GetStaticTiles(int x, int y, bool multis)
@@ -3577,12 +3741,12 @@ namespace Server
 
 				foreach (var multiTiles in m_Owner.GetMultiTilesAt(x, y))
 				{
-					if (!any)
+					if (multiTiles.Length > 0)
 					{
 						any = true;
-					}
 
-					m_TilesList.AddRange(multiTiles);
+						m_TilesList.AddRange(multiTiles);
+					}
 				}
 
 				if (any)
@@ -3667,10 +3831,7 @@ namespace Server
 					}
 				}
 
-				if (tiles == null)
-				{
-					tiles = ReadLandBlock(x, y);
-				}
+				tiles ??= ReadLandBlock(x, y);
 
 				m_LandTiles[x][y] = tiles;
 			}
@@ -3694,7 +3855,7 @@ namespace Server
 		{
 			try
 			{
-				IndexReader.BaseStream.Seek(((x * BlockHeight) + y) * 12, SeekOrigin.Begin);
+				_ = IndexReader.BaseStream.Seek(((x * BlockHeight) + y) * 12, SeekOrigin.Begin);
 
 				var lookup = IndexReader.ReadInt32();
 				var length = IndexReader.ReadInt32();
@@ -3715,7 +3876,7 @@ namespace Server
 
 				fixed (StaticTile* pTiles = staTiles)
 				{
-					NativeReader.Read(DataStream, lookup, pTiles, length);
+					_ = NativeReader.Read(DataStream, lookup, pTiles, length);
 
 					if (m_Lists == null)
 					{
@@ -3763,6 +3924,7 @@ namespace Server
 				if (DateTime.UtcNow >= m_NextStaticWarning)
 				{
 					Console.WriteLine("Warning: Static EOS for {0} ({1}, {2})", m_Owner, x, y);
+
 					m_NextStaticWarning = DateTime.UtcNow + TimeSpan.FromMinutes(1.0);
 				}
 
@@ -3772,14 +3934,6 @@ namespace Server
 
 		private DateTime m_NextStaticWarning;
 		private DateTime m_NextLandWarning;
-
-		public void Force()
-		{
-			if (ScriptCompiler.Assemblies == null || ScriptCompiler.Assemblies.Length == 0)
-			{
-				throw new Exception();
-			}
-		}
 
 		[MethodImpl(MethodImplOptions.Synchronized)]
 		private unsafe LandTile[] ReadLandBlock(int x, int y)
@@ -3798,7 +3952,7 @@ namespace Server
 
 				fixed (LandTile* pTiles = tiles)
 				{
-					NativeReader.Read(MapStream, offset, pTiles, tiles.Length * size);
+					_ = NativeReader.Read(MapStream, offset, pTiles, tiles.Length * size);
 				}
 
 				return tiles;
@@ -3821,56 +3975,49 @@ namespace Server
 			{
 				m_MapIndex.Close();
 			}
-			else if (MapStream != null)
+			else
 			{
-				MapStream.Close();
+				MapStream?.Close();
 			}
 
-			if (DataStream != null)
-			{
-				DataStream.Close();
-			}
+			DataStream?.Close();
 
-			if (IndexReader != null)
-			{
-				IndexReader.Close();
-			}
+			IndexReader?.Close();
 		}
 	}
 
 	[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 3)]
 	public struct LandTile
 	{
-		internal short m_ID;
+		internal ushort m_ID;
 		internal sbyte m_Z;
 
-		public int ID => m_ID;
+		public readonly ushort ID => m_ID;
 
-		public int Z
-		{
-			get => m_Z;
-			set => m_Z = (sbyte)value;
-		}
+		public sbyte Z { readonly get => m_Z; set => m_Z = (sbyte)value; }
 
-		public int Height => 0;
+		public readonly bool Ignored => m_ID is 2 or 0x1DB or (>= 0x1AE and <= 0x1B5);
 
-		public bool Ignored => m_ID == 2 || m_ID == 0x1DB || (m_ID >= 0x1AE && m_ID <= 0x1B5);
-
-		public LandTile(short id, sbyte z)
+		public LandTile(ushort id, sbyte z)
 		{
 			m_ID = id;
 			m_Z = z;
 		}
 
-		public void Set(short id, sbyte z)
+		public void Set(ushort id, sbyte z)
 		{
 			m_ID = id;
 			m_Z = z;
 		}
 
-		public override int GetHashCode()
+		public override readonly int GetHashCode()
 		{
 			return HashCode.Combine(m_ID, m_Z);
+		}
+
+		public override readonly string ToString()
+		{
+			return $"({ID}, {Z}, {Ignored})";
 		}
 	}
 
@@ -3881,18 +4028,22 @@ namespace Server
 		internal byte m_X;
 		internal byte m_Y;
 		internal sbyte m_Z;
-		internal short m_Hue;
+		internal ushort m_Hue;
 
-		public int ID => m_ID;
+		public readonly ushort ID => m_ID;
 
-		public int X { get => m_X; set => m_X = (byte)value; }
-		public int Y { get => m_Y; set => m_Y = (byte)value; }
-		public int Z { get => m_Z; set => m_Z = (sbyte)value; }
-		public int Hue { get => m_Hue; set => m_Hue = (short)value; }
+		public byte X { readonly get => m_X; set => m_X = (byte)value; }
+		public byte Y { readonly get => m_Y; set => m_Y = (byte)value; }
+		public sbyte Z { readonly get => m_Z; set => m_Z = (sbyte)value; }
+		public ushort Hue { readonly get => m_Hue; set => m_Hue = (ushort)value; }
 
-		public int Height => TileData.ItemTable[m_ID & TileData.MaxItemValue].Height;
+		public readonly ItemData Data => TileData.ItemTable[m_ID & TileData.MaxItemValue];
 
-		public bool Ignored => m_ID <= 1 || m_ID == 0x1796;
+		public readonly int Height => Data.Height;
+
+		public readonly TileFlag Flags => Data.Flags;
+
+		public readonly bool Ignored => m_ID is <= 1 or 0x1796;
 
 		public StaticTile(ushort id, sbyte z)
 		{
@@ -3904,7 +4055,7 @@ namespace Server
 			m_Hue = 0;
 		}
 
-		public StaticTile(ushort id, byte x, byte y, sbyte z, short hue)
+		public StaticTile(ushort id, byte x, byte y, sbyte z, ushort hue)
 		{
 			m_ID = id;
 			m_X = x;
@@ -3919,7 +4070,7 @@ namespace Server
 			m_Z = z;
 		}
 
-		public void Set(ushort id, byte x, byte y, sbyte z, short hue)
+		public void Set(ushort id, byte x, byte y, sbyte z, ushort hue)
 		{
 			m_ID = id;
 			m_X = x;
@@ -3928,9 +4079,14 @@ namespace Server
 			m_Hue = hue;
 		}
 
-		public override int GetHashCode()
+		public override readonly int GetHashCode()
 		{
 			return HashCode.Combine(m_ID, m_X, m_Y, m_Z, m_Hue);
+		}
+
+		public override readonly string ToString()
+		{
+			return $"({ID}, {X}, {Y}, {Z}, {Height}, {Hue})";
 		}
 	}
 
@@ -3982,17 +4138,22 @@ namespace Server
 			}
 
 			Version = m_Reader.ReadInt32();
-			m_Reader.ReadInt32();
+
+			_ = m_Reader.ReadInt32();
+
 			var nextTable = m_Reader.ReadInt32();
 
 			var entries = new List<UOPEntry>();
 
 			do
 			{
-				stream.Seek(nextTable, SeekOrigin.Begin);
+				_ = stream.Seek(nextTable, SeekOrigin.Begin);
+
 				var count = m_Reader.ReadInt32();
+
 				nextTable = m_Reader.ReadInt32();
-				m_Reader.ReadInt32();
+
+				_ = m_Reader.ReadInt32();
 
 				for (var i = 0; i < count; ++i)
 				{
@@ -4000,16 +4161,18 @@ namespace Server
 
 					if (offset == 0)
 					{
-						stream.Seek(30, SeekOrigin.Current);
+						_ = stream.Seek(30, SeekOrigin.Current);
+
 						continue;
 					}
 
-					m_Reader.ReadInt64();
+					_ = m_Reader.ReadInt64();
+
 					var length = m_Reader.ReadInt32();
 
 					entries.Add(new UOPEntry(offset, length));
 
-					stream.Seek(18, SeekOrigin.Current);
+					_ = stream.Seek(18, SeekOrigin.Current);
 				}
 			}
 			while (nextTable != 0 && nextTable < m_Length);
@@ -4018,16 +4181,19 @@ namespace Server
 
 			for (var i = 0; i < entries.Count; ++i)
 			{
-				stream.Seek(entries[i].m_Offset + 2, SeekOrigin.Begin);
+				_ = stream.Seek(entries[i].m_Offset + 2, SeekOrigin.Begin);
 
 				int dataOffset = m_Reader.ReadInt16();
+
 				entries[i].m_Offset += 4 + dataOffset;
 
-				stream.Seek(dataOffset, SeekOrigin.Current);
+				_ = stream.Seek(dataOffset, SeekOrigin.Current);
+
 				entries[i].m_Order = m_Reader.ReadInt32();
 			}
 
 			entries.Sort();
+
 			m_Entries = entries.ToArray();
 		}
 
@@ -4113,36 +4279,33 @@ namespace Server
 		[MethodImpl(MethodImplOptions.Synchronized)]
 		private unsafe int PatchLand(TileMatrix matrix, string dataPath, string indexPath)
 		{
-			using (var fsData = new FileStream(dataPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+			using var fsData = new FileStream(dataPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+			using var fsIndex = new FileStream(indexPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+
+			var indexReader = new BinaryReader(fsIndex);
+
+			var size = sizeof(LandTile);
+			var count = (int)(indexReader.BaseStream.Length / 4);
+
+			for (int i = 0, fsOffset = 4; i < count; i++, fsOffset += 4)
 			{
-				using (var fsIndex = new FileStream(indexPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+				var blockID = indexReader.ReadInt32();
+				var x = blockID / matrix.BlockHeight;
+				var y = blockID % matrix.BlockHeight;
+
+				var tiles = new LandTile[64];
+
+				fixed (LandTile* pTiles = tiles)
 				{
-					var indexReader = new BinaryReader(fsIndex);
-
-					var size = sizeof(LandTile);
-					var count = (int)(indexReader.BaseStream.Length / 4);
-
-					for (int i = 0, fsOffset = 4; i < count; i++, fsOffset += 4)
-					{
-						var blockID = indexReader.ReadInt32();
-						var x = blockID / matrix.BlockHeight;
-						var y = blockID % matrix.BlockHeight;
-
-						var tiles = new LandTile[64];
-
-						fixed (LandTile* pTiles = tiles)
-						{
-							NativeReader.Read(fsData, fsOffset, pTiles, tiles.Length * size);
-						}
-
-						matrix.SetLandBlock(x, y, tiles);
-					}
-
-					indexReader.Close();
-
-					return count;
+					_ = NativeReader.Read(fsData, fsOffset, pTiles, tiles.Length * size);
 				}
+
+				matrix.SetLandBlock(x, y, tiles);
 			}
+
+			indexReader.Close();
+
+			return count;
 		}
 
 		private StaticTile[] m_TileBuffer = new StaticTile[128];
@@ -4150,90 +4313,87 @@ namespace Server
 		[MethodImpl(MethodImplOptions.Synchronized)]
 		private unsafe int PatchStatics(TileMatrix matrix, string dataPath, string indexPath, string lookupPath)
 		{
-			using (var fsData = new FileStream(dataPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+			using var fsData = new FileStream(dataPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+			using var fsIndex = new FileStream(indexPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+			using var fsLookup = new FileStream(lookupPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+
+			var indexReader = new BinaryReader(fsIndex);
+			var lookupReader = new BinaryReader(fsLookup);
+
+			var count = (int)(indexReader.BaseStream.Length / 4);
+
+			var lists = new TileList[8][];
+
+			for (var x = 0; x < 8; ++x)
 			{
-				using (var fsIndex = new FileStream(indexPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+				lists[x] = new TileList[8];
+
+				for (var y = 0; y < 8; ++y)
 				{
-					using (var fsLookup = new FileStream(lookupPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-					{
-						var indexReader = new BinaryReader(fsIndex);
-						var lookupReader = new BinaryReader(fsLookup);
-
-						var count = (int)(indexReader.BaseStream.Length / 4);
-
-						var lists = new TileList[8][];
-
-						for (var x = 0; x < 8; ++x)
-						{
-							lists[x] = new TileList[8];
-
-							for (var y = 0; y < 8; ++y)
-							{
-								lists[x][y] = new TileList();
-							}
-						}
-
-						for (var i = 0; i < count; ++i)
-						{
-							var blockID = indexReader.ReadInt32();
-							var blockX = blockID / matrix.BlockHeight;
-							var blockY = blockID % matrix.BlockHeight;
-
-							var offset = lookupReader.ReadInt32();
-							var length = lookupReader.ReadInt32();
-							lookupReader.ReadInt32(); // Extra
-
-							if (offset < 0 || length <= 0)
-							{
-								matrix.SetStaticBlock(blockX, blockY, matrix.EmptyStaticBlock);
-								continue;
-							}
-
-							var tileCount = length / 7;
-
-							if (m_TileBuffer.Length < tileCount)
-							{
-								m_TileBuffer = new StaticTile[tileCount];
-							}
-
-							var staTiles = m_TileBuffer;
-
-							fixed (StaticTile* pTiles = staTiles)
-							{
-								NativeReader.Read(fsData, offset, pTiles, length);
-
-								StaticTile* pCur = pTiles, pEnd = pTiles + tileCount;
-
-								while (pCur < pEnd)
-								{
-									lists[pCur->m_X & 0x7][pCur->m_Y & 0x7].Add(*pCur);
-
-									++pCur;
-								}
-
-								var tiles = new StaticTile[8][][];
-
-								for (var x = 0; x < 8; ++x)
-								{
-									tiles[x] = new StaticTile[8][];
-
-									for (var y = 0; y < 8; ++y)
-									{
-										tiles[x][y] = lists[x][y].ToArray();
-									}
-								}
-
-								matrix.SetStaticBlock(blockX, blockY, tiles);
-							}
-						}
-
-						indexReader.Close();
-						lookupReader.Close();
-
-						return count;
-					}
+					lists[x][y] = new TileList();
 				}
 			}
+
+			for (var i = 0; i < count; ++i)
+			{
+				var blockID = indexReader.ReadInt32();
+				var blockX = blockID / matrix.BlockHeight;
+				var blockY = blockID % matrix.BlockHeight;
+
+				var offset = lookupReader.ReadInt32();
+				var length = lookupReader.ReadInt32();
+
+				_ = lookupReader.ReadInt32(); // Extra
+
+				if (offset < 0 || length <= 0)
+				{
+					matrix.SetStaticBlock(blockX, blockY, matrix.EmptyStaticBlock);
+
+					continue;
+				}
+
+				var tileCount = length / 7;
+
+				if (m_TileBuffer.Length < tileCount)
+				{
+					m_TileBuffer = new StaticTile[tileCount];
+				}
+
+				var staTiles = m_TileBuffer;
+
+				fixed (StaticTile* pTiles = staTiles)
+				{
+					_ = NativeReader.Read(fsData, offset, pTiles, length);
+
+					StaticTile* pCur = pTiles, pEnd = pTiles + tileCount;
+
+					while (pCur < pEnd)
+					{
+						lists[pCur->m_X & 0x7][pCur->m_Y & 0x7].Add(*pCur);
+
+						++pCur;
+					}
+
+					var tiles = new StaticTile[8][][];
+
+					for (var x = 0; x < 8; ++x)
+					{
+						tiles[x] = new StaticTile[8][];
+
+						for (var y = 0; y < 8; ++y)
+						{
+							tiles[x][y] = lists[x][y].ToArray();
+						}
+					}
+
+					matrix.SetStaticBlock(blockX, blockY, tiles);
+				}
+			}
+
+			indexReader.Close();
+			lookupReader.Close();
+
+			return count;
 		}
 	}
 

@@ -38,8 +38,8 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 		public OakTreeSapling1()
 		  : base()
 		{
-			BaseAssetSets.Add(new GraphicAsset[] { new GraphicAsset(0x3BBE, 0, 0) });
-			LeafSets.Add(new GraphicAsset[] { new GraphicAsset(0x3BBF, 0, 0) });
+			BaseAssetSets.Add(new HarvestGraphicAsset[] { new HarvestGraphicAsset(0x3BBE, 0, 0) });
+			LeafSets.Add(new HarvestGraphicAsset[] { new HarvestGraphicAsset(0x3BBF, 0, 0) });
 		}
 	}
 
@@ -54,8 +54,8 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 		public OakTreeSapling2()
 		  : base()
 		{
-			BaseAssetSets.Add(new GraphicAsset[] { new GraphicAsset(0x3BC0, 0, 0) });
-			LeafSets.Add(new GraphicAsset[] { new GraphicAsset(0x3BC1, 0, 0) });
+			BaseAssetSets.Add(new HarvestGraphicAsset[] { new HarvestGraphicAsset(0x3BC0, 0, 0) });
+			LeafSets.Add(new HarvestGraphicAsset[] { new HarvestGraphicAsset(0x3BC1, 0, 0) });
 		}
 	}
 
@@ -81,49 +81,49 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 			PhaseResources.Add(339, bloodwoodResource);
 			PhaseResources.Add(688, frostwoodResource);
 
-			GraphicAsset asset1 = new GraphicAsset(0x3BC2, -1, 0);
+			HarvestGraphicAsset asset1 = new HarvestGraphicAsset(0x3BC2, -1, 0);
 			asset1.HarvestResourceBaseAmount = 10;
 
-			GraphicAsset asset2 = new GraphicAsset(0x3BC3, -2, 0);
+			HarvestGraphicAsset asset2 = new HarvestGraphicAsset(0x3BC3, -2, 0);
 			asset2.HarvestResourceBaseAmount = 10;
 
-			GraphicAsset asset3 = new GraphicAsset(0x3BC4, -3, 0);
+			HarvestGraphicAsset asset3 = new HarvestGraphicAsset(0x3BC4, -3, 0);
 			asset3.HarvestResourceBaseAmount = 10;
 
-			GraphicAsset asset4 = new GraphicAsset(0x3BC5, -4, 0);
+			HarvestGraphicAsset asset4 = new HarvestGraphicAsset(0x3BC5, -4, 0);
 			asset4.HarvestResourceBaseAmount = 10;
 
-			GraphicAsset asset5 = new GraphicAsset(0x3BC6, -5, 0);
+			HarvestGraphicAsset asset5 = new HarvestGraphicAsset(0x3BC6, -5, 0);
 			asset5.HarvestResourceBaseAmount = 10;
 
-			GraphicAsset asset6 = new GraphicAsset(0x3BC7, -5, -1);
+			HarvestGraphicAsset asset6 = new HarvestGraphicAsset(0x3BC7, -5, -1);
 			asset6.HarvestResourceBaseAmount = 10;
 
-			GraphicAsset asset7 = new GraphicAsset(0x3BC8, -4, -1);
+			HarvestGraphicAsset asset7 = new HarvestGraphicAsset(0x3BC8, -4, -1);
 			asset7.HarvestResourceBaseAmount = 10;
 
-			GraphicAsset asset8 = new GraphicAsset(0x3BC9, -3, -1);
+			HarvestGraphicAsset asset8 = new HarvestGraphicAsset(0x3BC9, -3, -1);
 			asset8.HarvestResourceBaseAmount = 10;
 
-			GraphicAsset asset9 = new GraphicAsset(0x3BCA, -2, -1);
+			HarvestGraphicAsset asset9 = new HarvestGraphicAsset(0x3BCA, -2, -1);
 			asset9.HarvestResourceBaseAmount = 10;
 
-			GraphicAsset asset10 = new GraphicAsset(0x3BCB, -3, -2);
+			HarvestGraphicAsset asset10 = new HarvestGraphicAsset(0x3BCB, -3, -2);
 			asset10.HarvestResourceBaseAmount = 10;
 
-			GraphicAsset asset11 = new GraphicAsset(0x3BCC, -5, 1);
+			HarvestGraphicAsset asset11 = new HarvestGraphicAsset(0x3BCC, -5, 1);
 			asset11.HarvestResourceBaseAmount = 10;
 
-			GraphicAsset asset12 = new GraphicAsset(0x3BCD, -4, 1);
+			HarvestGraphicAsset asset12 = new HarvestGraphicAsset(0x3BCD, -4, 1);
 			asset12.HarvestResourceBaseAmount = 10;
 
-			GraphicAsset asset13 = new GraphicAsset(0x3BCE, -3, 1);
+			HarvestGraphicAsset asset13 = new HarvestGraphicAsset(0x3BCE, -3, 1);
 			asset13.HarvestResourceBaseAmount = 10;
 
-			GraphicAsset asset14 = new GraphicAsset(0x3BCF, -2, 1);
+			HarvestGraphicAsset asset14 = new HarvestGraphicAsset(0x3BCF, -2, 1);
 			asset14.HarvestResourceBaseAmount = 10;
 
-			BaseAssetSets.Add(new GraphicAsset[] { asset1, asset2, asset3, asset4, asset5, asset6, asset7, asset8, asset9, asset10, asset11, asset12, asset13, asset14 });
+			BaseAssetSets.Add(new HarvestGraphicAsset[] { asset1, asset2, asset3, asset4, asset5, asset6, asset7, asset8, asset9, asset10, asset11, asset12, asset13, asset14 });
 		}
 	}
 
@@ -153,8 +153,8 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 		public OakTree2Sapling1()
 		  : base()
 		{
-			BaseAssetSets.Add(new GraphicAsset[] { new GraphicAsset(0x3BD1, 0, 0) });
-			LeafSets.Add(new GraphicAsset[] { new GraphicAsset(0x3BD2, 0, 0) });
+			BaseAssetSets.Add(new HarvestGraphicAsset[] { new HarvestGraphicAsset(0x3BD1, 0, 0) });
+			LeafSets.Add(new HarvestGraphicAsset[] { new HarvestGraphicAsset(0x3BD2, 0, 0) });
 		}
 	}
 
@@ -169,8 +169,8 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 		public OakTree2Sapling2()
 		  : base()
 		{
-			BaseAssetSets.Add(new GraphicAsset[] { new GraphicAsset(0x3BD3, 0, 0) });
-			LeafSets.Add(new GraphicAsset[] { new GraphicAsset(0x3BD4, 0, 0) });
+			BaseAssetSets.Add(new HarvestGraphicAsset[] { new HarvestGraphicAsset(0x3BD3, 0, 0) });
+			LeafSets.Add(new HarvestGraphicAsset[] { new HarvestGraphicAsset(0x3BD4, 0, 0) });
 		}
 	}
 
@@ -196,48 +196,48 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 			PhaseResources.Add(339, bloodwoodResource);
 			PhaseResources.Add(688, frostwoodResource);
 
-			GraphicAsset asset1 = new GraphicAsset(0x3BD5, -1, 0);
+			HarvestGraphicAsset asset1 = new HarvestGraphicAsset(0x3BD5, -1, 0);
 			asset1.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset2 = new GraphicAsset(0x3BD6, -2, 0);
+			HarvestGraphicAsset asset2 = new HarvestGraphicAsset(0x3BD6, -2, 0);
 			asset2.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset3 = new GraphicAsset(0x3BD7, -3, 0);
+			HarvestGraphicAsset asset3 = new HarvestGraphicAsset(0x3BD7, -3, 0);
 			asset3.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset4 = new GraphicAsset(0x3BD8, -4, 0);
+			HarvestGraphicAsset asset4 = new HarvestGraphicAsset(0x3BD8, -4, 0);
 			asset4.HarvestResourceBaseAmount = 10;
 
-			GraphicAsset asset5 = new GraphicAsset(0x3BD9, -4, -1);
+			HarvestGraphicAsset asset5 = new HarvestGraphicAsset(0x3BD9, -4, -1);
 			asset5.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset6 = new GraphicAsset(0x3BDA, -3, -1);
+			HarvestGraphicAsset asset6 = new HarvestGraphicAsset(0x3BDA, -3, -1);
 			asset6.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset7 = new GraphicAsset(0x3BDB, -2, -1);
+			HarvestGraphicAsset asset7 = new HarvestGraphicAsset(0x3BDB, -2, -1);
 			asset7.HarvestResourceBaseAmount = 10;
 
-			GraphicAsset asset8 = new GraphicAsset(0x3BDC, -4, -2);
+			HarvestGraphicAsset asset8 = new HarvestGraphicAsset(0x3BDC, -4, -2);
 			asset8.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset9 = new GraphicAsset(0x3BDD, -3, -2);
+			HarvestGraphicAsset asset9 = new HarvestGraphicAsset(0x3BDD, -3, -2);
 			asset9.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset10 = new GraphicAsset(0x3BDE, -2, -2);
+			HarvestGraphicAsset asset10 = new HarvestGraphicAsset(0x3BDE, -2, -2);
 			asset10.HarvestResourceBaseAmount = 10;
 
-			GraphicAsset asset11 = new GraphicAsset(0x3BDF, -1, 1);
+			HarvestGraphicAsset asset11 = new HarvestGraphicAsset(0x3BDF, -1, 1);
 			asset11.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset12 = new GraphicAsset(0x3BE0, -2, 1);
+			HarvestGraphicAsset asset12 = new HarvestGraphicAsset(0x3BE0, -2, 1);
 			asset12.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset13 = new GraphicAsset(0x3BE1, -3, 1);
+			HarvestGraphicAsset asset13 = new HarvestGraphicAsset(0x3BE1, -3, 1);
 			asset13.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset14 = new GraphicAsset(0x3BE2, -4, 1);
+			HarvestGraphicAsset asset14 = new HarvestGraphicAsset(0x3BE2, -4, 1);
 			asset14.HarvestResourceBaseAmount = 10;
 
-			GraphicAsset asset15 = new GraphicAsset(0x3BE3, -4, 2);
+			HarvestGraphicAsset asset15 = new HarvestGraphicAsset(0x3BE3, -4, 2);
 			asset15.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset16 = new GraphicAsset(0x3BE4, -3, 2);
+			HarvestGraphicAsset asset16 = new HarvestGraphicAsset(0x3BE4, -3, 2);
 			asset16.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset17 = new GraphicAsset(0x3BE5, -2, 2);
+			HarvestGraphicAsset asset17 = new HarvestGraphicAsset(0x3BE5, -2, 2);
 			asset17.HarvestResourceBaseAmount = 10;
-			GraphicAsset asset18 = new GraphicAsset(0x3BE6, -1, 2);
+			HarvestGraphicAsset asset18 = new HarvestGraphicAsset(0x3BE6, -1, 2);
 			asset18.HarvestResourceBaseAmount = 10;
 
-			BaseAssetSets.Add(new GraphicAsset[] { asset1, asset2, asset3, asset4, asset5, asset6, asset7, asset8, asset9, asset10, asset11, asset12, asset13, asset14, asset15, asset16, asset17, asset18 });
+			BaseAssetSets.Add(new HarvestGraphicAsset[] { asset1, asset2, asset3, asset4, asset5, asset6, asset7, asset8, asset9, asset10, asset11, asset12, asset13, asset14, asset15, asset16, asset17, asset18 });
 		}
 	}
 }

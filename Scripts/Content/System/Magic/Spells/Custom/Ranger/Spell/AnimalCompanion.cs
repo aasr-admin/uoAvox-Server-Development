@@ -72,8 +72,8 @@ namespace Server.Spells.Ranger
 		private readonly Mobile m_From;
 		private readonly RangerFamiliarEntry[] m_Entries;
 
-		private const int m_EnabledColor16 = 0x0F20;
-		private const int m_DisabledColor16 = 0x262A;
+		private const short m_EnabledColor16 = 0x0F20;
+		private const short m_DisabledColor16 = 0x262A;
 
 		private const int m_EnabledColor32 = 0x18CD00;
 		private const int m_DisabledColor32 = 0x4A8B52;

@@ -3,7 +3,7 @@
 	public class LuckyDagger : Dagger
 	{
 		[Constructable]
-		public LuckyDagger() : base(0xF52)
+		public LuckyDagger()
 		{
 			Hue = 0x8A5;
 			Weight = 1.0;

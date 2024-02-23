@@ -22,11 +22,11 @@ namespace Server.Items
 
 			if (gump.EntryCount > 0)
 			{
-				if (gump.EntryCount == 1 && insertGold)
+				if (gump.EntryCount == 1)
 				{
-					callback?.Invoke(player, Currencies.GoldEntry);
+					callback?.Invoke(player, gump.EntryAmounts.First());
 				}
-				else if (player.SendGump(gump, false))
+				else if (player.SendGump(gump))
 				{
 					return gump;
 				}
@@ -247,6 +247,11 @@ namespace Server.Items
 	/// </summary>
 	public class Currencies : TypeAmounts
 	{
+		/// <summary>
+		/// Limits the maximum value for the exchange rate of any given currency entry in a <see cref="Currencies"/> collection.
+		/// </summary>
+		public const int MaxExchangeRate = 1000;
+
 		public static readonly Type GoldType = typeof(Gold);
 
 		public static readonly TypeAmount GoldEntry = new(GoldType, 100);
@@ -256,10 +261,8 @@ namespace Server.Items
 		/// </summary>
 		public static readonly Currencies DefaultEntries = new(Enumerable.Empty<TypeAmount>());
 
-		/// <summary>
-		/// Limits the maximum value for the exchange rate of any given currency entry in a <see cref="Currencies"/> collection.
-		/// </summary>
-		public const int MaxExchangeRate = 1000;
+		public override int DefaultAmountMin => 0;
+		public override int DefaultAmountMax => MaxExchangeRate;
 
 		public Currencies()
 		{
@@ -285,11 +288,7 @@ namespace Server.Items
 
 		public override bool SetAmount(Type type, int amount)
 		{
-			if (Contains(type))
-			{
-				amount = Math.Clamp(amount, 0, MaxExchangeRate);
-			}
-			else if (amount == 1)
+			if (amount == 1 && !Contains(type))
 			{
 				amount = 100;
 			}
@@ -398,6 +397,8 @@ namespace Server.Items
 		private readonly bool m_InsertGold;
 
 		private readonly HashSet<TypeAmount> m_Currencies;
+
+		public IEnumerable<TypeAmount> EntryAmounts => m_Currencies.AsEnumerable();
 
 		public int EntryCount => m_Currencies.Count + (m_InsertGold ? 1 : 0);
 

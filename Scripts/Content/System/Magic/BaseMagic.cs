@@ -37,7 +37,7 @@ namespace Server.Spells
 		public string Desc => Info.Desc ?? String.Empty;
 		public string Mantra => Info.Mantra ?? String.Empty;
 
-		public TypeAmounts Reagents => Info.Reagents;
+		public SpellReagents Reagents => Info.Reagents;
 
 		public SpellState State { get; set; }
 
@@ -736,6 +736,8 @@ namespace Server.Spells
 			{
 				m_CastTimer.Tick();
 			}
+
+			EventSink.InvokeCastSpellSuccess(new CastSpellSuccessEventArgs(Caster, this));
 
 			return true;
 		}

@@ -205,7 +205,7 @@ namespace Server.Engines.UOStore
 
 	public static class PromoCodes
 	{
-		public static string FilePath => Path.Combine(Core.CurrentSavesDirectory, "GameStore", "PromoCodes.bin");
+		public static string FilePath => Path.Combine(Core.CurrentSavesDirectory, "Store", "Promo.bin");
 
 		public static readonly Dictionary<string, PromoCodeHandler> Codes = new Dictionary<string, PromoCodeHandler>(StringComparer.InvariantCultureIgnoreCase);
 
@@ -612,7 +612,7 @@ namespace Server.Engines.UOStore
 
 	public static partial class UltimaStore
 	{
-		public static readonly string FilePath = Path.Combine("Export/Saves/Current", "GameStore", "uoAvosStore.bin");
+		public static string FilePath => Path.Combine(Core.CurrentSavesDirectory, "Store", "Store.bin");
 
 		public static bool Enabled { get => Configuration.Enabled; set => Configuration.Enabled = value; }
 
@@ -1480,7 +1480,7 @@ namespace Server.Engines.UOStore
 						}
 						else
 						{
-							AddHtml(175, 84 + (35 * i), 256, 25, SetColor(C16232(0x6B55), entry.Name[0].String), false, false);
+							AddHtml(175, 84 + (35 * i), 256, 25, SetColor((short)0x6B55, entry.Name[0].String), false, false);
 						}
 
 						AddButton(431, 81 + (35 * i), 0x9C52, 0x9C5C, index + 2000, GumpButtonType.Reply, 0);
@@ -1876,7 +1876,7 @@ namespace Server.Engines.UOStore
 				}
 				else
 				{
-					AddHtml(10, 60 + (i * 14), 400, 20, ColorAndCenter(C16232(0x6B45), Entry.Name[i].String), false, false);
+					AddHtml(10, 60 + (i * 14), 400, 20, ColorAndCenter((short)0x6B45, Entry.Name[i].String), false, false);
 				}
 			}
 
@@ -2068,7 +2068,7 @@ namespace Server.Engines.UOStore
 			AddBackground(0, 0, 400, 340, 0x9C40);
 
 			AddHtmlLocalized(0, 10, 400, 20, 1114513, "#1062516", 0x7FFF, false, false); // Enter Promotional Code
-			AddHtmlLocalized(20, 60, 355, 160, 1062869, C32216(0xFFFF00), false, true); // Enter your promotional code EXACTLY as it was given to you (including dashes). Enter no other text in the box aside from your promotional code.
+			AddHtmlLocalized(20, 60, 355, 160, 1062869, 0x7FFF, false, true); // Enter your promotional code EXACTLY as it was given to you (including dashes). Enter no other text in the box aside from your promotional code.
 
 			AddECHandleInput();
 

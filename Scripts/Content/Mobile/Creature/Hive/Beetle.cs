@@ -6,7 +6,7 @@ using System.Collections.Generic;
 namespace Server.Mobiles
 {
 	[CorpseName("a giant beetle corpse")]
-	public class Beetle : BaseMount
+	public class Beetle : BaseMount, IPackAnimal
 	{
 		public virtual double BoostedSpeed => 0.1;
 

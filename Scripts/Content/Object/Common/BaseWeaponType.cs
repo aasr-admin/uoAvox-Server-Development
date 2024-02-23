@@ -1,4 +1,5 @@
 ﻿using Server.ContextMenus;
+using Server.Engine.Facet;
 using Server.Engine.Facet.Module.LumberHarvest;
 using Server.Engines.Harvest;
 using Server.Mobiles;
@@ -32,7 +33,7 @@ namespace Server.Items
 		bool Axe(Mobile from, BaseAxe axe);
 	}
 
-	public abstract class BaseAxe : BaseMeleeWeapon, IUsesRemaining
+	public abstract class BaseAxe : BaseMeleeWeapon, IUsesRemaining, IHarvestTool
 	{
 		public override int DefHitSound => 0x232;
 		public override int DefMissSound => 0x23A;
@@ -41,7 +42,9 @@ namespace Server.Items
 		public override WeaponType DefType => WeaponType.Axe;
 		public override WeaponAnimation DefAnimation => WeaponAnimation.Slash2H;
 
-		public virtual HarvestSystem HarvestSystem => FacetModule_Lumberjacking.System; // public virtual HarvestSystem HarvestSystem => Lumberjacking.System;
+		public virtual HarvestSystem HarvestSystem => Lumberjacking.System;
+
+		IHarvestSystem IHarvestTool.HarvestSystem => HarvestSystem;
 
 		private int m_UsesRemaining;
 		private bool m_ShowUsesRemaining;
@@ -62,7 +65,7 @@ namespace Server.Items
 
 		public virtual int GetUsesScalar()
 		{
-			if (Quality == WeaponQuality.Exceptional)
+			if (Quality == ItemQuality.Exceptional)
 			{
 				return 200;
 			}
@@ -458,7 +461,7 @@ namespace Server.Items
 	}
 
 	/// BasePoleArm
-	public abstract class BasePoleArm : BaseMeleeWeapon, IUsesRemaining
+	public abstract class BasePoleArm : BaseMeleeWeapon, IUsesRemaining, IHarvestTool
 	{
 		public override int DefHitSound => 0x237;
 		public override int DefMissSound => 0x238;
@@ -467,7 +470,9 @@ namespace Server.Items
 		public override WeaponType DefType => WeaponType.Polearm;
 		public override WeaponAnimation DefAnimation => WeaponAnimation.Slash2H;
 
-		public virtual HarvestSystem HarvestSystem => FacetModule_Lumberjacking.System; // public virtual HarvestSystem HarvestSystem => Lumberjacking.System;
+		public virtual HarvestSystem HarvestSystem => Lumberjacking.System;
+
+		IHarvestSystem IHarvestTool.HarvestSystem => HarvestSystem;
 
 		private int m_UsesRemaining;
 		private bool m_ShowUsesRemaining;
@@ -870,7 +875,7 @@ namespace Server.Items
 		{
 			Visible = false;
 			Movable = false;
-			Quality = WeaponQuality.Regular;
+			Quality = ItemQuality.Regular;
 		}
 
 		public Fists(Serial serial) : base(serial)

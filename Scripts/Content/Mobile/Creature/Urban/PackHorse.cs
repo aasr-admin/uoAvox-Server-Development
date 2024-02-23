@@ -5,8 +5,12 @@ using System.Collections.Generic;
 
 namespace Server.Mobiles
 {
+	public interface IPackAnimal : IEntity
+	{
+	}
+
 	[CorpseName("a horse corpse")]
-	public class PackHorse : BaseCreature
+	public class PackHorse : BaseCreature, IPackAnimal
 	{
 		[Constructable]
 		public PackHorse() : base(AIType.AI_Animal, FightMode.Aggressor, 10, 1, 0.2, 0.4)

@@ -1,10 +1,10 @@
-﻿using Server.Engines.Facet;
-using Server.Mobiles;
+﻿using Server.Mobiles;
 using Server.Network;
 
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace Server.Engine.Facet
 {
@@ -102,8 +102,8 @@ namespace Server.Engine.Facet
 
 			var blocknum = pvSrc.ReadUInt32();
 
-			_ = pvSrc.ReadUInt32();	// byte 007 through 010  -  number of statics in the packet (8 for a query response)
-			
+			_ = pvSrc.ReadUInt32(); // byte 007 through 010  -  number of statics in the packet (8 for a query response)
+
 			// byte 011 through 012  -  Server Facet sequence number - we sent one out, did we get it back?
 			// byte 013              -  Server Facet command (0xFF is a block Query Response)
 
@@ -131,7 +131,14 @@ namespace Server.Engine.Facet
 
 		public static ushort GetBlockCrc(Point2D blockCoords, int mapID, ref byte[] landDataOut, ref byte[] staticsDataOut)
 		{
-			if (blockCoords.X < 0 || blockCoords.Y < 0 || blockCoords.X >= Map.Maps[mapID].Tiles.BlockWidth || blockCoords.Y >= Map.Maps[mapID].Tiles.BlockHeight)
+			if (blockCoords.X < 0 || blockCoords.Y < 0)
+			{
+				return 0;
+			}
+
+			var map = Map.Maps[mapID];
+
+			if (map == null || blockCoords.X >= map.Tiles.BlockWidth || blockCoords.Y >= map.Tiles.BlockHeight)
 			{
 				return 0;
 			}
@@ -154,21 +161,16 @@ namespace Server.Engine.Facet
 			//Console.WriteLine("Block: " + block);
 			//Console.WriteLine("----------------------------------------------------------------------------------------------------");
 
-			if (!MapRegistry.Definitions.ContainsKey(mapID))
-			{
-				Console.WriteLine("Received query for an invalid map.");
-				return;
-			}
-
-			var tm = Map.Maps[mapID].Tiles;
+			var map = Map.Maps[mapID];
+			var tm = map.Tiles;
 
 			var blockX = block / tm.BlockHeight;
 			var blockY = block % tm.BlockHeight;
 
-			var wrapWidthInBlocks = MapRegistry.Definitions[mapID].Wrap.Width >> 3;
-			var wrapHeightInBlocks = MapRegistry.Definitions[mapID].Wrap.Height >> 3;
-			var mapWidthInBlocks = MapRegistry.Definitions[mapID].Bounds.Width >> 3;
-			var mapHeightInBlocks = MapRegistry.Definitions[mapID].Bounds.Height >> 3;
+			var wrapWidthInBlocks = map.Area.Width >> 3;
+			var wrapHeightInBlocks = map.Area.Height >> 3;
+			var mapWidthInBlocks = map.Bounds.Width >> 3;
+			var mapHeightInBlocks = map.Bounds.Height >> 3;
 
 			//Console.WriteLine("BlockX: " + blockX + " BlockY: " + blockY);
 			//Console.WriteLine("Map Height in blocks: " + mapHeightInBlocks);
@@ -348,12 +350,12 @@ namespace Server.Engine.Facet
 
 			EnsureCapacity(15 + staticsData.Length); //byte 001 to 002  -  packet size
 
-			m_Stream.Write((uint)blockNumber);					// byte 003 to 006  -  block number
-			m_Stream.Write(staticsData.Length / 7);				// byte 007 to 010  -  number of statics in packet
-			m_Stream.Write((ushort)0);							// byte 011 to 012  -  Server Facet sequence number
-			m_Stream.Write((byte)0);							// byte 013         -  Server Facet command (0x00 is a statics update)
-			m_Stream.Write((byte)mapID);						// byte 014         -  Server Facet mapnumber
-			m_Stream.Write(staticsData, 0, staticsData.Length);	// byte 015 to ???  -  statics data
+			m_Stream.Write((uint)blockNumber);                  // byte 003 to 006  -  block number
+			m_Stream.Write(staticsData.Length / 7);             // byte 007 to 010  -  number of statics in packet
+			m_Stream.Write((ushort)0);                          // byte 011 to 012  -  Server Facet sequence number
+			m_Stream.Write((byte)0);                            // byte 013         -  Server Facet command (0x00 is a statics update)
+			m_Stream.Write((byte)mapID);                        // byte 014         -  Server Facet mapnumber
+			m_Stream.Write(staticsData, 0, staticsData.Length); // byte 015 to ???  -  statics data
 
 			//Console.WriteLine(string.Format("Sending statics data for block: {0}, Map: {1}", blockNum, playerMap.MapID));
 			//BlockUtility.WriteStaticsDataToConsole(staticsData);
@@ -380,11 +382,11 @@ namespace Server.Engine.Facet
 
 			EnsureCapacity(15); // byte 001 to 002  -  packet size
 
-			m_Stream.Write(blocknum);				// byte 003 to 006  -  central block number for the query (block that player is standing in)
-			m_Stream.Write(0);						// byte 007 to 010  -  number of statics in the packet (0 for a query)
-			m_Stream.Write((ushort)0);				// byte 011 to 012  -  Server Facet sequence number
-			m_Stream.Write((byte)0xFF);				// byte 013         -  Server Facet command (0xFF is a block Query)
-			m_Stream.Write((byte)playerMap.MapID);	// byte 014         -  Server Facet mapnumber
+			m_Stream.Write(blocknum);               // byte 003 to 006  -  central block number for the query (block that player is standing in)
+			m_Stream.Write(0);                      // byte 007 to 010  -  number of statics in the packet (0 for a query)
+			m_Stream.Write((ushort)0);              // byte 011 to 012  -  Server Facet sequence number
+			m_Stream.Write((byte)0xFF);             // byte 013         -  Server Facet command (0xFF is a block Query)
+			m_Stream.Write((byte)playerMap.MapID);  // byte 014         -  Server Facet mapnumber
 		}
 	}
 
@@ -397,9 +399,9 @@ namespace Server.Engine.Facet
 	{
 		public MapDefinitions() : base(0x3F)
 		{
-			var definitions = MapRegistry.Definitions.Values;
+			var maps = Map.AllMaps;
 
-			var length = definitions.Count * 9; // 12 * 9 = 108
+			var length = maps.Count(m => m != null && m.FileIndex != 0x7F) * 9; // 12 * 9 = 108
 			var count = length / 7; // 108 / 7 = 15
 			var padding = 0;
 
@@ -413,20 +415,25 @@ namespace Server.Engine.Facet
 
 			EnsureCapacity(15 + length); // byte 001 to 002  -  packet size
 
-			m_Stream.Write(0);			// byte 003 to 006  -  block number, doesn't really apply in this case
-			m_Stream.Write(count);		// byte 007 to 010  -  number of statics in the packet, in this case its calculated to hold enough space for all the map definitions
-			m_Stream.Write((ushort)0);	// byte 011 to 012  -  Server Facet sequence number, doesn't apply in this case
-			m_Stream.Write((byte)1);	// byte 013         -  Server Facet command (0x01 is Update Map Definitions)
-			m_Stream.Write((byte)0);	// byte 014         -  Server Facet mapnumber, doesn't apply in this case
+			m_Stream.Write(0);          // byte 003 to 006  -  block number, doesn't really apply in this case
+			m_Stream.Write(count);      // byte 007 to 010  -  number of statics in the packet, in this case its calculated to hold enough space for all the map definitions
+			m_Stream.Write((ushort)0);  // byte 011 to 012  -  Server Facet sequence number, doesn't apply in this case
+			m_Stream.Write((byte)1);    // byte 013         -  Server Facet command (0x01 is Update Map Definitions)
+			m_Stream.Write((byte)0);    // byte 014         -  Server Facet mapnumber, doesn't apply in this case
 
 			// byte 015 to end  -  Map Definitions
-			foreach (var md in definitions)
+			foreach (var map in maps)
 			{
-				m_Stream.Write((byte)md.FileIndex);	// iteration byte 000         -  map file index number
-				m_Stream.Write(md.Bounds.Width);	// iteration byte 001 to 002  -  map width
-				m_Stream.Write(md.Bounds.Height);	// iteration byte 003 to 004  -  map height
-				m_Stream.Write(md.Wrap.Width);		// iteration byte 005 to 006  -  wrap around dimension X
-				m_Stream.Write(md.Wrap.Height);		// iteration byte 007 to 008  -  wrap around dimension Y
+				if (map == null || map.FileIndex == 0x7F)
+				{
+					continue;
+				}
+
+				m_Stream.Write((byte)map.FileIndex);    // iteration byte 000         -  map file index number
+				m_Stream.Write(map.Bounds.Width);   // iteration byte 001 to 002  -  map width
+				m_Stream.Write(map.Bounds.Height);  // iteration byte 003 to 004  -  map height
+				m_Stream.Write(map.Area.Width);     // iteration byte 005 to 006  -  wrap around dimension X
+				m_Stream.Write(map.Area.Height);        // iteration byte 007 to 008  -  wrap around dimension Y
 			}
 
 			for (var i = 0; i < padding; i++)
@@ -483,12 +490,12 @@ namespace Server.Engine.Facet
 
 			// byte 000              -  cmd
 
-			m_Stream.Write(blockNumber);					// byte 001 through 004  -  blocknum
-			m_Stream.Write(landData, 0, landData.Length);	// byte 005 through 196  -  land data
-			m_Stream.Write((byte)0);						// byte 197              -  padding
-			m_Stream.Write((byte)0);						// byte 198              -  padding
-			m_Stream.Write((byte)0);						// byte 199              -  padding
-			m_Stream.Write((byte)mapID);					// byte 200              -  map number
+			m_Stream.Write(blockNumber);                    // byte 001 through 004  -  blocknum
+			m_Stream.Write(landData, 0, landData.Length);   // byte 005 through 196  -  land data
+			m_Stream.Write((byte)0);                        // byte 197              -  padding
+			m_Stream.Write((byte)0);                        // byte 198              -  padding
+			m_Stream.Write((byte)0);                        // byte 199              -  padding
+			m_Stream.Write((byte)mapID);                    // byte 200              -  map number
 
 			//Console.WriteLine(string.Format("Sending land data for block: {0} Map: {1}", blocknum, playerMap.MapID));
 			//BlockUtility.WriteLandDataToConsole(landData);
@@ -532,21 +539,21 @@ namespace Server.Engine.Facet
 
 			EnsureCapacity(packetSize); // byte 001 through 002  -  packet size
 
-			m_Stream.Write(allowGroundByte);				// byte 003              -  Allow Ground
-			m_Stream.Write((int)m.Serial);					// byte 004 through 007  -  target serial
-			m_Stream.Write((ushort)0);						// byte 008 through 009  -  x
-			m_Stream.Write((ushort)0);						// byte 010 through 011  -  y
-			m_Stream.Write((ushort)0);						// byte 012 through 013  -  z
-			m_Stream.Write((ushort)targetObjects.Count);	// byte 014 through 015  -  Number of Entries
-			
+			m_Stream.Write(allowGroundByte);                // byte 003              -  Allow Ground
+			m_Stream.Write((int)m.Serial);                  // byte 004 through 007  -  target serial
+			m_Stream.Write((ushort)0);                      // byte 008 through 009  -  x
+			m_Stream.Write((ushort)0);                      // byte 010 through 011  -  y
+			m_Stream.Write((ushort)0);                      // byte 012 through 013  -  z
+			m_Stream.Write((ushort)targetObjects.Count);    // byte 014 through 015  -  Number of Entries
+
 			// byte 016 through end  -  target object entries (10 bytes each)
 			foreach (var t in targetObjects)
 			{
-				m_Stream.Write((ushort)t.ItemID);	// entry byte 000 through 001  -  Number of Entries
-				m_Stream.Write((ushort)t.Hue);		// entry byte 002 through 003  -  Number of Entries
-				m_Stream.Write((ushort)t.xOffset);	// entry byte 004 through 005  -  Number of Entries
-				m_Stream.Write((ushort)t.yOffset);	// entry byte 006 through 007  -  Number of Entries
-				m_Stream.Write((ushort)t.zOffset);	// entry byte 008 through 009  -  Number of Entries
+				m_Stream.Write((ushort)t.ItemID);   // entry byte 000 through 001  -  Number of Entries
+				m_Stream.Write((ushort)t.Hue);      // entry byte 002 through 003  -  Number of Entries
+				m_Stream.Write((ushort)t.xOffset);  // entry byte 004 through 005  -  Number of Entries
+				m_Stream.Write((ushort)t.yOffset);  // entry byte 006 through 007  -  Number of Entries
+				m_Stream.Write((ushort)t.zOffset);  // entry byte 008 through 009  -  Number of Entries
 			}
 		}
 	}
@@ -570,11 +577,11 @@ namespace Server.Engine.Facet
 
 			EnsureCapacity(43); // byte 001 to 002  -  packet size
 
-			m_Stream.Write(1U);			// byte 003 to 006  -  block number, doesn't really apply in this case
-			m_Stream.Write(4U);			// byte 007 to 010  -  number of statics in the packet - 0 in this case
-			m_Stream.Write((ushort)0);	// byte 011 to 012  -  Server Facet sequence number, doesn't apply in this case
-			m_Stream.Write((byte)2);	// byte 013         -  Server Facet command (0x02 is Login Confirmation)
-			m_Stream.Write((byte)0);	// byte 014         -  Server Facet mapnumber, doesn't apply in this case
+			m_Stream.Write(1U);         // byte 003 to 006  -  block number, doesn't really apply in this case
+			m_Stream.Write(4U);         // byte 007 to 010  -  number of statics in the packet - 0 in this case
+			m_Stream.Write((ushort)0);  // byte 011 to 012  -  Server Facet sequence number, doesn't apply in this case
+			m_Stream.Write((byte)2);    // byte 013         -  Server Facet command (0x02 is Login Confirmation)
+			m_Stream.Write((byte)0);    // byte 014         -  Server Facet mapnumber, doesn't apply in this case
 
 			if (FacetEditingSettings.UNIQUE_SERVER_IDENTIFIER.Length < 28)
 			{
@@ -608,11 +615,11 @@ namespace Server.Engine.Facet
 
 			EnsureCapacity(15); // byte 001 to 002  -  packet size
 
-			m_Stream.Write(0);			// byte 003 to 006  -  central block number for the query (block that player is standing in)
-			m_Stream.Write(0);			// byte 007 to 010  -  number of statics in the packet (0 for a query)
-			m_Stream.Write((ushort)0);	// byte 011 to 012  -  Server Facet sequence number
-			m_Stream.Write((byte)3);	// byte 013         -  Server Facet command (0x03 is a REFRESH_CLIENT)
-			m_Stream.Write((byte)0);	// byte 014         -  Server Facet mapnumber
+			m_Stream.Write(0);          // byte 003 to 006  -  central block number for the query (block that player is standing in)
+			m_Stream.Write(0);          // byte 007 to 010  -  number of statics in the packet (0 for a query)
+			m_Stream.Write((ushort)0);  // byte 011 to 012  -  Server Facet sequence number
+			m_Stream.Write((byte)3);    // byte 013         -  Server Facet command (0x03 is a REFRESH_CLIENT)
+			m_Stream.Write((byte)0);    // byte 014         -  Server Facet mapnumber
 		}
 	}
 

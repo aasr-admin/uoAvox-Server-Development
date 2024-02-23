@@ -84,8 +84,8 @@ namespace Server.Spells.Necromancy
 
 		private readonly SummonFamiliarSpell m_Spell;
 
-		private const int EnabledColor16 = 0x0F20;
-		private const int DisabledColor16 = 0x262A;
+		private const short EnabledColor16 = 0x0F20;
+		private const short DisabledColor16 = 0x262A;
 
 		private const int EnabledColor32 = 0x18CD00;
 		private const int DisabledColor32 = 0x4A8B52;

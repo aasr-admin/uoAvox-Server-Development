@@ -72,8 +72,7 @@ namespace Server.Engines.Publishing
 		public override void Deserialize(GenericReader reader)
 		{
 			base.Deserialize(reader);
-
-			var version = reader.ReadInt();
+			_ = reader.ReadInt();
 		}
 	}
 
@@ -151,12 +150,12 @@ namespace Server.Engines.Publishing
 					}
 				case 1:
 					{
-						from.SendGump(new BookPubGump(from, m_Page - 1));
+						_ = from.SendGump(new BookPubGump(from, m_Page - 1));
 						break;
 					}
 				case 2:
 					{
-						from.SendGump(new BookPubGump(from, m_Page + 1));
+						_ = from.SendGump(new BookPubGump(from, m_Page + 1));
 						break;
 					}
 				default:
@@ -174,10 +173,10 @@ namespace Server.Engines.Publishing
 
 										if (300 - cost > 0)
 										{
-											from.AddToBackpack(new Gold(300 - cost));
+											_ = from.AddToBackpack(new Gold(300 - cost));
 										}
 
-										from.SendGump(new BookPubGump(from, m_Page));
+										_ = from.SendGump(new BookPubGump(from, m_Page));
 										return;
 									}
 
@@ -185,7 +184,7 @@ namespace Server.Engines.Publishing
 
 									if (pb != null)
 									{
-										from.AddToBackpack(pb);
+										_ = from.AddToBackpack(pb);
 									}
 
 									break;
@@ -201,7 +200,8 @@ namespace Server.Engines.Publishing
 									break;
 								}
 						}
-						from.SendGump(new BookPubGump(from, m_Page));
+
+						_ = from.SendGump(new BookPubGump(from, m_Page));
 						break;
 					}
 			}
@@ -210,9 +210,9 @@ namespace Server.Engines.Publishing
 
 	public class BP_Save
 	{
-		public static int Version = 1;
-		public static string SavePath = "Export\\Saves\\Current\\BookPublisher";
-		public static string FileName = "books.xml";
+		public const int Version = 1;
+
+		public static string FilePath => Path.Combine(Core.CurrentSavesDirectory, "Publisher", "books.xml");
 
 		[CallPriority(101)]
 		public static void Initialize()
@@ -222,36 +222,32 @@ namespace Server.Engines.Publishing
 
 		public static void WriteData(WorldSaveEventArgs e)
 		{
-			if (!Directory.Exists(SavePath))
+			var filePath = FilePath;
+
+			Directory.CreateDirectory(Path.GetDirectoryName(filePath));
+
+			using var file = new StreamWriter(filePath);
+			var xml = new XmlTextWriter(file)
 			{
-				Directory.CreateDirectory(SavePath);
+				Formatting = Formatting.Indented,
+				IndentChar = '\t',
+				Indentation = 1
+			};
+
+			xml.WriteStartDocument(true);
+
+			xml.WriteStartElement("BookPublisher");
+
+			xml.WriteAttributeString("Version", Version.ToString());
+
+			for (var i = 0; i < Publisher.Books.Count; i++)
+			{
+				WriteBookNode(Publisher.Books[i], xml);
 			}
 
-			var filePath = Path.Combine(SavePath, FileName);
+			xml.WriteEndElement();
 
-			using (var file = new StreamWriter(filePath))
-			{
-				var xml = new XmlTextWriter(file) {
-					Formatting = Formatting.Indented,
-					IndentChar = '\t',
-					Indentation = 1
-				};
-
-				xml.WriteStartDocument(true);
-
-				xml.WriteStartElement("BookPublisher");
-
-				xml.WriteAttributeString("Version", Version.ToString());
-
-				for (var i = 0; i < Publisher.Books.Count; i++)
-				{
-					WriteBookNode(Publisher.Books[i], xml);
-				}
-
-				xml.WriteEndElement();
-
-				xml.Close();
-			}
+			xml.Close();
 		}
 
 		public static void WriteBookNode(BookContent bc, XmlTextWriter xml)
@@ -287,7 +283,7 @@ namespace Server.Engines.Publishing
 		[CallPriority(101)]
 		public static void Initialize()
 		{
-			ReadData(Path.Combine(BP_Save.SavePath, BP_Save.FileName));
+			ReadData(BP_Save.FilePath);
 		}
 
 		public static void ReadData(string filePath)
@@ -304,14 +300,20 @@ namespace Server.Engines.Publishing
 			doc.Load(filePath);
 
 			var root = doc["BookPublisher"];
-			var version = Utility.ToInt32(root.GetAttribute("Version"));
+			_ = Utility.ToInt32(root.GetAttribute("Version"));
 
 			if (root.HasChildNodes)
 			{
 				foreach (XmlElement book in root.GetElementsByTagName("PublishedBook"))
 				{
-					try { ReadBookNode(book); }
-					catch { Console.WriteLine("Warning: Book Publisher load failed."); }
+					try
+					{
+						ReadBookNode(book);
+					}
+					catch
+					{
+						Console.WriteLine("Warning: Book Publisher load failed.");
+					}
 				}
 			}
 		}
@@ -336,12 +338,14 @@ namespace Server.Engines.Publishing
 						pages[i++] = ReadPageNode(child);
 					}
 				}
+
 				Publisher.Books.Add(new BookContent(title, author, pages));
 			}
 			catch
 			{
 				Console.WriteLine("failed.");
 			}
+
 			Console.WriteLine("done.");
 		}
 
@@ -361,7 +365,7 @@ namespace Server.Engines.Publishing
 
 	public delegate void YesNoCallback(Mobile from, bool yesNo);
 
-	public delegate void YesNoCallbackState(Mobile from, bool yesNo, object[] state);
+	public delegate void YesNoCallbackState(Mobile from, bool yesNo, params object[] state);
 
 	public class YesNo
 	{
@@ -370,19 +374,19 @@ namespace Server.Engines.Publishing
 			SimpleConfirmMsg(callback, callingPlayer, "Are you sure?", dragable);
 		}
 
-		public static void SimpleConfirm(YesNoCallbackState callback, Mobile callingPlayer, bool dragable, object[] state)
+		public static void SimpleConfirm(YesNoCallbackState callback, Mobile callingPlayer, bool dragable, params object[] state)
 		{
 			SimpleConfirmMsg(callback, callingPlayer, "Are you sure?", dragable, state);
 		}
 
 		public static void SimpleConfirmMsg(YesNoCallback callback, Mobile callingPlayer, string msg, bool dragable)
 		{
-			callingPlayer.SendGump(new SimpleConfirmGump(callback, callingPlayer, msg, dragable));
+			_ = callingPlayer.SendGump(new SimpleConfirmGump(callback, callingPlayer, msg, dragable));
 		}
 
-		public static void SimpleConfirmMsg(YesNoCallbackState callback, Mobile callingPlayer, string msg, bool dragable, object[] state)
+		public static void SimpleConfirmMsg(YesNoCallbackState callback, Mobile callingPlayer, string msg, bool dragable, params object[] state)
 		{
-			callingPlayer.SendGump(new SimpleConfirmStateGump(callback, callingPlayer, msg, dragable, state));
+			_ = callingPlayer.SendGump(new SimpleConfirmStateGump(callback, callingPlayer, msg, dragable, state));
 		}
 
 		public static void AskYesNo(YesNoCallback callback, Mobile callingPlayer, string theQuestion, bool dragable)
@@ -395,10 +399,9 @@ namespace Server.Engines.Publishing
 			AskYesNo(callback, callingPlayer, queryTitle, theQuestion, "Yes", "No", dragable);
 		}
 
-
 		public static void AskYesNo(YesNoCallback callback, Mobile callingPlayer, string queryTitle, string theQuestion, string yesString, string noString, bool dragable)
 		{
-			callingPlayer.SendGump(new YesNoGump(callback, callingPlayer, queryTitle, theQuestion, yesString, noString, dragable));
+			_ = callingPlayer.SendGump(new YesNoGump(callback, callingPlayer, queryTitle, theQuestion, yesString, noString, dragable));
 		}
 
 		private class YesNoGump : Gump
@@ -429,7 +432,7 @@ namespace Server.Engines.Publishing
 			//Handles button presses
 			public override void OnResponse(NetState state, RelayInfo info)
 			{
-				var theAnswer = (info.ButtonID != 0);
+				var theAnswer = info.ButtonID != 0;
 
 				_CallBack(_CallingPlayer, theAnswer);
 			}
@@ -462,7 +465,7 @@ namespace Server.Engines.Publishing
 			//Handles button presses
 			public override void OnResponse(NetState state, RelayInfo info)
 			{
-				var theAnswer = (info.ButtonID == 1);
+				var theAnswer = info.ButtonID == 1;
 
 				_CallBack(_CallingPlayer, theAnswer);
 
@@ -498,7 +501,7 @@ namespace Server.Engines.Publishing
 			//Handles button presses
 			public override void OnResponse(NetState state, RelayInfo info)
 			{
-				var theAnswer = (info.ButtonID == 1);
+				var theAnswer = info.ButtonID == 1;
 
 				_CallBack(_CallingPlayer, theAnswer, _State);
 			}
@@ -511,35 +514,37 @@ namespace Server.Engines.Publishing
 	{
 		private string m_Title;
 		private string m_Author;
-		private BookPageInfo[] m_Pages;
-		private bool m_Writable;
 		private SecureLevel m_SecureLevel;
 
 		[CommandProperty(AccessLevel.GameMaster)]
 		public string Title
 		{
 			get => m_Title;
-			set { m_Title = value; InvalidateProperties(); }
+			set
+			{
+				m_Title = value;
+				InvalidateProperties();
+			}
 		}
 
 		[CommandProperty(AccessLevel.GameMaster)]
 		public string Author
 		{
 			get => m_Author;
-			set { m_Author = value; InvalidateProperties(); }
+			set
+			{
+				m_Author = value;
+				InvalidateProperties();
+			}
 		}
 
 		[CommandProperty(AccessLevel.GameMaster)]
-		public bool Writable
-		{
-			get => m_Writable;
-			set => m_Writable = value;
-		}
+		public bool Writable { get; set; }
 
 		[CommandProperty(AccessLevel.GameMaster)]
-		public int PagesCount => m_Pages.Length;
+		public int PagesCount => Pages.Length;
 
-		public BookPageInfo[] Pages => m_Pages;
+		public BookPageInfo[] Pages { get; private set; }
 
 		[Constructable]
 		public BaseBook(int itemID) : this(itemID, 20, true)
@@ -556,41 +561,41 @@ namespace Server.Engines.Publishing
 		{
 			m_Title = title;
 			m_Author = author;
-			m_Writable = writable;
+			Writable = writable;
 
 			var content = DefaultContent;
 
 			if (content == null)
 			{
-				m_Pages = new BookPageInfo[pageCount];
+				Pages = new BookPageInfo[pageCount];
 
-				for (var i = 0; i < m_Pages.Length; ++i)
+				for (var i = 0; i < Pages.Length; ++i)
 				{
-					m_Pages[i] = new BookPageInfo();
+					Pages[i] = new BookPageInfo();
 				}
 			}
 			else
 			{
-				m_Pages = content.Copy();
+				Pages = content.Copy();
 			}
 		}
 
 		// Intended for defined books only
 		public BaseBook(int itemID, bool writable) : base(itemID)
 		{
-			m_Writable = writable;
+			Writable = writable;
 
 			var content = DefaultContent;
 
 			if (content == null)
 			{
-				m_Pages = new BookPageInfo[0];
+				Pages = new BookPageInfo[0];
 			}
 			else
 			{
 				m_Title = content.Title;
 				m_Author = content.Author;
-				m_Pages = content.Copy();
+				Pages = content.Copy();
 			}
 		}
 
@@ -624,22 +629,22 @@ namespace Server.Engines.Publishing
 
 			var flags = SaveFlags.None;
 
-			if (m_Title != (content == null ? null : content.Title))
+			if (m_Title != (content?.Title))
 			{
 				flags |= SaveFlags.Title;
 			}
 
-			if (m_Author != (content == null ? null : content.Author))
+			if (m_Author != (content?.Author))
 			{
 				flags |= SaveFlags.Author;
 			}
 
-			if (m_Writable)
+			if (Writable)
 			{
 				flags |= SaveFlags.Writable;
 			}
 
-			if (content == null || !content.IsMatch(m_Pages))
+			if (content == null || !content.IsMatch(Pages))
 			{
 				flags |= SaveFlags.Content;
 			}
@@ -662,11 +667,11 @@ namespace Server.Engines.Publishing
 
 			if ((flags & SaveFlags.Content) != 0)
 			{
-				writer.WriteEncodedInt(m_Pages.Length);
+				writer.WriteEncodedInt(Pages.Length);
 
-				for (var i = 0; i < m_Pages.Length; ++i)
+				for (var i = 0; i < Pages.Length; ++i)
 				{
-					m_Pages[i].Serialize(writer);
+					Pages[i].Serialize(writer);
 				}
 			}
 		}
@@ -709,26 +714,26 @@ namespace Server.Engines.Publishing
 							m_Author = content.Author;
 						}
 
-						m_Writable = (flags & SaveFlags.Writable) != 0;
+						Writable = (flags & SaveFlags.Writable) != 0;
 
 						if ((flags & SaveFlags.Content) != 0)
 						{
-							m_Pages = new BookPageInfo[reader.ReadEncodedInt()];
+							Pages = new BookPageInfo[reader.ReadEncodedInt()];
 
-							for (var i = 0; i < m_Pages.Length; ++i)
+							for (var i = 0; i < Pages.Length; ++i)
 							{
-								m_Pages[i] = new BookPageInfo(reader);
+								Pages[i] = new BookPageInfo(reader);
 							}
 						}
 						else
 						{
 							if (content != null)
 							{
-								m_Pages = content.Copy();
+								Pages = content.Copy();
 							}
 							else
 							{
-								m_Pages = new BookPageInfo[0];
+								Pages = new BookPageInfo[0];
 							}
 						}
 
@@ -739,15 +744,15 @@ namespace Server.Engines.Publishing
 					{
 						m_Title = reader.ReadString();
 						m_Author = reader.ReadString();
-						m_Writable = reader.ReadBool();
+						Writable = reader.ReadBool();
 
 						if (version == 0 || reader.ReadBool())
 						{
-							m_Pages = new BookPageInfo[reader.ReadInt()];
+							Pages = new BookPageInfo[reader.ReadInt()];
 
-							for (var i = 0; i < m_Pages.Length; ++i)
+							for (var i = 0; i < Pages.Length; ++i)
 							{
-								m_Pages[i] = new BookPageInfo(reader);
+								Pages[i] = new BookPageInfo(reader);
 							}
 						}
 						else
@@ -756,11 +761,11 @@ namespace Server.Engines.Publishing
 
 							if (content != null)
 							{
-								m_Pages = content.Copy();
+								Pages = content.Copy();
 							}
 							else
 							{
-								m_Pages = new BookPageInfo[0];
+								Pages = new BookPageInfo[0];
 							}
 						}
 
@@ -803,19 +808,19 @@ namespace Server.Engines.Publishing
 		public override void OnSingleClick(Mobile from)
 		{
 			LabelTo(from, "{0} by {1}", m_Title, m_Author);
-			LabelTo(from, "[{0} pages]", m_Pages.Length);
+			LabelTo(from, "[{0} pages]", Pages.Length);
 		}
 
 		public override void OnDoubleClick(Mobile from)
 		{
-			if (m_Title == null && m_Author == null && m_Writable == true)
+			if (m_Title == null && m_Author == null && Writable == true)
 			{
 				Title = "a book";
 				Author = from.Name;
 			}
 
-			from.Send(new BookHeader(from, this));
-			from.Send(new BookPageDetails(this));
+			_ = from.Send(new BookHeader(from, this));
+			_ = from.Send(new BookPageDetails(this));
 		}
 
 		public string ContentAsString
@@ -824,11 +829,11 @@ namespace Server.Engines.Publishing
 			{
 				var sb = new StringBuilder();
 
-				foreach (var bpi in m_Pages)
+				foreach (var bpi in Pages)
 				{
 					foreach (var line in bpi.Lines)
 					{
-						sb.AppendLine(line);
+						_ = sb.AppendLine(line);
 					}
 				}
 
@@ -842,7 +847,7 @@ namespace Server.Engines.Publishing
 			{
 				var lines = new List<string>();
 
-				foreach (var bpi in m_Pages)
+				foreach (var bpi in Pages)
 				{
 					lines.AddRange(bpi.Lines);
 				}
@@ -861,14 +866,13 @@ namespace Server.Engines.Publishing
 		public static void OldHeaderChange(NetState state, PacketReader pvSrc)
 		{
 			var from = state.Mobile;
-			var book = World.FindItem(pvSrc.ReadInt32()) as BaseBook;
 
-			if (book == null || !book.Writable || !from.InRange(book.GetWorldLocation(), 1) || !book.IsAccessibleTo(from))
+			if (pvSrc.ReadItem() is not BaseBook book || !book.Writable || !from.InRange(book.GetWorldLocation(), 1) || !book.IsAccessibleTo(from))
 			{
 				return;
 			}
 
-			pvSrc.Seek(4, SeekOrigin.Current); // Skip flags and page count
+			_ = pvSrc.Seek(4, SeekOrigin.Current); // Skip flags and page count
 
 			var title = pvSrc.ReadStringSafe(60);
 			var author = pvSrc.ReadStringSafe(30);
@@ -880,14 +884,13 @@ namespace Server.Engines.Publishing
 		public static void HeaderChange(NetState state, PacketReader pvSrc)
 		{
 			var from = state.Mobile;
-			var book = World.FindItem(pvSrc.ReadInt32()) as BaseBook;
 
-			if (book == null || !book.Writable || !from.InRange(book.GetWorldLocation(), 1) || !book.IsAccessibleTo(from))
+			if (pvSrc.ReadItem() is not BaseBook book || !book.Writable || !from.InRange(book.GetWorldLocation(), 1) || !book.IsAccessibleTo(from))
 			{
 				return;
 			}
 
-			pvSrc.Seek(4, SeekOrigin.Current); // Skip flags and page count
+			_ = pvSrc.Seek(4, SeekOrigin.Current); // Skip flags and page count
 
 			int titleLength = pvSrc.ReadUInt16();
 
@@ -914,9 +917,8 @@ namespace Server.Engines.Publishing
 		public static void ContentChange(NetState state, PacketReader pvSrc)
 		{
 			var from = state.Mobile;
-			var book = World.FindItem(pvSrc.ReadInt32()) as BaseBook;
 
-			if (book == null || !book.Writable || !from.InRange(book.GetWorldLocation(), 1) || !book.IsAccessibleTo(from))
+			if (pvSrc.ReadItem() is not BaseBook book || !book.Writable || !from.InRange(book.GetWorldLocation(), 1) || !book.IsAccessibleTo(from))
 			{
 				return;
 			}
@@ -980,8 +982,8 @@ namespace Server.Engines.Publishing
 	{
 		public BookHeader(Mobile from, BaseBook book) : base(0xD4)
 		{
-			var title = book.Title == null ? "" : book.Title;
-			var author = book.Author == null ? "" : book.Author;
+			var title = book.Title ?? "";
+			var author = book.Author ?? "";
 
 			var titleBuffer = Utility.UTF8.GetBytes(title);
 			var authorBuffer = Utility.UTF8.GetBytes(author);
@@ -1005,43 +1007,37 @@ namespace Server.Engines.Publishing
 
 	public class BookPageInfo
 	{
-		private string[] m_Lines;
-
-		public string[] Lines
-		{
-			get => m_Lines;
-			set => m_Lines = value;
-		}
+		public string[] Lines { get; set; }
 
 		public BookPageInfo()
 		{
-			m_Lines = new string[0];
+			Lines = new string[0];
 		}
 
 		public BookPageInfo(params string[] lines)
 		{
-			m_Lines = lines;
+			Lines = lines;
 		}
 
 		public BookPageInfo(GenericReader reader)
 		{
 			var length = reader.ReadInt();
 
-			m_Lines = new string[length];
+			Lines = new string[length];
 
-			for (var i = 0; i < m_Lines.Length; ++i)
+			for (var i = 0; i < Lines.Length; ++i)
 			{
-				m_Lines[i] = Utility.Intern(reader.ReadString());
+				Lines[i] = Utility.Intern(reader.ReadString());
 			}
 		}
 
 		public void Serialize(GenericWriter writer)
 		{
-			writer.Write(m_Lines.Length);
+			writer.Write(Lines.Length);
 
-			for (var i = 0; i < m_Lines.Length; ++i)
+			for (var i = 0; i < Lines.Length; ++i)
 			{
-				writer.Write(m_Lines[i]);
+				writer.Write(Lines[i]);
 			}
 		}
 	}
@@ -1075,30 +1071,27 @@ namespace Server.Engines.Publishing
 
 	public class BookContent
 	{
-		private readonly string m_Title;
 		private readonly string m_Author;
 
-		private readonly BookPageInfo[] m_Pages;
-
-		public string Title => m_Title;
+		public string Title { get; }
 		public string Author => m_Author;
 
-		public BookPageInfo[] Pages => m_Pages;
+		public BookPageInfo[] Pages { get; }
 
 		public BookContent(string title, string author, params BookPageInfo[] pages)
 		{
-			m_Title = title;
+			Title = title;
 			m_Author = author;
-			m_Pages = pages;
+			Pages = pages;
 		}
 
 		public BookPageInfo[] Copy()
 		{
-			var copy = new BookPageInfo[m_Pages.Length];
+			var copy = new BookPageInfo[Pages.Length];
 
 			for (var i = 0; i < copy.Length; ++i)
 			{
-				copy[i] = new BookPageInfo(m_Pages[i].Lines);
+				copy[i] = new BookPageInfo(Pages[i].Lines);
 			}
 
 			return copy;
@@ -1106,14 +1099,14 @@ namespace Server.Engines.Publishing
 
 		public bool IsMatch(BookPageInfo[] cmp)
 		{
-			if (cmp.Length != m_Pages.Length)
+			if (cmp.Length != Pages.Length)
 			{
 				return false;
 			}
 
 			for (var i = 0; i < cmp.Length; ++i)
 			{
-				var a = m_Pages[i].Lines;
+				var a = Pages[i].Lines;
 				var b = cmp[i].Lines;
 
 				if (a.Length != b.Length)

@@ -479,7 +479,7 @@ namespace Server.Engines.Help
 			AddImageTiled(9, 11, 21, 53, 0xBBC);
 
 			AddButton(10, 12, 0x7D2, 0x7D2, 0, GumpButtonType.Reply, 0);
-			AddHtmlLocalized(34, 28, 65, 24, 3001002, 0xFFFFFF, false, false); // Message
+			AddHtmlLocalized(34, 28, 65, 24, 3001002, 0x7FFF, false, false); // Message
 		}
 
 		public override void OnResponse(NetState state, RelayInfo info)

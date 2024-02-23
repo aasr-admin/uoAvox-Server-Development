@@ -1,5 +1,4 @@
-﻿using Server.Engines.Quests.Mobiles;
-using Server.Items;
+﻿using Server.Items;
 using Server.Mobiles;
 
 using System;
@@ -19,11 +18,9 @@ namespace Server.Multis
 
 		public override void AddComponents()
 		{
-			BaseCreature bc;
-			//BaseEscortable be;
-
 			Visible = false;
 			DecayDelay = TimeSpan.FromMinutes(5.0);
+
 			AddItem(new Static(0x10ee), 0, 0, 0);
 			AddItem(new Static(0xfac), 0, 7, 0);
 
@@ -46,6 +43,7 @@ namespace Server.Multis
 						break;
 					}
 			}
+
 			AddItem(new Item(0x41F), 4, 4, 0); // Gruesome Standart South
 
 			AddCampChests();
@@ -54,51 +52,42 @@ namespace Server.Multis
 			{
 				AddMobile(Lizardmen, 6, Utility.RandomMinMax(-7, 7), Utility.RandomMinMax(-7, 7), 0);
 			}
-
+			/*
 			switch (Utility.Random(2))
 			{
 				case 0: m_Prisoner = new Noble(); break;
 				default: m_Prisoner = new SeekerOfAdventure(); break;
 			}
 
-			//be = (BaseEscortable)m_Prisoner;
-			//be.m_Captive = true;
-
-			bc = (BaseCreature)m_Prisoner;
-			bc.IsPrisoner = true;
-			bc.CantWalk = true;
+			m_Prisoner.IsPrisoner = true;
+			m_Prisoner.CantWalk = true;
 
 			m_Prisoner.YellHue = Utility.RandomList(0x57, 0x67, 0x77, 0x87, 0x117);
+
 			AddMobile(m_Prisoner, 2, Utility.RandomMinMax(-2, 2), Utility.RandomMinMax(-2, 2), 0);
+			*/
 		}
 
 		private void AddCampChests()
 		{
-			LockableContainer chest = null;
-
-			switch (Utility.Random(3))
+			LockableContainer chest = Utility.Random(3) switch
 			{
-				case 0: chest = new MetalChest(); break;
-				case 1: chest = new MetalGoldenChest(); break;
-				default: chest = new WoodenChest(); break;
-			}
-
+				0 => new MetalChest(),
+				1 => new MetalGoldenChest(),
+				_ => new WoodenChest(),
+			};
 			chest.LiftOverride = true;
 
 			TreasureMapChest.Fill(chest, 1);
 
 			AddItem(chest, 2, -2, 0);
-
-			LockableContainer crates = null;
-
-			switch (Utility.Random(4))
+			LockableContainer crates = Utility.Random(4) switch
 			{
-				case 0: crates = new SmallCrate(); break;
-				case 1: crates = new MediumCrate(); break;
-				case 2: crates = new LargeCrate(); break;
-				default: crates = new LockableBarrel(); break;
-			}
-
+				0 => new SmallCrate(),
+				1 => new MediumCrate(),
+				2 => new LargeCrate(),
+				_ => new LockableBarrel(),
+			};
 			crates.TrapType = TrapType.ExplosionTrap;
 			crates.TrapPower = Utility.RandomMinMax(30, 40);
 			crates.TrapLevel = 2;
@@ -133,19 +122,17 @@ namespace Server.Multis
 		{
 			if (m.Player && m_Prisoner != null && m_Prisoner.CantWalk)
 			{
-				int number;
-
-				switch (Utility.Random(8))
+				var number = Utility.Random(8) switch
 				{
-					case 0: number = 502261; break; // HELP!
-					case 1: number = 502262; break; // Help me!
-					case 2: number = 502263; break; // Canst thou aid me?!
-					case 3: number = 502264; break; // Help a poor prisoner!
-					case 4: number = 502265; break; // Help! Please!
-					case 5: number = 502266; break; // Aaah! Help me!
-					case 6: number = 502267; break; // Go and get some help!
-					default: number = 502268; break; // Quickly, I beg thee! Unlock my chains! If thou dost look at me close thou canst see them.	
-				}
+					0 => 502261,
+					1 => 502262,
+					2 => 502263,
+					3 => 502264,
+					4 => 502265,
+					5 => 502266,
+					6 => 502267,
+					_ => 502268,
+				};
 				m_Prisoner.Yell(number);
 			}
 		}

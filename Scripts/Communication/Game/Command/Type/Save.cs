@@ -76,12 +76,9 @@ namespace Server.Accounting
 
 		public static void Save(WorldSaveEventArgs e)
 		{
-			if (!Directory.Exists("Export/Saves/Current/Accounts"))
-			{
-				Directory.CreateDirectory("Export/Saves/Current/Accounts");
-			}
+			var filePath = FilePath;
 
-			var filePath = Path.Combine("Export/Saves/Current/Accounts", "accounts.xml");
+			Directory.CreateDirectory(Path.GetDirectoryName(filePath));
 
 			using (var op = new StreamWriter(filePath))
 			{

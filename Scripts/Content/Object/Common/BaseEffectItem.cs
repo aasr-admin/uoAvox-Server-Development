@@ -315,11 +315,6 @@ namespace Server.Items
 			writer.WriteEncodedInt(m_TriggerRange);
 		}
 
-		private IEntity ReadEntity(GenericReader reader)
-		{
-			return World.FindEntity(reader.ReadInt());
-		}
-
 		public override void Deserialize(GenericReader reader)
 		{
 			base.Deserialize(reader);
@@ -334,9 +329,9 @@ namespace Server.Items
 						m_TriggerDelay = reader.ReadTimeSpan();
 						m_SoundDelay = reader.ReadTimeSpan();
 
-						m_Source = ReadEntity(reader);
-						m_Target = ReadEntity(reader);
-						m_Trigger = reader.ReadItem() as EffectController;
+						m_Source = reader.ReadEntity();
+						m_Target = reader.ReadEntity();
+						m_Trigger = reader.ReadItem<EffectController>();
 
 						m_FixedDirection = reader.ReadBool();
 						m_Explodes = reader.ReadBool();

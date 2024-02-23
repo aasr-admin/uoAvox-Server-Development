@@ -1077,7 +1077,7 @@ namespace Server.Spells
 		//towns
 		public static bool CheckTown(ISpell spell, GuardedRegion region)
 		{
-			if ((spell.Caster == null || spell.Caster.AccessLevel < AccessLevel.GameMaster) && !region.IsDisabled() && !spell.OnCastInTown(region))
+			if ((spell.Caster == null || spell.Caster.AccessLevel < AccessLevel.GameMaster) && !region.Disabled && !spell.OnCastInTown(region))
 			{
 				spell.Caster?.SendMessage($"You cannot cast {spell.Name} in town!");
 

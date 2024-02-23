@@ -165,7 +165,7 @@ namespace Server
 			if (target.Body.IsHuman && (cret == null || (!cret.AlwaysAttackable && !cret.AlwaysMurderer)))
 			{
 
-				if (reg == null || reg.IsDisabled())
+				if (reg == null || reg.Disabled)
 				{
 					//Allow honor on blue if Out of guardzone
 				}

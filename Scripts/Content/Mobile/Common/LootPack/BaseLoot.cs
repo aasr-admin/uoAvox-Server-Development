@@ -439,7 +439,7 @@ namespace Server
 
 					var instr = (BaseInstrument)item;
 
-					instr.Quality = InstrumentQuality.Regular;
+					instr.Quality = ItemQuality.Regular;
 					instr.Slayer = slayer;
 				}
 

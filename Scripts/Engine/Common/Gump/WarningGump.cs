@@ -10,12 +10,12 @@ namespace Server.Gumps
 
 	public class WarningGump : WarningGump<object>
 	{
-		public WarningGump(int header, int headerColor, object content, int contentColor, int width, int height, WarningGumpCallback callback, object state)
+		public WarningGump(int header, short headerColor, object content, int contentColor, int width, int height, WarningGumpCallback callback, object state)
 			: base(header, headerColor, content, contentColor, width, height, (m, o, s) => callback?.Invoke(m, o, s), state)
 		{
 		}
 
-		public WarningGump(int header, int headerColor, object content, int contentColor, int width, int height, WarningGumpCallback callback, object state, bool cancelButton) 
+		public WarningGump(int header, short headerColor, object content, int contentColor, int width, int height, WarningGumpCallback callback, object state, bool cancelButton) 
 			: base(header, headerColor, content, contentColor, width, height, (m, o, s) => callback?.Invoke(m, o, s), state, cancelButton)
 		{
 		}
@@ -27,12 +27,12 @@ namespace Server.Gumps
 		private readonly T m_State;
 		private readonly bool m_CancelButton;
 
-		public WarningGump(int header, int headerColor, object content, int contentColor, int width, int height, WarningGumpCallback<T> callback, T state)
+		public WarningGump(int header, short headerColor, object content, int contentColor, int width, int height, WarningGumpCallback<T> callback, T state)
 			: this(header, headerColor, content, contentColor, width, height, callback, state, true)
 		{
 		}
 
-		public WarningGump(int header, int headerColor, object content, int contentColor, int width, int height, WarningGumpCallback<T> callback, T state, bool cancelButton) 
+		public WarningGump(int header, short headerColor, object content, int contentColor, int width, int height, WarningGumpCallback<T> callback, T state, bool cancelButton) 
 			: base((640 - width) / 2, (480 - height) / 2)
 		{
 			m_Callback = callback;
@@ -47,6 +47,7 @@ namespace Server.Gumps
 
 			AddImageTiled(10, 10, width - 20, 20, 2624);
 			AddAlphaRegion(10, 10, width - 20, 20);
+
 			AddHtmlLocalized(10, 10, width - 20, 20, header, headerColor, false, false);
 
 			AddImageTiled(10, 40, width - 20, height - 80, 2624);
@@ -54,7 +55,9 @@ namespace Server.Gumps
 
 			if (content is int)
 			{
-				AddHtmlLocalized(10, 40, width - 20, height - 80, (int)content, contentColor, false, true);
+				Utility.ConvertColor(contentColor, out var contentColor16);
+
+				AddHtmlLocalized(10, 40, width - 20, height - 80, (int)content, contentColor16, false, true);
 			}
 			else if (content is string)
 			{

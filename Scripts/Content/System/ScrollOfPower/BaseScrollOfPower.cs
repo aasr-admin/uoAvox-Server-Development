@@ -173,17 +173,17 @@ namespace Server.Items
 
 				AddHtmlLocalized(40, 48, 387, 100, m_Scroll.Message, true, true);
 
-				AddHtmlLocalized(125, 148, 200, 20, 1049478, 0xFFFFFF, false, false); // Do you wish to use this scroll?
+				AddHtmlLocalized(125, 148, 200, 20, 1049478, 0x7FFF, false, false); // Do you wish to use this scroll?
 
 				AddButton(100, 172, 4005, 4007, 1, GumpButtonType.Reply, 0);
-				AddHtmlLocalized(135, 172, 120, 20, 1046362, 0xFFFFFF, false, false); // Yes
+				AddHtmlLocalized(135, 172, 120, 20, 1046362, 0x7FFF, false, false); // Yes
 
 				AddButton(275, 172, 4005, 4007, 0, GumpButtonType.Reply, 0);
-				AddHtmlLocalized(310, 172, 120, 20, 1046363, 0xFFFFFF, false, false); // No
+				AddHtmlLocalized(310, 172, 120, 20, 1046363, 0x7FFF, false, false); // No
 
 				if (m_Scroll.Title != 0)
 				{
-					AddHtmlLocalized(40, 20, 260, 20, m_Scroll.Title, 0xFFFFFF, false, false);
+					AddHtmlLocalized(40, 20, 260, 20, m_Scroll.Title, 0x7FFF, false, false);
 				}
 				else
 				{
@@ -192,11 +192,11 @@ namespace Server.Items
 
 				if (m_Scroll is StatCapScroll)
 				{
-					AddHtmlLocalized(310, 20, 120, 20, 1038019, 0xFFFFFF, false, false); // Power
+					AddHtmlLocalized(310, 20, 120, 20, 1038019, 0x7FFF, false, false); // Power
 				}
 				else
 				{
-					AddHtmlLocalized(310, 20, 120, 20, AosSkillBonuses.GetLabel(m_Scroll.Skill), 0xFFFFFF, false, false);
+					AddHtmlLocalized(310, 20, 120, 20, AosSkillBonuses.GetLabel(m_Scroll.Skill), 0x7FFF, false, false);
 				}
 			}
 

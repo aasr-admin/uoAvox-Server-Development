@@ -123,7 +123,7 @@ namespace Server
 				}
 			}
 
-			invoke.Sort(new CallPriorityComparer());
+			invoke.Sort(CallPriorityComparer.Instance);
 
 			foreach (var m in invoke)
 			{

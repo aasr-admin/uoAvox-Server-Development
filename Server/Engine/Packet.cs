@@ -1957,7 +1957,7 @@ namespace Server.Network
 			m_Stream.Write((short)item.X);
 			m_Stream.Write((short)item.Y);
 			m_Stream.Write(parentSerial);
-			m_Stream.Write((ushort)(item.QuestItem ? Item.QuestItemHue : item.Hue));
+			m_Stream.Write((ushort)item.Hue);
 		}
 	}
 
@@ -1985,7 +1985,7 @@ namespace Server.Network
 			m_Stream.Write((short)item.Y);
 			m_Stream.Write((byte)0); // Grid Location?
 			m_Stream.Write(parentSerial);
-			m_Stream.Write((ushort)(item.QuestItem ? Item.QuestItemHue : item.Hue));
+			m_Stream.Write((ushort)item.Hue);
 		}
 	}
 
@@ -2019,7 +2019,7 @@ namespace Server.Network
 					m_Stream.Write((short)loc.m_X);
 					m_Stream.Write((short)loc.m_Y);
 					m_Stream.Write(beheld.Serial);
-					m_Stream.Write((ushort)(child.QuestItem ? Item.QuestItemHue : child.Hue));
+					m_Stream.Write((ushort)child.Hue);
 
 					++written;
 				}
@@ -2061,7 +2061,7 @@ namespace Server.Network
 					m_Stream.Write((short)loc.m_Y);
 					m_Stream.Write((byte)0); // Grid Location?
 					m_Stream.Write(beheld.Serial);
-					m_Stream.Write((ushort)(child.QuestItem ? Item.QuestItemHue : child.Hue));
+					m_Stream.Write((ushort)child.Hue);
 
 					++written;
 				}
@@ -4114,88 +4114,10 @@ namespace Server.Network
 
 	public sealed class LoginComplete : Packet
 	{
-		public static readonly Packet Instance = Packet.SetStatic(new LoginComplete());
+		public static readonly Packet Instance = SetStatic(new LoginComplete());
 
 		public LoginComplete() : base(0x55, 1)
 		{
-		}
-	}
-
-	public sealed class CityInfo
-	{
-		private string m_City;
-		private string m_Building;
-		private int m_Description;
-		private Point3D m_Location;
-		private Map m_Map;
-
-		public CityInfo(string city, string building, int description, int x, int y, int z, Map m)
-		{
-			m_City = city;
-			m_Building = building;
-			m_Description = description;
-			m_Location = new Point3D(x, y, z);
-			m_Map = m;
-		}
-
-		public CityInfo(string city, string building, int x, int y, int z, Map m) : this(city, building, 0, x, y, z, m)
-		{
-		}
-
-		public CityInfo(string city, string building, int description, int x, int y, int z) : this(city, building, description, x, y, z, Map.Trammel)
-		{
-		}
-
-		public CityInfo(string city, string building, int x, int y, int z) : this(city, building, 0, x, y, z, Map.Trammel)
-		{
-		}
-
-		public string City
-		{
-			get => m_City;
-			set => m_City = value;
-		}
-
-		public string Building
-		{
-			get => m_Building;
-			set => m_Building = value;
-		}
-
-		public int Description
-		{
-			get => m_Description;
-			set => m_Description = value;
-		}
-
-		public int X
-		{
-			get => m_Location.X;
-			set => m_Location.X = value;
-		}
-
-		public int Y
-		{
-			get => m_Location.Y;
-			set => m_Location.Y = value;
-		}
-
-		public int Z
-		{
-			get => m_Location.Z;
-			set => m_Location.Z = value;
-		}
-
-		public Point3D Location
-		{
-			get => m_Location;
-			set => m_Location = value;
-		}
-
-		public Map Map
-		{
-			get => m_Map;
-			set => m_Map = value;
 		}
 	}
 

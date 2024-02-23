@@ -49,14 +49,14 @@ namespace Server.Mobiles
 			{
 				AddItem(new Halberd
 				{
-					Quality = WeaponQuality.Exceptional
+					Quality = ItemQuality.Exceptional
 				});
 			}
 			else
 			{
 				AddItem(new Bardiche
 				{
-					Quality = WeaponQuality.Exceptional
+					Quality = ItemQuality.Exceptional
 				});
 			}
 		}

@@ -25,7 +25,7 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 
 		public YuccaTree()
 		{
-			BaseAssetSets.Add(new GraphicAsset[] { new GraphicAsset(3383, 0, 0) });
+			BaseAssetSets.Add(new HarvestGraphicAsset[] { new HarvestGraphicAsset(3383, 0, 0) });
 			PhaseResources.Add(0, new HarvestResource(00.0, 00.0, 100.0, 1072540, typeof(Log)));
 		}
 	}
@@ -39,7 +39,7 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 
 		public YuccaTree2()
 		{
-			BaseAssetSets.Add(new GraphicAsset[] { new GraphicAsset(3384, 0, 0) });
+			BaseAssetSets.Add(new HarvestGraphicAsset[] { new HarvestGraphicAsset(3384, 0, 0) });
 			PhaseResources.Add(0, new HarvestResource(00.0, 00.0, 100.0, 1072540, typeof(Log)));
 		}
 	}

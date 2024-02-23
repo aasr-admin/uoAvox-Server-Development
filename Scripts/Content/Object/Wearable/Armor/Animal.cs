@@ -128,11 +128,12 @@ namespace Server.Items
 					}
 			}
 		}
-		#region ICraftable Members
+		
+		#region ICraftable
 
-		public int OnCraft(int quality, bool makersMark, Mobile from, CraftSystem craftSystem, Type typeRes, BaseTool tool, CraftItem craftItem, int resHue)
+		public virtual int OnCraft(int quality, bool makersMark, Mobile from, ICraftSystem craftSystem, Type typeRes, ICraftTool tool, ICraftItem craftItem, int resHue)
 		{
-			Exceptional = (quality >= 2);
+			Exceptional = quality >= 2;
 
 			if (makersMark)
 			{
@@ -141,18 +142,21 @@ namespace Server.Items
 
 			var resourceType = typeRes;
 
-			if (resourceType == null)
+			if (resourceType == null && craftItem is CraftItem ci)
 			{
-				resourceType = craftItem.Resources.GetAt(0).ItemType;
+				resourceType = ci.Resources.GetAt(0).ItemType;
 			}
 
 			Resource = CraftResources.GetFromType(resourceType);
 
-			var context = craftSystem.GetContext(from);
-
-			if (context != null && context.DoNotColor)
+			if (craftSystem is CraftSystem cs)
 			{
-				Hue = 0;
+				var context = cs.GetContext(from);
+
+				if (context != null && context.DoNotColor)
+				{
+					Hue = 0;
+				}
 			}
 
 			return quality;

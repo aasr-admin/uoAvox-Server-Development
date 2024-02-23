@@ -1212,38 +1212,23 @@ namespace Server.Items
 				return true;
 			}
 
-			if (m_Stone.Deed == null)
+			if (m_Stone.Deed?.Deleted != false)
 			{
 				return false;
 			}
 
 			var pack = from.Backpack;
 
-			if (pack != null && ContainsDeed(pack))
+			if (pack != null && m_Stone.Deed.IsChildOf(pack))
 			{
 				return true;
 			}
 
 			var bank = from.FindBankNoCreate();
 
-			if (bank != null && ContainsDeed(bank))
+			if (bank != null && m_Stone.Deed.IsChildOf(bank))
 			{
 				return true;
-			}
-
-			return false;
-		}
-
-		private bool ContainsDeed(Container cont)
-		{
-			var deeds = cont.FindItemsByType<HouseRaffleDeed>();
-
-			for (var i = 0; i < deeds.Count; ++i)
-			{
-				if (deeds[i] == m_Stone.Deed)
-				{
-					return true;
-				}
 			}
 
 			return false;

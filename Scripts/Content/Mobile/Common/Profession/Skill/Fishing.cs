@@ -1,31 +1,29 @@
-﻿using Server.Engines.Quests.Definitions;
+﻿
+using System;
+
 using Server.Items;
 using Server.Mobiles;
-
-using System;
 
 namespace Server.Engines.Harvest
 {
 	public class Fishing : HarvestSystem
 	{
+		private static readonly MutateEntry[] m_MutateTable = new MutateEntry[]
+		{
+			new MutateEntry(  true,  false, 80.0,  80.0,  4080.0, typeof( SpecialFishingNet ) ),
+			new MutateEntry(  true,  false, 80.0,  80.0,  4080.0, typeof( BigFish ) ),
+			new MutateEntry(  true,  false, 90.0,  80.0,  4080.0, typeof( TreasureMap ) ),
+			new MutateEntry( true,  false, 100.0,  80.0,  4080.0, typeof( MessageInABottle ) ),
+			new MutateEntry(   false, false, 0.0, 125.0, -2375.0, typeof( PrizedFish ), typeof( WondrousFish ), typeof( TrulyRareFish ), typeof( PeculiarFish ) ),
+			new MutateEntry(   false, false, 0.0,  105.0, -420.0, typeof( Boots ), typeof( Shoes ), typeof( Sandals ), typeof( ThighBoots ) ),
+			new MutateEntry(   false, false, 0.0,  200.0, -200.0, new Type[1]{ null } )
+		};
+
 		private static Fishing m_System;
 
-		public static Fishing System
-		{
-			get
-			{
-				if (m_System == null)
-				{
-					m_System = new Fishing();
-				}
+		public static Fishing System => m_System ??= new();
 
-				return m_System;
-			}
-		}
-
-		private readonly HarvestDefinition m_Definition;
-
-		public HarvestDefinition Definition => m_Definition;
+		public HarvestDefinition Definition { get; }
 
 		private Fishing()
 		{
@@ -33,8 +31,9 @@ namespace Server.Engines.Harvest
 			HarvestVein[] veins;
 
 			#region Fishing
-			var fish = new HarvestDefinition {
 
+			var fish = new HarvestDefinition
+			{
 				// Resource banks are every 8x8 tiles
 				BankWidth = 8,
 				BankHeight = 8,
@@ -51,7 +50,7 @@ namespace Server.Engines.Harvest
 				Skill = SkillName.Fishing,
 
 				// Set the list of harvestable tiles
-				Tiles = m_WaterTiles,
+				Tiles = Utility.ConvertToRangedArray(WaterUtility.AllWaterTiles),
 				RangedTiles = true,
 
 				// Players must be within 4 tiles to harvest
@@ -63,7 +62,7 @@ namespace Server.Engines.Harvest
 
 				// The fishing
 				EffectActions = new int[] { 12 },
-				EffectSounds = new int[0],
+				EffectSounds = Array.Empty<int>(),
 				EffectCounts = new int[] { 1 },
 				EffectDelay = TimeSpan.Zero,
 				EffectSoundDelay = TimeSpan.FromSeconds(8.0),
@@ -76,73 +75,44 @@ namespace Server.Engines.Harvest
 				ToolBrokeMessage = 503174 // You broke your fishing pole.
 			};
 
-			res = new HarvestResource[]
-				{
-					new HarvestResource( 00.0, 00.0, 100.0, 1043297, typeof( SaltwaterFish ) )
-				};
+			res = new[]
+			{
+				new HarvestResource( 00.0, 00.0, 100.0, 1043297, typeof( Fish ) )
+			};
 
-			veins = new HarvestVein[]
-				{
-					new HarvestVein( 100.0, 0.0, res[0], null )
-				};
+			veins = new[]
+			{
+				new HarvestVein( 100.0, 0.0, res[0], null )
+			};
 
 			fish.Resources = res;
 			fish.Veins = veins;
 
 			if (Core.ML)
 			{
-				fish.BonusResources = new BonusHarvestResource[]
+				fish.BonusResources = new[]
 				{
 					new BonusHarvestResource( 0, 99.4, null, null ), //set to same chance as mining ml gems
 					new BonusHarvestResource( 80.0, .6, 1072597, typeof( WhitePearl ) )
 				};
 			}
 
-			m_Definition = fish;
+			Definition = fish;
 			Definitions.Add(fish);
+
 			#endregion
 		}
 
-		public override void OnConcurrentHarvest(Mobile from, Item tool, HarvestDefinition def, object toHarvest)
+		public override void OnConcurrentHarvest(Mobile from, IHarvestTool tool, HarvestDefinition def, object toHarvest)
 		{
 			from.SendLocalizedMessage(500972); // You are already fishing.
 		}
 
-		private class MutateEntry
+		public override Type MutateType(Type type, Mobile from, IHarvestTool tool, HarvestDefinition def, Map map, Point3D loc, HarvestResource resource)
 		{
-			public double m_ReqSkill, m_MinSkill, m_MaxSkill;
-			public bool m_DeepWater;
-			public Type[] m_Types;
+			var newZ = loc.Z;
 
-			public MutateEntry(double reqSkill, double minSkill, double maxSkill, bool deepWater, params Type[] types)
-			{
-				m_ReqSkill = reqSkill;
-				m_MinSkill = minSkill;
-				m_MaxSkill = maxSkill;
-				m_DeepWater = deepWater;
-				m_Types = types;
-			}
-		}
-
-		private static readonly MutateEntry[] m_MutateTable = new MutateEntry[]
-			{
-				new MutateEntry(  80.0,  80.0,  4080.0,  true, typeof( SpecialFishingNet ) ),
-				new MutateEntry(  80.0,  80.0,  4080.0,  true, typeof( BigFish ) ),
-				new MutateEntry(  90.0,  80.0,  4080.0,  true, typeof( TreasureMap ) ),
-				new MutateEntry( 100.0,  80.0,  4080.0,  true, typeof( MessageInABottle ) ),
-				new MutateEntry(   0.0, 125.0, -2375.0, false, typeof( PrizedFish ), typeof( WondrousFish ), typeof( TrulyRareFish ), typeof( PeculiarFish ) ),
-				new MutateEntry(   0.0, 105.0,  -420.0, false, typeof( Boots ), typeof( Shoes ), typeof( Sandals ), typeof( ThighBoots ) ),
-				new MutateEntry(   0.0, 200.0,  -200.0, false, new Type[1]{ null } )
-			};
-
-		public override bool SpecialHarvest(Mobile from, Item tool, HarvestDefinition def, Map map, Point3D loc)
-		{
-			return false;
-		}
-
-		public override Type MutateType(Type type, Mobile from, Item tool, HarvestDefinition def, Map map, Point3D loc, HarvestResource resource)
-		{
-			var deepWater = SpecialFishingNet.FullValidation(map, loc.X, loc.Y);
+			var deepWater = WaterUtility.FullDeepValidation(map, loc, ref newZ, out var freshWater);
 
 			var skillBase = from.Skills[SkillName.Fishing].Base;
 			var skillValue = from.Skills[SkillName.Fishing].Value;
@@ -151,47 +121,38 @@ namespace Server.Engines.Harvest
 			{
 				var entry = m_MutateTable[i];
 
-				if (!deepWater && entry.m_DeepWater)
+				if (!deepWater && entry.DeepWater)
 				{
 					continue;
 				}
 
-				if (skillBase >= entry.m_ReqSkill)
+				if (!freshWater && entry.FreshWater)
 				{
-					var chance = (skillValue - entry.m_MinSkill) / (entry.m_MaxSkill - entry.m_MinSkill);
+					continue;
+				}
+
+				if (skillBase >= entry.ReqSkill)
+				{
+					var chance = (skillValue - entry.MinSkill) / (entry.MaxSkill - entry.MinSkill);
 
 					if (chance > Utility.RandomDouble())
 					{
-						return entry.m_Types[Utility.Random(entry.m_Types.Length)];
+						return entry.Types[Utility.Random(entry.Types.Length)];
 					}
 				}
 			}
 
-			return type;
+			return base.MutateType(type, from, tool, def, map, loc, resource);
 		}
 
-		private static Map SafeMap(Map map)
-		{
-			if (map == null || map == Map.Internal)
-			{
-				return Map.Trammel;
-			}
-
-			return map;
-		}
-
-		public override bool CheckResources(Mobile from, Item tool, HarvestDefinition def, Map map, Point3D loc, bool timed)
+		public override bool CheckResources(Mobile from, IHarvestTool tool, HarvestDefinition def, Map map, Point3D loc, bool timed)
 		{
 			var pack = from.Backpack;
 
 			if (pack != null)
 			{
-				var messages = pack.FindItemsByType<SOS>();
-
-				for (var i = 0; i < messages.Count; ++i)
+				foreach (var sos in pack.FindItemsByType<SOS>())
 				{
-					var sos = messages[i];
-
 					if ((from.Map == Map.Felucca || from.Map == Map.Trammel) && from.InRange(sos.TargetLocation, 60))
 					{
 						return true;
@@ -207,7 +168,8 @@ namespace Server.Engines.Harvest
 			if (type == typeof(TreasureMap))
 			{
 				int level;
-				if (from is PlayerMobile && ((PlayerMobile)from).Young && from.Map == Map.Trammel && TreasureMap.IsInHavenIsland(from))
+
+				if (from is PlayerMobile pm && pm.Young && from.Map == Map.Trammel && TreasureMap.IsInHavenIsland(from))
 				{
 					level = 0;
 				}
@@ -227,12 +189,8 @@ namespace Server.Engines.Harvest
 
 			if (pack != null)
 			{
-				var messages = pack.FindItemsByType<SOS>();
-
-				for (var i = 0; i < messages.Count; ++i)
+				foreach (var sos in pack.FindItemsByType<SOS>())
 				{
-					var sos = messages[i];
-
 					if ((from.Map == Map.Felucca || from.Map == Map.Trammel) && from.InRange(sos.TargetLocation, 60))
 					{
 						Item preLoot = null;
@@ -241,25 +199,25 @@ namespace Server.Engines.Harvest
 						{
 							case 0: // Body parts
 								{
-									var list = new int[]
-										{
+									var list = new[]
+									{
 										0x1CDD, 0x1CE5, // arm
 										0x1CE0, 0x1CE8, // torso
 										0x1CE1, 0x1CE9, // head
 										0x1CE2, 0x1CEC // leg
-										};
+									};
 
 									preLoot = new ShipwreckedItem(Utility.RandomList(list));
 									break;
 								}
 							case 1: // Bone parts
 								{
-									var list = new int[]
-										{
+									var list = new[]
+									{
 										0x1AE0, 0x1AE1, 0x1AE2, 0x1AE3, 0x1AE4, // skulls
 										0x1B09, 0x1B0A, 0x1B0B, 0x1B0C, 0x1B0D, 0x1B0E, 0x1B0F, 0x1B10, // bone piles
 										0x1B15, 0x1B16 // pelvis bones
-										};
+									};
 
 									preLoot = new ShipwreckedItem(Utility.RandomList(list));
 									break;
@@ -294,14 +252,14 @@ namespace Server.Engines.Harvest
 								}
 							case 6: // Misc
 								{
-									var list = new int[]
-										{
+									var list = new[]
+									{
 										0x1EB5, // unfinished barrel
 										0xA2A, // stool
 										0xC1F, // broken clock
 										0x1047, 0x1048, // globe
 										0x1EB1, 0x1EB2, 0x1EB3, 0x1EB4 // barrel staves
-										};
+									};
 
 									if (Utility.Random(list.Length + 1) == 0)
 									{
@@ -318,9 +276,9 @@ namespace Server.Engines.Harvest
 
 						if (preLoot != null)
 						{
-							if (preLoot is IShipwreckedItem)
+							if (preLoot is IShipwreckedItem swi)
 							{
-								((IShipwreckedItem)preLoot).IsShipwreckedItem = true;
+								swi.IsShipwreckedItem = true;
 							}
 
 							return preLoot;
@@ -425,13 +383,13 @@ namespace Server.Engines.Harvest
 
 		public override void SendSuccessTo(Mobile from, Item item, HarvestResource resource)
 		{
-			if (item is BigFish)
+			if (item is BigFish bf)
 			{
 				from.SendLocalizedMessage(1042635); // Your fishing pole bends as you pull a big fish from the depths!
 
-				((BigFish)item).Fisher = from;
+				bf.Fisher = from;
 			}
-			else if (item is WoodenChest || item is MetalGoldenChest)
+			else if (item is WoodenChest or MetalGoldenChest)
 			{
 				from.SendLocalizedMessage(503175); // You pull up a heavy chest from the depths of the ocean!
 			}
@@ -506,7 +464,7 @@ namespace Server.Engines.Harvest
 			}
 		}
 
-		public override void OnHarvestStarted(Mobile from, Item tool, HarvestDefinition def, object toHarvest)
+		public override void OnHarvestStarted(Mobile from, IHarvestTool tool, HarvestDefinition def, object toHarvest)
 		{
 			base.OnHarvestStarted(from, tool, def, toHarvest);
 
@@ -530,7 +488,7 @@ namespace Server.Engines.Harvest
 			}
 		}
 
-		public override void OnHarvestFinished(Mobile from, Item tool, HarvestDefinition def, HarvestVein vein, HarvestBank bank, HarvestResource resource, object harvested)
+		public override void OnHarvestFinished(Mobile from, IHarvestTool tool, HarvestDefinition def, HarvestVein vein, HarvestBank bank, HarvestResource resource, object harvested)
 		{
 			base.OnHarvestFinished(from, tool, def, vein, bank, resource, harvested);
 
@@ -540,12 +498,12 @@ namespace Server.Engines.Harvest
 			}
 		}
 
-		public override object GetLock(Mobile from, Item tool, HarvestDefinition def, object toHarvest)
+		public override object GetLock(Mobile from, IHarvestTool tool, HarvestDefinition def, object toHarvest)
 		{
 			return this;
 		}
 
-		public override bool BeginHarvesting(Mobile from, Item tool)
+		public override bool BeginHarvesting(Mobile from, IHarvestTool tool)
 		{
 			if (!base.BeginHarvesting(from, tool))
 			{
@@ -556,7 +514,7 @@ namespace Server.Engines.Harvest
 			return true;
 		}
 
-		public override bool CheckHarvest(Mobile from, Item tool)
+		public override bool CheckHarvest(Mobile from, IHarvestTool tool)
 		{
 			if (!base.CheckHarvest(from, tool))
 			{
@@ -572,7 +530,7 @@ namespace Server.Engines.Harvest
 			return true;
 		}
 
-		public override bool CheckHarvest(Mobile from, Item tool, HarvestDefinition def, object toHarvest)
+		public override bool CheckHarvest(Mobile from, IHarvestTool tool, HarvestDefinition def, object toHarvest)
 		{
 			if (!base.CheckHarvest(from, tool, def, toHarvest))
 			{
@@ -588,14 +546,28 @@ namespace Server.Engines.Harvest
 			return true;
 		}
 
-		private static readonly int[] m_WaterTiles = new int[]
+		private class MutateEntry
+		{
+			public double ReqSkill { get; set; }
+			public double MinSkill { get; set; }
+			public double MaxSkill { get; set; }
+
+			public bool DeepWater { get; set; }
+			public bool FreshWater { get; set; }
+
+			public Type[] Types { get; set; }
+
+			public MutateEntry(bool deepWater, bool freshWater, double reqSkill, double minSkill, double maxSkill, params Type[] types)
 			{
-				0x00A8, 0x00AB,
-				0x0136, 0x0137,
-				0x5797, 0x579C,
-				0x746E, 0x7485,
-				0x7490, 0x74AB,
-				0x74B5, 0x75D5
-			};
+				DeepWater = deepWater;
+				FreshWater = freshWater;
+
+				ReqSkill = reqSkill;
+				MinSkill = minSkill;
+				MaxSkill = maxSkill;
+
+				Types = types;
+			}
+		}
 	}
 }

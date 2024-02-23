@@ -28,7 +28,7 @@ namespace Server.Mobiles
 			var kat = new Katana {
 				Crafter = this,
 				Movable = true,
-				Quality = WeaponQuality.Regular
+				Quality = ItemQuality.Regular
 			};
 			AddItem(kat);
 
@@ -41,7 +41,7 @@ namespace Server.Mobiles
 				Movable = false,
 				LootType = LootType.Newbied,
 				Crafter = this,
-				Quality = ArmorQuality.Regular
+				Quality = ItemQuality.Regular
 			};
 			AddItem(cht);
 
@@ -49,7 +49,7 @@ namespace Server.Mobiles
 				Movable = false,
 				LootType = LootType.Newbied,
 				Crafter = this,
-				Quality = ArmorQuality.Regular
+				Quality = ItemQuality.Regular
 			};
 			AddItem(chl);
 
@@ -57,7 +57,7 @@ namespace Server.Mobiles
 				Movable = false,
 				LootType = LootType.Newbied,
 				Crafter = this,
-				Quality = ArmorQuality.Regular
+				Quality = ItemQuality.Regular
 			};
 			AddItem(pla);
 

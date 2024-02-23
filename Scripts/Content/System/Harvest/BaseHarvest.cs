@@ -1,28 +1,25 @@
 ﻿using Server.Engine.Facet.Module.LumberHarvest;
-using Server.Engines.Quests.Definitions;
 using Server.Items;
-using Server.Mobiles;
 using Server.Targeting;
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 
 namespace Server.Engines.Harvest
 {
-	public abstract class HarvestSystem
+	public abstract class HarvestSystem : IHarvestSystem
 	{
-		private readonly List<HarvestDefinition> m_Definitions;
-
-		public List<HarvestDefinition> Definitions => m_Definitions;
+		public List<HarvestDefinition> Definitions { get; }
 
 		public HarvestSystem()
 		{
-			m_Definitions = new List<HarvestDefinition>();
+			Definitions = new List<HarvestDefinition>();
 		}
 
-		public virtual bool CheckTool(Mobile from, Item tool)
+		public virtual bool CheckTool(Mobile from, IHarvestTool tool)
 		{
-			var wornOut = (tool == null || tool.Deleted || (tool is IUsesRemaining && ((IUsesRemaining)tool).UsesRemaining <= 0));
+			var wornOut = tool == null || tool.Deleted || (tool is IUsesRemaining && ((IUsesRemaining)tool).UsesRemaining <= 0);
 
 			if (wornOut)
 			{
@@ -32,19 +29,19 @@ namespace Server.Engines.Harvest
 			return !wornOut;
 		}
 
-		public virtual bool CheckHarvest(Mobile from, Item tool)
+		public virtual bool CheckHarvest(Mobile from, IHarvestTool tool)
 		{
 			return CheckTool(from, tool);
 		}
 
-		public virtual bool CheckHarvest(Mobile from, Item tool, HarvestDefinition def, object toHarvest)
+		public virtual bool CheckHarvest(Mobile from, IHarvestTool tool, HarvestDefinition def, object toHarvest)
 		{
 			return CheckTool(from, tool);
 		}
 
-		public virtual bool CheckRange(Mobile from, Item tool, HarvestDefinition def, Map map, Point3D loc, bool timed)
+		public virtual bool CheckRange(Mobile from, IHarvestTool tool, HarvestDefinition def, Map map, Point3D loc, bool timed)
 		{
-			var inRange = (from.Map == map && from.InRange(loc, def.MaxRange));
+			var inRange = from.Map == map && from.InRange(loc, def.MaxRange);
 
 			if (!inRange)
 			{
@@ -54,10 +51,10 @@ namespace Server.Engines.Harvest
 			return inRange;
 		}
 
-		public virtual bool CheckResources(Mobile from, Item tool, HarvestDefinition def, Map map, Point3D loc, bool timed)
+		public virtual bool CheckResources(Mobile from, IHarvestTool tool, HarvestDefinition def, Map map, Point3D loc, bool timed)
 		{
 			var bank = def.GetBank(map, loc.X, loc.Y);
-			var available = (bank != null && bank.Current >= def.ConsumedPerHarvest);
+			var available = bank != null && bank.Current >= def.ConsumedPerHarvest;
 
 			if (!available)
 			{
@@ -67,11 +64,11 @@ namespace Server.Engines.Harvest
 			return available;
 		}
 
-		public virtual void OnBadHarvestTarget(Mobile from, Item tool, object toHarvest)
+		public virtual void OnBadHarvestTarget(Mobile from, IHarvestTool tool, object toHarvest)
 		{
 		}
 
-		public virtual object GetLock(Mobile from, Item tool, HarvestDefinition def, object toHarvest)
+		public virtual object GetLock(Mobile from, IHarvestTool tool, HarvestDefinition def, object toHarvest)
 		{
 			/* Here we prevent multiple harvesting.
 			 * 
@@ -84,15 +81,15 @@ namespace Server.Engines.Harvest
 			return tool;
 		}
 
-		public virtual void OnConcurrentHarvest(Mobile from, Item tool, HarvestDefinition def, object toHarvest)
+		public virtual void OnConcurrentHarvest(Mobile from, IHarvestTool tool, HarvestDefinition def, object toHarvest)
 		{
 		}
 
-		public virtual void OnHarvestStarted(Mobile from, Item tool, HarvestDefinition def, object toHarvest)
+		public virtual void OnHarvestStarted(Mobile from, IHarvestTool tool, HarvestDefinition def, object toHarvest)
 		{
 		}
 
-		public virtual bool BeginHarvesting(Mobile from, Item tool)
+		public virtual bool BeginHarvesting(Mobile from, IHarvestTool tool)
 		{
 			if (!CheckHarvest(from, tool))
 			{
@@ -103,7 +100,7 @@ namespace Server.Engines.Harvest
 			return true;
 		}
 
-		public virtual void FinishHarvesting(Mobile from, Item tool, HarvestDefinition def, object toHarvest, object locked)
+		public virtual void FinishHarvesting(Mobile from, IHarvestTool tool, HarvestDefinition def, object toHarvest, object locked)
 		{
 			from.EndAction(locked);
 
@@ -112,16 +109,13 @@ namespace Server.Engines.Harvest
 				return;
 			}
 
-			int tileID;
-			Map map;
-			Point3D loc;
-
-			if (!GetHarvestDetails(from, tool, toHarvest, out tileID, out map, out loc))
+			if (!GetHarvestDetails(from, tool, toHarvest, out var tileID, out var map, out var loc))
 			{
 				OnBadHarvestTarget(from, tool, toHarvest);
 				return;
 			}
-			else if (!def.Validate(tileID))
+
+			if (!def.Validate(tileID))
 			{
 				OnBadHarvestTarget(from, tool, toHarvest);
 				return;
@@ -131,16 +125,18 @@ namespace Server.Engines.Harvest
 			{
 				return;
 			}
-			else if (!CheckResources(from, tool, def, map, loc, true))
-			{
-				return;
-			}
-			else if (!CheckHarvest(from, tool, def, toHarvest))
+
+			if (!CheckResources(from, tool, def, map, loc, true))
 			{
 				return;
 			}
 
-			if (SpecialHarvest(from, tool, def, map, loc))
+			if (!CheckHarvest(from, tool, def, toHarvest))
+			{
+				return;
+			}
+
+			if (SpecialHarvest(from, tool, def, toHarvest, tileID, map, loc))
 			{
 				return;
 			}
@@ -169,19 +165,14 @@ namespace Server.Engines.Harvest
 			var resource = MutateResource(from, tool, def, map, loc, vein, primary, fallback);
 
 			var skillBase = from.Skills[def.Skill].Base;
-			var skillValue = from.Skills[def.Skill].Value;
 
 			Type type = null;
 
 			if (skillBase >= resource.ReqSkill && from.CheckSkill(def.Skill, resource.MinSkill, resource.MaxSkill))
 			{
 				type = GetResourceType(from, tool, def, map, loc, resource);
-
-				if (type != null)
-				{
-					type = MutateType(type, from, tool, def, map, loc, resource);
-				}
-
+				type = MutateType(type, from, tool, def, map, loc, resource);
+				
 				if (type != null)
 				{
 					var item = Construct(type, from);
@@ -201,8 +192,8 @@ namespace Server.Engines.Harvest
 							var racialAmount = (int)Math.Ceiling(amount * 1.1);
 							var feluccaRacialAmount = (int)Math.Ceiling(feluccaAmount * 1.1);
 
-							var eligableForRacialBonus = (def.RaceBonus && from.Race == Race.Human);
-							var inFelucca = (map == Map.Felucca);
+							var eligableForRacialBonus = def.RaceBonus && from.Race == Race.Human;
+							var inFelucca = map == Map.Felucca;
 
 							if (eligableForRacialBonus && inFelucca && bank.Current >= feluccaRacialAmount && 0.1 > Utility.RandomDouble())
 							{
@@ -222,10 +213,14 @@ namespace Server.Engines.Harvest
 							}
 						}
 
-						bank.Consume(item.Amount, from);
+						var itemAmount = item.Amount;
+
+						bank.Consume(itemAmount, from);
 
 						if (Give(from, item, def.PlaceAtFeetIfFull))
 						{
+							EventSink.InvokeHarvestedItem(new HarvestedItemEventArgs(from, item, itemAmount, this, tool));
+
 							SendSuccessTo(from, item, resource);
 						}
 						else
@@ -240,9 +235,13 @@ namespace Server.Engines.Harvest
 						{
 							var bonusItem = Construct(bonus.Type, from);
 
-							if (Give(from, bonusItem, true))    //Bonuses always allow placing at feet, even if pack is full irregrdless of def
+							var bonusAmount = bonusItem.Amount;
+
+							if (Give(from, bonusItem, true)) // Bonuses always allow placing at feet, even if pack is full regrdless of def
 							{
 								bonus.SendSuccessTo(from);
+
+								EventSink.InvokeHarvestedItem(new HarvestedItemEventArgs(from, bonusItem, bonusAmount, this, tool));
 							}
 							else
 							{
@@ -250,10 +249,8 @@ namespace Server.Engines.Harvest
 							}
 						}
 
-						if (tool is IUsesRemaining)
+						if (tool is IUsesRemaining toolWithUses)
 						{
-							var toolWithUses = (IUsesRemaining)tool;
-
 							toolWithUses.ShowUsesRemaining = true;
 
 							if (toolWithUses.UsesRemaining > 0)
@@ -279,22 +276,28 @@ namespace Server.Engines.Harvest
 			OnHarvestFinished(from, tool, def, vein, bank, resource, toHarvest);
 		}
 
-		public virtual void OnHarvestFinished(Mobile from, Item tool, HarvestDefinition def, HarvestVein vein, HarvestBank bank, HarvestResource resource, object harvested)
+		public virtual void OnHarvestFinished(Mobile from, IHarvestTool tool, HarvestDefinition def, HarvestVein vein, HarvestBank bank, HarvestResource resource, object harvested)
 		{
 		}
 
-		public virtual bool SpecialHarvest(Mobile from, Item tool, HarvestDefinition def, Map map, Point3D loc)
+		public virtual bool SpecialHarvest(Mobile from, IHarvestTool tool, HarvestDefinition def, object toHarvest, int tileID, Map map, Point3D loc)
 		{
 			return false;
 		}
 
 		public virtual Item Construct(Type type, Mobile from)
 		{
-			try { return Activator.CreateInstance(type) as Item; }
-			catch { return null; }
+			try
+			{
+				return Activator.CreateInstance(type) as Item;
+			}
+			catch
+			{
+				return null;
+			}
 		}
 
-		public virtual HarvestVein MutateVein(Mobile from, Item tool, HarvestDefinition def, HarvestBank bank, object toHarvest, HarvestVein vein)
+		public virtual HarvestVein MutateVein(Mobile from, IHarvestTool tool, HarvestDefinition def, HarvestBank bank, object toHarvest, HarvestVein vein)
 		{
 			return vein;
 		}
@@ -349,12 +352,14 @@ namespace Server.Engines.Harvest
 			return true;
 		}
 
-		public virtual Type MutateType(Type type, Mobile from, Item tool, HarvestDefinition def, Map map, Point3D loc, HarvestResource resource)
+		public virtual Type MutateType(Type type, Mobile from, IHarvestTool tool, HarvestDefinition def, Map map, Point3D loc, HarvestResource resource)
 		{
-			return from.Region.GetResource(type);
+			var region = Region.Find(loc, map) ?? from?.Region;
+
+			return region?.GetResource(from, tool, map, loc, this, type) ?? type;
 		}
 
-		public virtual Type GetResourceType(Mobile from, Item tool, HarvestDefinition def, Map map, Point3D loc, HarvestResource resource)
+		public virtual Type GetResourceType(Mobile from, IHarvestTool tool, HarvestDefinition def, Map map, Point3D loc, HarvestResource resource)
 		{
 			if (resource.Types.Length > 0)
 			{
@@ -364,9 +369,9 @@ namespace Server.Engines.Harvest
 			return null;
 		}
 
-		public virtual HarvestResource MutateResource(Mobile from, Item tool, HarvestDefinition def, Map map, Point3D loc, HarvestVein vein, HarvestResource primary, HarvestResource fallback)
+		public virtual HarvestResource MutateResource(Mobile from, IHarvestTool tool, HarvestDefinition def, Map map, Point3D loc, HarvestVein vein, HarvestResource primary, HarvestResource fallback)
 		{
-			var racialBonus = (def.RaceBonus && from.Race == Race.Elf);
+			var racialBonus = def.RaceBonus && from.Race == Race.Elf;
 
 			if (vein.ChanceToFallback > (Utility.RandomDouble() + (racialBonus ? .20 : 0)))
 			{
@@ -383,7 +388,7 @@ namespace Server.Engines.Harvest
 			return primary;
 		}
 
-		public virtual bool OnHarvesting(Mobile from, Item tool, HarvestDefinition def, object toHarvest, object locked, bool last)
+		public virtual bool OnHarvesting(Mobile from, IHarvestTool tool, HarvestDefinition def, object toHarvest, object locked, bool last)
 		{
 			if (!CheckHarvest(from, tool))
 			{
@@ -430,7 +435,7 @@ namespace Server.Engines.Harvest
 			return !last;
 		}
 
-		public virtual void DoHarvestingSound(Mobile from, Item tool, HarvestDefinition def, object toHarvest)
+		public virtual void DoHarvestingSound(Mobile from, IHarvestTool tool, HarvestDefinition def, object toHarvest)
 		{
 			if (def.EffectSounds.Length > 0)
 			{
@@ -438,7 +443,7 @@ namespace Server.Engines.Harvest
 			}
 		}
 
-		public virtual void DoHarvestingEffect(Mobile from, Item tool, HarvestDefinition def, Map map, Point3D loc)
+		public virtual void DoHarvestingEffect(Mobile from, IHarvestTool tool, HarvestDefinition def, Map map, Point3D loc)
 		{
 			from.Direction = from.GetDirectionTo(loc);
 
@@ -452,9 +457,9 @@ namespace Server.Engines.Harvest
 		{
 			HarvestDefinition def = null;
 
-			for (var i = 0; def == null && i < m_Definitions.Count; ++i)
+			for (var i = 0; def == null && i < Definitions.Count; ++i)
 			{
-				var check = m_Definitions[i];
+				var check = Definitions[i];
 
 				if (check.Validate(tileID))
 				{
@@ -465,7 +470,7 @@ namespace Server.Engines.Harvest
 			return def;
 		}
 
-		public virtual void StartHarvesting(Mobile from, Item tool, object toHarvest)
+		public virtual void StartHarvesting(Mobile from, IHarvestTool tool, object toHarvest)
 		{
 			if (!CheckHarvest(from, tool))
 			{
@@ -515,7 +520,7 @@ namespace Server.Engines.Harvest
 			OnHarvestStarted(from, tool, def, toHarvest);
 		}
 
-		public virtual bool GetHarvestDetails(Mobile from, Item tool, object toHarvest, out int tileID, out Map map, out Point3D loc)
+		public virtual bool GetHarvestDetails(Mobile from, IHarvestTool tool, object toHarvest, out int tileID, out Map map, out Point3D loc)
 		{
 			if (toHarvest is Static && !((Static)toHarvest).Movable)
 			{
@@ -533,10 +538,8 @@ namespace Server.Engines.Harvest
 				map = from.Map;
 				loc = obj.Location;
 			}
-			else if (toHarvest is LandTarget)
+			else if (toHarvest is LandTarget obj)
 			{
-				var obj = (LandTarget)toHarvest;
-
 				tileID = obj.TileID;
 				map = from.Map;
 				loc = obj.Location;
@@ -549,67 +552,44 @@ namespace Server.Engines.Harvest
 				return false;
 			}
 
-			return (map != null && map != Map.Internal);
+			return map != null && map != Map.Internal;
 		}
 	}
 
 	public class HarvestDefinition
 	{
-		private int m_BankWidth, m_BankHeight;
-		private int m_MinTotal, m_MaxTotal;
-		private int[] m_Tiles;
-		private bool m_RangedTiles;
-		private TimeSpan m_MinRespawn, m_MaxRespawn;
-		private int m_MaxRange;
-		private int m_ConsumedPerHarvest, m_ConsumedPerFeluccaHarvest;
-		private bool m_PlaceAtFeetIfFull;
-		private SkillName m_Skill;
-		private int[] m_EffectActions;
-		private int[] m_EffectCounts;
-		private int[] m_EffectSounds;
-		private TimeSpan m_EffectSoundDelay;
-		private TimeSpan m_EffectDelay;
-		private object m_NoResourcesMessage, m_OutOfRangeMessage, m_TimedOutOfRangeMessage, m_DoubleHarvestMessage, m_FailMessage, m_PackFullMessage, m_ToolBrokeMessage;
-		private HarvestResource[] m_Resources;
-		private HarvestVein[] m_Veins;
-		private BonusHarvestResource[] m_BonusResources;
-		private bool m_RaceBonus;
-		private bool m_RandomizeVeins;
+		public int BankWidth { get; set; }
+		public int BankHeight { get; set; }
+		public int MinTotal { get; set; }
+		public int MaxTotal { get; set; }
+		public int[] Tiles { get; set; }
+		public bool RangedTiles { get; set; }
+		public TimeSpan MinRespawn { get; set; }
+		public TimeSpan MaxRespawn { get; set; }
+		public int MaxRange { get; set; }
+		public int ConsumedPerHarvest { get; set; }
+		public int ConsumedPerFeluccaHarvest { get; set; }
+		public bool PlaceAtFeetIfFull { get; set; }
+		public SkillName Skill { get; set; }
+		public int[] EffectActions { get; set; }
+		public int[] EffectCounts { get; set; }
+		public int[] EffectSounds { get; set; }
+		public TimeSpan EffectSoundDelay { get; set; }
+		public TimeSpan EffectDelay { get; set; }
+		public object NoResourcesMessage { get; set; }
+		public object OutOfRangeMessage { get; set; }
+		public object TimedOutOfRangeMessage { get; set; }
+		public object DoubleHarvestMessage { get; set; }
+		public object FailMessage { get; set; }
+		public object PackFullMessage { get; set; }
+		public object ToolBrokeMessage { get; set; }
+		public HarvestResource[] Resources { get; set; }
+		public HarvestVein[] Veins { get; set; }
+		public BonusHarvestResource[] BonusResources { get; set; }
+		public bool RaceBonus { get; set; }
+		public bool RandomizeVeins { get; set; }
 
-		public int BankWidth { get => m_BankWidth; set => m_BankWidth = value; }
-		public int BankHeight { get => m_BankHeight; set => m_BankHeight = value; }
-		public int MinTotal { get => m_MinTotal; set => m_MinTotal = value; }
-		public int MaxTotal { get => m_MaxTotal; set => m_MaxTotal = value; }
-		public int[] Tiles { get => m_Tiles; set => m_Tiles = value; }
-		public bool RangedTiles { get => m_RangedTiles; set => m_RangedTiles = value; }
-		public TimeSpan MinRespawn { get => m_MinRespawn; set => m_MinRespawn = value; }
-		public TimeSpan MaxRespawn { get => m_MaxRespawn; set => m_MaxRespawn = value; }
-		public int MaxRange { get => m_MaxRange; set => m_MaxRange = value; }
-		public int ConsumedPerHarvest { get => m_ConsumedPerHarvest; set => m_ConsumedPerHarvest = value; }
-		public int ConsumedPerFeluccaHarvest { get => m_ConsumedPerFeluccaHarvest; set => m_ConsumedPerFeluccaHarvest = value; }
-		public bool PlaceAtFeetIfFull { get => m_PlaceAtFeetIfFull; set => m_PlaceAtFeetIfFull = value; }
-		public SkillName Skill { get => m_Skill; set => m_Skill = value; }
-		public int[] EffectActions { get => m_EffectActions; set => m_EffectActions = value; }
-		public int[] EffectCounts { get => m_EffectCounts; set => m_EffectCounts = value; }
-		public int[] EffectSounds { get => m_EffectSounds; set => m_EffectSounds = value; }
-		public TimeSpan EffectSoundDelay { get => m_EffectSoundDelay; set => m_EffectSoundDelay = value; }
-		public TimeSpan EffectDelay { get => m_EffectDelay; set => m_EffectDelay = value; }
-		public object NoResourcesMessage { get => m_NoResourcesMessage; set => m_NoResourcesMessage = value; }
-		public object OutOfRangeMessage { get => m_OutOfRangeMessage; set => m_OutOfRangeMessage = value; }
-		public object TimedOutOfRangeMessage { get => m_TimedOutOfRangeMessage; set => m_TimedOutOfRangeMessage = value; }
-		public object DoubleHarvestMessage { get => m_DoubleHarvestMessage; set => m_DoubleHarvestMessage = value; }
-		public object FailMessage { get => m_FailMessage; set => m_FailMessage = value; }
-		public object PackFullMessage { get => m_PackFullMessage; set => m_PackFullMessage = value; }
-		public object ToolBrokeMessage { get => m_ToolBrokeMessage; set => m_ToolBrokeMessage = value; }
-		public HarvestResource[] Resources { get => m_Resources; set => m_Resources = value; }
-		public HarvestVein[] Veins { get => m_Veins; set => m_Veins = value; }
-		public BonusHarvestResource[] BonusResources { get => m_BonusResources; set => m_BonusResources = value; }
-		public bool RaceBonus { get => m_RaceBonus; set => m_RaceBonus = value; }
-		public bool RandomizeVeins { get => m_RandomizeVeins; set => m_RandomizeVeins = value; }
-
-		private Dictionary<Map, Dictionary<Point2D, HarvestBank>> m_BanksByMap;
-
-		public Dictionary<Map, Dictionary<Point2D, HarvestBank>> Banks { get => m_BanksByMap; set => m_BanksByMap = value; }
+		public Dictionary<Map, Dictionary<Point2D, HarvestBank>> Banks { get; set; }
 
 		public void SendMessageTo(Mobile from, object message)
 		{
@@ -630,20 +610,20 @@ namespace Server.Engines.Harvest
 				return null;
 			}
 
-			x /= m_BankWidth;
-			y /= m_BankHeight;
+			x /= BankWidth;
+			y /= BankHeight;
 
-			Dictionary<Point2D, HarvestBank> banks = null;
-			m_BanksByMap.TryGetValue(map, out banks);
+			Dictionary<Point2D, HarvestBank> banks;
+			_ = Banks.TryGetValue(map, out banks);
 
 			if (banks == null)
 			{
-				m_BanksByMap[map] = banks = new Dictionary<Point2D, HarvestBank>();
+				Banks[map] = banks = new Dictionary<Point2D, HarvestBank>();
 			}
 
 			var key = new Point2D(x, y);
-			HarvestBank bank = null;
-			banks.TryGetValue(key, out bank);
+			HarvestBank bank;
+			_ = banks.TryGetValue(key, out bank);
 
 			if (bank == null)
 			{
@@ -655,14 +635,14 @@ namespace Server.Engines.Harvest
 
 		public HarvestVein GetVeinAt(Map map, int x, int y)
 		{
-			if (m_Veins.Length == 1)
+			if (Veins.Length == 1)
 			{
-				return m_Veins[0];
+				return Veins[0];
 			}
 
 			double randomValue;
 
-			if (m_RandomizeVeins)
+			if (RandomizeVeins)
 			{
 				randomValue = Utility.RandomDouble();
 			}
@@ -677,21 +657,21 @@ namespace Server.Engines.Harvest
 
 		public HarvestVein GetVeinFrom(double randomValue)
 		{
-			if (m_Veins.Length == 1)
+			if (Veins.Length == 1)
 			{
-				return m_Veins[0];
+				return Veins[0];
 			}
 
 			randomValue *= 100;
 
-			for (var i = 0; i < m_Veins.Length; ++i)
+			for (var i = 0; i < Veins.Length; ++i)
 			{
-				if (randomValue <= m_Veins[i].VeinChance)
+				if (randomValue <= Veins[i].VeinChance)
 				{
-					return m_Veins[i];
+					return Veins[i];
 				}
 
-				randomValue -= m_Veins[i].VeinChance;
+				randomValue -= Veins[i].VeinChance;
 			}
 
 			return null;
@@ -699,21 +679,21 @@ namespace Server.Engines.Harvest
 
 		public BonusHarvestResource GetBonusResource()
 		{
-			if (m_BonusResources == null)
+			if (BonusResources == null)
 			{
 				return null;
 			}
 
 			var randomValue = Utility.RandomDouble() * 100;
 
-			for (var i = 0; i < m_BonusResources.Length; ++i)
+			for (var i = 0; i < BonusResources.Length; ++i)
 			{
-				if (randomValue <= m_BonusResources[i].Chance)
+				if (randomValue <= BonusResources[i].Chance)
 				{
-					return m_BonusResources[i];
+					return BonusResources[i];
 				}
 
-				randomValue -= m_BonusResources[i].Chance;
+				randomValue -= BonusResources[i].Chance;
 			}
 
 			return null;
@@ -721,18 +701,18 @@ namespace Server.Engines.Harvest
 
 		public HarvestDefinition()
 		{
-			m_BanksByMap = new Dictionary<Map, Dictionary<Point2D, HarvestBank>>();
+			Banks = new Dictionary<Map, Dictionary<Point2D, HarvestBank>>();
 		}
 
 		public bool Validate(int tileID)
 		{
-			if (m_RangedTiles)
+			if (RangedTiles)
 			{
 				var contains = false;
 
-				for (var i = 0; !contains && i < m_Tiles.Length; i += 2)
+				for (var i = 0; !contains && i < Tiles.Length; i += 2)
 				{
-					contains = (tileID >= m_Tiles[i] && tileID <= m_Tiles[i + 1]);
+					contains = tileID >= Tiles[i] && tileID <= Tiles[i + 1];
 				}
 
 				return contains;
@@ -741,12 +721,12 @@ namespace Server.Engines.Harvest
 			{
 				var dist = -1;
 
-				for (var i = 0; dist < 0 && i < m_Tiles.Length; ++i)
+				for (var i = 0; dist < 0 && i < Tiles.Length; ++i)
 				{
-					dist = (m_Tiles[i] - tileID);
+					dist = Tiles[i] - tileID;
 				}
 
-				return (dist == 0);
+				return dist == 0;
 			}
 		}
 	}
@@ -757,9 +737,8 @@ namespace Server.Engines.Harvest
 		private readonly int m_Maximum;
 		private DateTime m_NextRespawn;
 		private HarvestVein m_Vein, m_DefaultVein;
-		private readonly HarvestDefinition m_Definition;
 
-		public HarvestDefinition Definition => m_Definition;
+		public HarvestDefinition Definition { get; }
 
 		public int Current
 		{
@@ -798,9 +777,9 @@ namespace Server.Engines.Harvest
 
 			m_Current = m_Maximum;
 
-			if (m_Definition.RandomizeVeins)
+			if (Definition.RandomizeVeins)
 			{
-				m_DefaultVein = m_Definition.GetVeinFrom(Utility.RandomDouble());
+				m_DefaultVein = Definition.GetVeinFrom(Utility.RandomDouble());
 			}
 
 			m_Vein = m_DefaultVein;
@@ -812,14 +791,14 @@ namespace Server.Engines.Harvest
 
 			if (m_Current == m_Maximum)
 			{
-				var min = m_Definition.MinRespawn.TotalMinutes;
-				var max = m_Definition.MaxRespawn.TotalMinutes;
+				var min = Definition.MinRespawn.TotalMinutes;
+				var max = Definition.MaxRespawn.TotalMinutes;
 				var rnd = Utility.RandomDouble();
 
 				m_Current = m_Maximum - amount;
 
 				var minutes = min + (rnd * (max - min));
-				if (m_Definition.RaceBonus && from.Race == Race.Elf)    //def.RaceBonus = Core.ML
+				if (Definition.RaceBonus && from.Race == Race.Elf)    //def.RaceBonus = Core.ML
 				{
 					minutes *= .75; //25% off the time.  
 				}
@@ -844,37 +823,32 @@ namespace Server.Engines.Harvest
 			m_DefaultVein = defaultVein;
 			m_Vein = m_DefaultVein;
 
-			m_Definition = def;
+			Definition = def;
 		}
 	}
 
 	public class HarvestVein
 	{
-		private double m_VeinChance;
-		private double m_ChanceToFallback;
-		private HarvestResource m_PrimaryResource;
-		private HarvestResource m_FallbackResource;
-
-		public double VeinChance { get => m_VeinChance; set => m_VeinChance = value; }
-		public double ChanceToFallback { get => m_ChanceToFallback; set => m_ChanceToFallback = value; }
-		public HarvestResource PrimaryResource { get => m_PrimaryResource; set => m_PrimaryResource = value; }
-		public HarvestResource FallbackResource { get => m_FallbackResource; set => m_FallbackResource = value; }
+		public double VeinChance { get; set; }
+		public double ChanceToFallback { get; set; }
+		public HarvestResource PrimaryResource { get; set; }
+		public HarvestResource FallbackResource { get; set; }
 
 		public HarvestVein(double veinChance, double chanceToFallback, HarvestResource primaryResource, HarvestResource fallbackResource)
 		{
-			m_VeinChance = veinChance;
-			m_ChanceToFallback = chanceToFallback;
-			m_PrimaryResource = primaryResource;
-			m_FallbackResource = fallbackResource;
+			VeinChance = veinChance;
+			ChanceToFallback = chanceToFallback;
+			PrimaryResource = primaryResource;
+			FallbackResource = fallbackResource;
 		}
 	}
 
 	public class HarvestTarget : Target
 	{
-		private readonly Item m_Tool;
+		private readonly IHarvestTool m_Tool;
 		private readonly HarvestSystem m_System;
 
-		public HarvestTarget(Item tool, HarvestSystem system) : base(-1, true, TargetFlags.None)
+		public HarvestTarget(IHarvestTool tool, HarvestSystem system) : base(-1, true, TargetFlags.None)
 		{
 			m_Tool = tool;
 			m_System = system;
@@ -892,7 +866,7 @@ namespace Server.Engines.Harvest
 					return;
 				}
 			}
-			else if (m_System is Lumberjacking or FacetModule_Lumberjacking)
+			else if (m_System is Lumberjacking)
 			{
 				if (targeted is IChopable chop)
 				{
@@ -902,7 +876,7 @@ namespace Server.Engines.Harvest
 
 				if (targeted is ICarvable carvable)
 				{
-					carvable.Carve(from, m_Tool);
+					carvable.Carve(from, m_Tool as Item);
 					return;
 				}
 
@@ -928,9 +902,9 @@ namespace Server.Engines.Harvest
 						return;
 					}
 				}
-			}			
+			}
 
-			m_System.StartHarvesting(from, m_Tool, targeted);			
+			m_System.StartHarvesting(from, m_Tool, targeted);
 		}
 
 		private static void DestroyFurniture(Mobile from, Item item)
@@ -940,7 +914,7 @@ namespace Server.Engines.Harvest
 				from.SendLocalizedMessage(500446); // That is too far away.
 				return;
 			}
-			
+
 			if (!item.IsChildOf(from.Backpack) && !item.Movable)
 			{
 				from.SendLocalizedMessage(500462); // You can't destroy that while it is here.
@@ -955,9 +929,9 @@ namespace Server.Engines.Harvest
 			{
 				if (c is TrapableContainer tc)
 				{
-					tc.ExecuteTrap(from);
+					_ = tc.ExecuteTrap(from);
 				}
-				
+
 				c.Destroy();
 			}
 			else
@@ -970,13 +944,13 @@ namespace Server.Engines.Harvest
 	public class HarvestSoundTimer : Timer
 	{
 		private readonly Mobile m_From;
-		private readonly Item m_Tool;
+		private readonly IHarvestTool m_Tool;
 		private readonly HarvestSystem m_System;
 		private readonly HarvestDefinition m_Definition;
 		private readonly object m_ToHarvest, m_Locked;
 		private readonly bool m_Last;
 
-		public HarvestSoundTimer(Mobile from, Item tool, HarvestSystem system, HarvestDefinition def, object toHarvest, object locked, bool last) : base(def.EffectSoundDelay)
+		public HarvestSoundTimer(Mobile from, IHarvestTool tool, HarvestSystem system, HarvestDefinition def, object toHarvest, object locked, bool last) : base(def.EffectSoundDelay)
 		{
 			m_From = from;
 			m_Tool = tool;
@@ -1000,76 +974,68 @@ namespace Server.Engines.Harvest
 
 	public class HarvestResource
 	{
-		private Type[] m_Types;
-		private double m_ReqSkill, m_MinSkill, m_MaxSkill;
-		private readonly object m_SuccessMessage;
-
-		public Type[] Types { get => m_Types; set => m_Types = value; }
-		public double ReqSkill { get => m_ReqSkill; set => m_ReqSkill = value; }
-		public double MinSkill { get => m_MinSkill; set => m_MinSkill = value; }
-		public double MaxSkill { get => m_MaxSkill; set => m_MaxSkill = value; }
-		public object SuccessMessage => m_SuccessMessage;
+		public Type[] Types { get; set; }
+		public double ReqSkill { get; set; }
+		public double MinSkill { get; set; }
+		public double MaxSkill { get; set; }
+		public object SuccessMessage { get; }
 
 		public void SendSuccessTo(Mobile m)
 		{
-			if (m_SuccessMessage is int)
+			if (SuccessMessage is int)
 			{
-				m.SendLocalizedMessage((int)m_SuccessMessage);
+				m.SendLocalizedMessage((int)SuccessMessage);
 			}
-			else if (m_SuccessMessage is string)
+			else if (SuccessMessage is string)
 			{
-				m.SendMessage((string)m_SuccessMessage);
+				m.SendMessage((string)SuccessMessage);
 			}
 		}
 
 		public HarvestResource(double reqSkill, double minSkill, double maxSkill, object message, params Type[] types)
 		{
-			m_ReqSkill = reqSkill;
-			m_MinSkill = minSkill;
-			m_MaxSkill = maxSkill;
-			m_Types = types;
-			m_SuccessMessage = message;
+			ReqSkill = reqSkill;
+			MinSkill = minSkill;
+			MaxSkill = maxSkill;
+			Types = types;
+			SuccessMessage = message;
 		}
 	}
 
 	public class BonusHarvestResource
 	{
-		private Type m_Type;
-		private double m_ReqSkill, m_Chance;
-		private readonly TextDefinition m_SuccessMessage;
+		public Type Type { get; set; }
+		public double ReqSkill { get; set; }
+		public double Chance { get; set; }
 
-		public Type Type { get => m_Type; set => m_Type = value; }
-		public double ReqSkill { get => m_ReqSkill; set => m_ReqSkill = value; }
-		public double Chance { get => m_Chance; set => m_Chance = value; }
-
-		public TextDefinition SuccessMessage => m_SuccessMessage;
+		public TextDefinition SuccessMessage { get; }
 
 		public void SendSuccessTo(Mobile m)
 		{
-			TextDefinition.SendMessageTo(m, m_SuccessMessage);
+			TextDefinition.SendMessageTo(m, SuccessMessage);
 		}
 
 		public BonusHarvestResource(double reqSkill, double chance, TextDefinition message, Type type)
 		{
-			m_ReqSkill = reqSkill;
+			ReqSkill = reqSkill;
 
-			m_Chance = chance;
-			m_Type = type;
-			m_SuccessMessage = message;
+			Chance = chance;
+			Type = type;
+			SuccessMessage = message;
 		}
 	}
 
 	public class HarvestTimer : Timer
 	{
 		private readonly Mobile m_From;
-		private readonly Item m_Tool;
+		private readonly IHarvestTool m_Tool;
 		private readonly HarvestSystem m_System;
 		private readonly HarvestDefinition m_Definition;
 		private readonly object m_ToHarvest, m_Locked;
 		private int m_Index;
 		private readonly int m_Count;
 
-		public HarvestTimer(Mobile from, Item tool, HarvestSystem system, HarvestDefinition def, object toHarvest, object locked) : base(TimeSpan.Zero, def.EffectDelay)
+		public HarvestTimer(Mobile from, IHarvestTool tool, HarvestSystem system, HarvestDefinition def, object toHarvest, object locked) : base(TimeSpan.Zero, def.EffectDelay)
 		{
 			m_From = from;
 			m_Tool = tool;
@@ -1086,6 +1052,161 @@ namespace Server.Engines.Harvest
 			{
 				Stop();
 			}
+		}
+	}
+
+	public sealed class HarvestNodes : IEnumerable<HarvestNode>
+	{
+		private static readonly Type _FishingSystem = typeof(Fishing);
+		private static readonly Type _MiningSystem = typeof(Mining);
+		private static readonly Type _LumberjackingSystem = typeof(Lumberjacking);
+
+		private Dictionary<Type, HarvestNode> _Nodes;
+
+		public HarvestNode this[Type type]
+		{
+			get
+			{
+				_Nodes ??= new();
+
+				if (!_Nodes.TryGetValue(type, out var types))
+				{
+					_Nodes[type] = types = new(type);
+				}
+
+				return types;
+			}
+		}
+
+		[CommandProperty(AccessLevel.Counselor, AccessLevel.GameMaster)]
+		public HarvestNode FishingNodes => this[_FishingSystem];
+
+		[CommandProperty(AccessLevel.Counselor, AccessLevel.GameMaster)]
+		public HarvestNode MiningNodes => this[_MiningSystem];
+
+		[CommandProperty(AccessLevel.Counselor, AccessLevel.GameMaster)]
+		public HarvestNode LumberjackingNodes => this[_LumberjackingSystem];
+
+		public HarvestNodes()
+		{
+		}
+
+		public HarvestNodes(GenericReader reader)
+		{
+			Deserialize(reader);
+		}
+
+		public IEnumerator<HarvestNode> GetEnumerator()
+		{
+			if (_Nodes?.Count > 0)
+			{
+				foreach (var node in _Nodes.Values)
+				{
+					yield return node;
+				}
+			}
+		}
+
+		IEnumerator IEnumerable.GetEnumerator()
+		{
+			return GetEnumerator();
+		}
+
+		public void Serialize(GenericWriter writer)
+		{
+			writer.WriteEncodedInt(0);
+
+			if (_Nodes?.Count > 0)
+			{
+				writer.WriteEncodedInt(_Nodes.Count);
+
+				foreach (var (harvest, types) in _Nodes)
+				{
+					if (types?.Count > 0)
+					{
+						writer.Write(true);
+
+						writer.WriteObjectType(harvest);
+
+						types.Serialize(writer);
+					}
+					else
+					{
+						writer.Write(false);
+					}
+				}
+			}
+			else
+			{
+				writer.WriteEncodedInt(0);
+			}
+		}
+
+		public void Deserialize(GenericReader reader)
+		{
+			_ = reader.ReadEncodedInt();
+
+			var count = reader.ReadEncodedInt();
+
+			while (--count >= 0)
+			{
+				if (!reader.ReadBool())
+				{
+					continue;
+				}
+
+				var harvest = reader.ReadObjectType();
+
+				if (harvest != null)
+				{
+					_Nodes ??= new();
+
+					if (!_Nodes.TryGetValue(harvest, out var types))
+					{
+						_Nodes[harvest] = new(harvest, reader);
+					}
+					else
+					{
+						types.Deserialize(reader);
+					}
+				}
+				else
+				{
+					_ = new HarvestNode(null, reader);
+				}
+			}
+		}
+	}
+
+	public sealed class HarvestNode : TypeAmounts
+	{
+		public override int DefaultAmountMin => 0;
+
+		public Type Harvest { get; }
+
+		public HarvestNode(Type harvest)
+		{
+			Harvest = harvest;
+		}
+
+		public HarvestNode(Type harvest, GenericReader reader)
+			: base(reader)
+		{
+			Harvest = harvest;
+		}
+
+		public override void Serialize(GenericWriter writer)
+		{
+			base.Serialize(writer);
+
+			writer.WriteEncodedInt(0);
+		}
+
+		public override void Deserialize(GenericReader reader)
+		{
+			base.Deserialize(reader);
+
+			_ = reader.ReadEncodedInt();
 		}
 	}
 }

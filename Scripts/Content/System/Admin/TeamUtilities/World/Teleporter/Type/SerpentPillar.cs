@@ -64,10 +64,7 @@ namespace Server.Items
 
 				if (!Active)
 				{
-					if (boat.TillerMan != null)
-					{
-						boat.TillerMan.Say(502507); // Ar, Legend has it that these pillars are inactive! No man knows how it might be undone!
-					}
+					boat.TillerMan?.Say(502507); // Ar, Legend has it that these pillars are inactive! No man knows how it might be undone!
 
 					return;
 				}
@@ -78,26 +75,18 @@ namespace Server.Items
 				{
 					var x = Utility.Random(Destination.X, Destination.Width);
 					var y = Utility.Random(Destination.Y, Destination.Height);
-					var z = map.GetAverageZ(x, y);
 
-					var dest = new Point3D(x, y, z);
+					var dest = map.GetTopSurface(x, y);
 
 					if (boat.CanFit(dest, map, boat.ItemID))
 					{
-						var xOffset = x - boat.X;
-						var yOffset = y - boat.Y;
-						var zOffset = z - boat.Z;
-
-						boat.Teleport(xOffset, yOffset, zOffset);
+						boat.MoveToWorld(dest, map);
 
 						return;
 					}
 				}
 
-				if (boat.TillerMan != null)
-				{
-					boat.TillerMan.Say(502508); // Ar, I refuse to take that matey through here!
-				}
+				boat.TillerMan?.Say(502508); // Ar, I refuse to take that matey through here!
 			}
 		}
 
@@ -199,11 +188,8 @@ namespace Server.Items
 
 				if (!Active)
 				{
-					if (boat.TillerMan != null)
-					{
-						boat.TillerMan.Say(502507); // Ar, Legend has it that these pillars are inactive! No man knows how it might be undone!
-					}
-
+					boat.TillerMan?.Say(502507); // Ar, Legend has it that these pillars are inactive! No man knows how it might be undone!
+					
 					return;
 				}
 
@@ -213,26 +199,18 @@ namespace Server.Items
 				{
 					var x = Utility.Random(Destination.X, Destination.Width);
 					var y = Utility.Random(Destination.Y, Destination.Height);
-					var z = map.GetAverageZ(x, y);
 
-					var dest = new Point3D(x, y, z);
+					var dest = map.GetTopSurface(x, y);
 
 					if (boat.CanFit(dest, map, boat.ItemID))
 					{
-						var xOffset = x - boat.X;
-						var yOffset = y - boat.Y;
-						var zOffset = z - boat.Z;
-
-						boat.Teleport(xOffset, yOffset, zOffset, map);
+						boat.MoveToWorld(dest, map);
 
 						return;
 					}
 				}
 
-				if (boat.TillerMan != null)
-				{
-					boat.TillerMan.Say(502508); // Ar, I refuse to take that matey through here!
-				}
+				boat?.TillerMan.Say(502508); // Ar, I refuse to take that matey through here!
 			}
 		}
 

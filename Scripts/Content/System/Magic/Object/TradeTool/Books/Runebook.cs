@@ -452,9 +452,10 @@ namespace Server.Items
 
 			return false;
 		}
-		#region ICraftable Members
 
-		public int OnCraft(int quality, bool makersMark, Mobile from, CraftSystem craftSystem, Type typeRes, BaseTool tool, CraftItem craftItem, int resHue)
+		#region ICraftable
+
+		public virtual int OnCraft(int quality, bool makersMark, Mobile from, ICraftSystem craftSystem, Type typeRes, ICraftTool tool, ICraftItem craftItem, int resHue)
 		{
 			var charges = 5 + quality + (int)(from.Skills[SkillName.Inscribe].Value / 30);
 

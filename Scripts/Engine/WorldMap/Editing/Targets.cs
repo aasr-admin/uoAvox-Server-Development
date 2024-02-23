@@ -1,14 +1,7 @@
-﻿using Server;
-using Server.Commands;
-using Server.Commands.Generic;
-using Server.Gumps;
-using Server.Items;
-using Server.Mobiles;
+﻿using Server.Commands.Generic;
 using Server.Network;
 using Server.Targeting;
 
-using System;
-using System.Collections;
 using System.Collections.Generic;
 
 namespace Server.Engine.Facet
@@ -33,7 +26,7 @@ namespace Server.Engine.Facet
 				return false;
 			}
 
-			if (!(o is IPoint3D))
+			if (o is not IPoint3D)
 			{
 				return false;
 			}
@@ -46,49 +39,34 @@ namespace Server.Engine.Facet
 
 	public class RadialTarget : Target
 	{
-		private int m_Height;
-		private int m_TType;
-		private int m_Radius;
+		public int Height { get; set; }
 
-		public int Height
-		{
-			get { return m_Height; }
-			set { m_Height = value; }
-		}
+		public int TType { get; set; }
 
-		public int TType
-		{
-			get { return m_TType; }
-			set { m_TType = value; }
-		}
-
-		public int Radius
-		{
-			get { return m_Radius; }
-			set { m_Radius = value; }
-		}
+		public int Radius { get; set; }
 
 		public RadialTarget(int TType, int Radius, int Height) : base(-1, true, TargetFlags.None)
 		{
-			m_TType = TType;
-			m_Radius = Radius;
-			m_Height = Height;
+			this.TType = TType;
+			this.Radius = Radius;
+			this.Height = Height;
 		}
 
 		public override Packet GetPacketFor(NetState ns)
 		{
-			List<TargetObject> objs = new List<TargetObject>();
-			List<Point2D> circle = FacetEditingUtility.rasterCircle(new Point2D(0, 0), m_Radius);
+			var objs = new List<TargetObject>();
+			var circle = FacetEditingUtility.RasterCircle(new Point2D(0, 0), Radius);
 
-			foreach (Point2D p in circle)
+			foreach (var p in circle)
 			{
-				TargetObject t = new TargetObject();
-
-				t.ItemID = 0xA12;
-				t.Hue = 35;
-				t.xOffset = p.X;
-				t.yOffset = p.Y;
-				t.zOffset = 0;
+				var t = new TargetObject
+				{
+					ItemID = 0xA12,
+					Hue = 35,
+					xOffset = p.X,
+					yOffset = p.Y,
+					zOffset = 0
+				};
 
 				objs.Add(t);
 			}
@@ -117,7 +95,7 @@ namespace Server.Engine.Facet
 				return false;
 			}
 
-			if (!(o is IPoint3D))
+			if (o is not IPoint3D)
 			{
 				return false;
 			}

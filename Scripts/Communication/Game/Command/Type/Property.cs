@@ -390,7 +390,7 @@ namespace Server.Commands
 		{
 			if (e.Length == 1)
 			{
-				var ent = World.FindEntity(e.GetInt32(0));
+				var ent = e.GetEntity(0);
 
 				if (ent == null)
 				{
@@ -3236,7 +3236,7 @@ namespace Server.Gumps
 
 				try
 				{
-					var serial = Utility.ToInt32(text);
+					var serial = Utility.ToSerial(text);
 
 					toSet = World.FindEntity(serial);
 

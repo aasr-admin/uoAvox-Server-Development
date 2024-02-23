@@ -56,7 +56,7 @@ namespace Server.Mobiles
 			var bow = new Bow {
 				Movable = false,
 				Crafter = this,
-				Quality = WeaponQuality.Exceptional
+				Quality = ItemQuality.Exceptional
 			};
 
 			AddItem(bow);

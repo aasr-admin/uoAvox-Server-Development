@@ -1,16 +1,12 @@
-﻿using Server;
-using Server.Engines.Facet;
-using Server.Misc;
+﻿using Server.Engines.Facet;
 
 using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Server.Engine.Facet
 {
 	public class CRC
 	{
-		public static UInt16[][] MapCRCs; // CRC Caching: [map][block]
+		public static ushort[][] MapCRCs { get; private set; } // CRC Caching: [map][block]
 
 		public static void InvalidateBlockCRC(int map, int block)
 		{
@@ -24,16 +20,16 @@ namespace Server.Engine.Facet
 
 		public static void OnLoad()
 		{
-			MapCRCs = new UInt16[256][];
+			MapCRCs = new ushort[256][];
 
 			/// We Need CRCs For Every Block In Every Map
-			foreach (KeyValuePair<int, MapRegistry.MapDefinition> kvp in MapRegistry.Definitions)
+			foreach (var kvp in MapRegistry.Associations)
 			{
-				int blocks = Server.Map.Maps[kvp.Key].Tiles.BlockWidth * Server.Map.Maps[kvp.Key].Tiles.BlockHeight;
+				var blocks = Map.Maps[kvp.Key].Tiles.BlockWidth * Map.Maps[kvp.Key].Tiles.BlockHeight;
 
-				MapCRCs[kvp.Key] = new UInt16[blocks];
+				MapCRCs[kvp.Key] = new ushort[blocks];
 
-				for (int j = 0; j < blocks; j++)
+				for (var j = 0; j < blocks; j++)
 				{
 					MapCRCs[kvp.Key][j] = UInt16.MaxValue;
 				}
@@ -49,20 +45,20 @@ namespace Server.Engine.Facet
 
 		#endregion
 
-		public static UInt16 Fletcher16(byte[] data)
+		public static ushort Fletcher16(byte[] data)
 		{
-			UInt16 sum1 = 0;
-			UInt16 sum2 = 0;
+			ushort sum1 = 0;
+			ushort sum2 = 0;
 
 			int index;
 
 			for (index = 0; index < data.Length; ++index)
 			{
-				sum1 = (UInt16)((sum1 + data[index]) % 255);
-				sum2 = (UInt16)((sum2 + sum1) % 255);
+				sum1 = (ushort)((sum1 + data[index]) % 255);
+				sum2 = (ushort)((sum2 + sum1) % 255);
 			}
 
-			return (UInt16)((sum2 << 8) | sum1);
+			return (ushort)((sum2 << 8) | sum1);
 		}
 	}
 }

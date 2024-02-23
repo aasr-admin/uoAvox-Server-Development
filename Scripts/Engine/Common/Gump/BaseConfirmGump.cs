@@ -53,7 +53,7 @@ namespace Server.Gumps
 			AddImage(2, 2, 0x2716);
 			TextDefinition.AddHtmlText(this, 25, 25, 200, 20, Title, false, false, 0x7D00, 0xFF4200);
 			AddImage(25, 40, 0xBBF);
-			TextDefinition.AddHtmlText(this, 25, 55, 300, 120, Label, false, false, 0xFFFFFF, 0xFFFFFF);
+			TextDefinition.AddHtmlText(this, 25, 55, 300, 120, Label, false, false, 0x7FFF, 0xFFFFFF);
 
 			if (DisplayChoice)
 			{
@@ -61,8 +61,8 @@ namespace Server.Gumps
 				AddRadio(25, 210, 0x25F8, 0x25FB, false, (int)Buttons.Close);
 			}
 
-			AddHtmlLocalized(60, 180, 280, 20, 1074976, 0xFFFFFF, false, false);
-			AddHtmlLocalized(60, 215, 280, 20, 1074977, 0xFFFFFF, false, false);
+			AddHtmlLocalized(60, 180, 280, 20, 1074976, 0x7FFF, false, false);
+			AddHtmlLocalized(60, 215, 280, 20, 1074977, 0x7FFF, false, false);
 
 			AddButton(265, 220, 0xF7, 0xF8, (int)Buttons.Confirm, GumpButtonType.Reply, 0);
 		}

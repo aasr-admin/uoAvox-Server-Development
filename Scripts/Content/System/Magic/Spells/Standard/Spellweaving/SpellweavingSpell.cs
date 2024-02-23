@@ -1,5 +1,4 @@
-﻿using Server.Engines.ChainQuests;
-using Server.Items;
+﻿using Server.Items;
 using Server.Mobiles;
 
 namespace Server.Spells.Spellweaving
@@ -25,27 +24,6 @@ namespace Server.Spells.Spellweaving
 		public SpellweavingSpell(Mobile caster, Item scroll, SpellInfo info)
 			: base(caster, scroll, info)
 		{
-		}
-
-		public override bool CheckCast()
-		{
-			if (!base.CheckCast())
-			{
-				return false;
-			}
-
-			if (Caster is PlayerMobile pm)
-			{
-				var context = ChainQuestSystem.GetContext(pm);
-
-				if (context == null || !context.Spellweaving)
-				{
-					pm.SendLocalizedMessage(1073220); // You must have completed the epic arcanist quest to use this ability.
-					return false;
-				}
-			}
-
-			return true;
 		}
 
 		public override void GetCastSkills(ref double req, out double min, out double max)

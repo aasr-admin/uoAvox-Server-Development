@@ -39,12 +39,16 @@ namespace Server.Gumps
 			AddImageTiled(10, 10, width - 20, 20, 2624);
 			AddAlphaRegion(10, 10, width - 20, 20);
 
-			TextDefinition.AddHtmlText(this, 15, 10, width - 25, 20, header, false, false, headerColor, headerColor);
+			Utility.ConvertColor(headerColor, out var headerColor16);
+
+			TextDefinition.AddHtmlText(this, 15, 10, width - 25, 20, header, false, false, headerColor16, headerColor);
 
 			AddImageTiled(10, 40, width - 20, height - 80, 2624);
 			AddAlphaRegion(10, 40, width - 20, height - 80);
 
-			TextDefinition.AddHtmlText(this, 15, 40, width - 25, height - 80, content, false, true, contentColor, contentColor);
+			Utility.ConvertColor(contentColor, out var contentColor16);
+
+			TextDefinition.AddHtmlText(this, 15, 40, width - 25, height - 80, content, false, true, contentColor16, contentColor);
 
 			AddImageTiled(10, height - 30, width - 20, 20, 2624);
 			AddAlphaRegion(10, height - 30, width - 20, 20);

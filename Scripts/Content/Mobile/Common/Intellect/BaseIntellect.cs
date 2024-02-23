@@ -1,5 +1,4 @@
-﻿using Server.ContextMenus;
-using Server.Engines.Quests.Definitions;
+using Server.ContextMenus;
 using Server.Items;
 using Server.Misc;
 using Server.Mobiles;
@@ -29,6 +28,11 @@ namespace Server.Mobiles
 		AI_Mage,
 		AI_Berserk,
 		AI_Predator,
+
+		#region ActionAI
+		AI_ActionAI,
+		#endregion
+
 		AI_Thief
 	}
 
@@ -2167,12 +2171,11 @@ namespace Server.Mobiles
 
 			if (Double.IsNaN(delay))
 			{
-				using (var op = new StreamWriter("nan_transform.txt", true))
-				{
-					op.WriteLine(String.Format("NaN in TransformMoveDelay: {0}, {1}, {2}, {3}", DateTime.UtcNow, GetType().ToString(), m_Mobile == null ? "null" : m_Mobile.GetType().ToString(), m_Mobile.HitsMax));
-				}
+				delay = 1.0;
 
-				return 1.0;
+				using var op = new StreamWriter("nan_transform.txt", true);
+
+				op.WriteLine($"NaN in TransformMoveDelay: {DateTime.UtcNow}, {GetType()}, {m_Mobile}");
 			}
 
 			return delay;
@@ -2567,7 +2570,7 @@ namespace Server.Mobiles
 			{
 				m_Path = new PathFollower(m_Mobile, p)
 				{
-					Mover = DoMoveImpl
+					Mover = new MoveMethod(DoMoveImpl)
 				};
 
 				if (m_Path.Follow(run, 1))

@@ -57,7 +57,7 @@ namespace Server.Engine.Facet
 			{
 				if (base.SetupTarget(from, o))
 				{
-					List<Point2D> circle = FacetEditingUtility.rasterFilledCircle(new Point2D(m_Location.X, m_Location.Y), m_Radius);
+					List<Point2D> circle = FacetEditingUtility.RasterFilledCircle(new Point2D(m_Location.X, m_Location.Y), m_Radius);
 
 					MapOperationSeries moveSeries = new MapOperationSeries(null, from.Map.MapID);
 

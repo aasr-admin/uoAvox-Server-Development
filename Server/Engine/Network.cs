@@ -10,6 +10,7 @@ using Server.Targeting;
 
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -26,9 +27,7 @@ namespace Server.Network
 {
 	public class BufferPool
 	{
-		private static List<BufferPool> m_Pools = new List<BufferPool>();
-
-		public static List<BufferPool> Pools { get => m_Pools; set => m_Pools = value; }
+		public static List<BufferPool> Pools { get; set; } = new List<BufferPool>();
 
 		private readonly string m_Name;
 
@@ -66,9 +65,9 @@ namespace Server.Network
 				m_FreeBuffers.Enqueue(new byte[bufferSize]);
 			}
 
-			lock (m_Pools)
+			lock (Pools)
 			{
-				m_Pools.Add(this);
+				Pools.Add(this);
 			}
 		}
 
@@ -107,9 +106,9 @@ namespace Server.Network
 
 		public void Free()
 		{
-			lock (m_Pools)
+			lock (Pools)
 			{
-				m_Pools.Remove(this);
+				_ = Pools.Remove(this);
 			}
 		}
 	}
@@ -118,11 +117,9 @@ namespace Server.Network
 	{
 		private int m_Head;
 		private int m_Tail;
-		private int m_Size;
-
 		private byte[] m_Buffer;
 
-		public int Length => m_Size;
+		public int Length { get; private set; }
 
 		public ByteQueue()
 		{
@@ -133,18 +130,18 @@ namespace Server.Network
 		{
 			m_Head = 0;
 			m_Tail = 0;
-			m_Size = 0;
+			Length = 0;
 		}
 
 		private void SetCapacity(int capacity)
 		{
 			var newBuffer = new byte[capacity];
 
-			if (m_Size > 0)
+			if (Length > 0)
 			{
 				if (m_Head < m_Tail)
 				{
-					Buffer.BlockCopy(m_Buffer, m_Head, newBuffer, 0, m_Size);
+					Buffer.BlockCopy(m_Buffer, m_Head, newBuffer, 0, Length);
 				}
 				else
 				{
@@ -154,13 +151,13 @@ namespace Server.Network
 			}
 
 			m_Head = 0;
-			m_Tail = m_Size;
+			m_Tail = Length;
 			m_Buffer = newBuffer;
 		}
 
 		public byte GetPacketID()
 		{
-			if (m_Size >= 1)
+			if (Length >= 1)
 			{
 				return m_Buffer[m_Head];
 			}
@@ -170,7 +167,7 @@ namespace Server.Network
 
 		public int GetPacketLength()
 		{
-			if (m_Size >= 3)
+			if (Length >= 3)
 			{
 				return (m_Buffer[(m_Head + 1) % m_Buffer.Length] << 8) | m_Buffer[(m_Head + 2) % m_Buffer.Length];
 			}
@@ -180,9 +177,9 @@ namespace Server.Network
 
 		public int Dequeue(byte[] buffer, int offset, int size)
 		{
-			if (size > m_Size)
+			if (size > Length)
 			{
-				size = m_Size;
+				size = Length;
 			}
 
 			if (size == 0)
@@ -196,7 +193,7 @@ namespace Server.Network
 			}
 			else
 			{
-				var rightLength = (m_Buffer.Length - m_Head);
+				var rightLength = m_Buffer.Length - m_Head;
 
 				if (rightLength >= size)
 				{
@@ -210,9 +207,9 @@ namespace Server.Network
 			}
 
 			m_Head = (m_Head + size) % m_Buffer.Length;
-			m_Size -= size;
+			Length -= size;
 
-			if (m_Size == 0)
+			if (Length == 0)
 			{
 				m_Head = 0;
 				m_Tail = 0;
@@ -223,14 +220,14 @@ namespace Server.Network
 
 		public void Enqueue(byte[] buffer, int offset, int size)
 		{
-			if ((m_Size + size) > m_Buffer.Length)
+			if (Length + size > m_Buffer.Length)
 			{
-				SetCapacity((m_Size + size + 2047) & ~2047);
+				SetCapacity((Length + size + 2047) & ~2047);
 			}
 
 			if (m_Head < m_Tail)
 			{
-				var rightLength = (m_Buffer.Length - m_Tail);
+				var rightLength = m_Buffer.Length - m_Tail;
 
 				if (rightLength >= size)
 				{
@@ -248,7 +245,7 @@ namespace Server.Network
 			}
 
 			m_Tail = (m_Tail + size) % m_Buffer.Length;
-			m_Size += size;
+			Length += size;
 		}
 	}
 
@@ -256,7 +253,7 @@ namespace Server.Network
 	{
 		public class Gram
 		{
-			private static readonly Stack<Gram> _pool = new Stack<Gram>();
+			private static readonly Stack<Gram> _pool = new();
 
 			public static Gram Acquire()
 			{
@@ -273,23 +270,20 @@ namespace Server.Network
 						gram = new Gram();
 					}
 
-					gram._buffer = AcquireBuffer();
-					gram._length = 0;
+					gram.Buffer = AcquireBuffer();
+					gram.Length = 0;
 
 					return gram;
 				}
 			}
 
-			private byte[] _buffer;
-			private int _length;
+			public byte[] Buffer { get; private set; }
 
-			public byte[] Buffer => _buffer;
+			public int Length { get; private set; }
 
-			public int Length => _length;
+			public int Available => Buffer.Length - Length;
 
-			public int Available => (_buffer.Length - _length);
-
-			public bool IsFull => (_length == _buffer.Length);
+			public bool IsFull => Length == Buffer.Length;
 
 			private Gram()
 			{
@@ -299,9 +293,9 @@ namespace Server.Network
 			{
 				var write = Math.Min(length, Available);
 
-				System.Buffer.BlockCopy(buffer, offset, _buffer, _length, write);
+				System.Buffer.BlockCopy(buffer, offset, Buffer, Length, write);
 
-				_length += write;
+				Length += write;
 
 				return write;
 			}
@@ -311,13 +305,13 @@ namespace Server.Network
 				lock (_pool)
 				{
 					_pool.Push(this);
-					ReleaseBuffer(_buffer);
+					ReleaseBuffer(Buffer);
 				}
 			}
 		}
 
 		private static int m_CoalesceBufferSize = 512;
-		private static BufferPool m_UnusedBuffers = new BufferPool("Coalesced", 2048, m_CoalesceBufferSize);
+		private static BufferPool m_UnusedBuffers = new("Coalesced", 2048, m_CoalesceBufferSize);
 
 		public static int CoalesceBufferSize
 		{
@@ -333,10 +327,7 @@ namespace Server.Network
 
 				lock (old)
 				{
-					if (m_UnusedBuffers != null)
-					{
-						m_UnusedBuffers.Free();
-					}
+					m_UnusedBuffers?.Free();
 
 					m_CoalesceBufferSize = value;
 					m_UnusedBuffers = new BufferPool("Coalesced", 2048, m_CoalesceBufferSize);
@@ -367,9 +358,9 @@ namespace Server.Network
 
 		private Gram _buffered;
 
-		public bool IsFlushReady => (_pending.Count == 0 && _buffered != null);
+		public bool IsFlushReady => _pending.Count == 0 && _buffered != null;
 
-		public bool IsEmpty => (_pending.Count == 0 && _buffered == null);
+		public bool IsEmpty => _pending.Count == 0 && _buffered == null;
 
 		public SendQueue()
 		{
@@ -412,15 +403,15 @@ namespace Server.Network
 		{
 			if (buffer == null)
 			{
-				throw new ArgumentNullException("buffer");
+				throw new ArgumentNullException(nameof(buffer));
 			}
 			else if (!(offset >= 0 && offset < buffer.Length))
 			{
-				throw new ArgumentOutOfRangeException("offset", offset, "Offset must be greater than or equal to zero and less than the size of the buffer.");
+				throw new ArgumentOutOfRangeException(nameof(offset), offset, "Offset must be greater than or equal to zero and less than the size of the buffer.");
 			}
 			else if (length < 0 || length > buffer.Length)
 			{
-				throw new ArgumentOutOfRangeException("length", length, "Length cannot be less than zero or greater than the size of the buffer.");
+				throw new ArgumentOutOfRangeException(nameof(length), length, "Length cannot be less than zero or greater than the size of the buffer.");
 			}
 			else if ((buffer.Length - offset) < length)
 			{
@@ -429,7 +420,7 @@ namespace Server.Network
 
 			var existingBytes = (_pending.Count * m_CoalesceBufferSize) + (_buffered == null ? 0 : _buffered.Length);
 
-			if ((existingBytes + length) > PendingCap)
+			if (existingBytes + length > PendingCap)
 			{
 				throw new CapacityExceededException();
 			}
@@ -438,10 +429,7 @@ namespace Server.Network
 
 			while (length > 0)
 			{
-				if (_buffered == null)
-				{ // nothing yet buffered
-					_buffered = Gram.Acquire();
-				}
+				_buffered ??= Gram.Acquire();
 
 				var bytesWritten = _buffered.Write(buffer, offset, length);
 
@@ -515,10 +503,7 @@ namespace Server.Network
 
 	public interface ICompressor
 	{
-		string Version
-		{
-			get;
-		}
+		string Version { get; }
 
 		ZLibError Compress(byte[] dest, ref int destLength, byte[] source, int sourceLength);
 		ZLibError Compress(byte[] dest, ref int destLength, byte[] source, int sourceLength, ZLibQuality quality);
@@ -588,19 +573,22 @@ namespace Server.Network
 		{
 			if (input == null)
 			{
-				throw new ArgumentNullException("input");
+				throw new ArgumentNullException(nameof(input));
 			}
-			else if (offset < 0 || offset >= input.Length)
+
+			if (offset < 0 || offset >= input.Length)
 			{
-				throw new ArgumentOutOfRangeException("offset");
+				throw new ArgumentOutOfRangeException(nameof(offset));
 			}
-			else if (count < 0 || count > input.Length)
+
+			if (count < 0 || count > input.Length)
 			{
-				throw new ArgumentOutOfRangeException("count");
+				throw new ArgumentOutOfRangeException(nameof(count));
 			}
-			else if ((input.Length - offset) < count)
+
+			if (input.Length - offset < count)
 			{
-				throw new ArgumentException();
+				throw new ArgumentOutOfRangeException(nameof(input));
 			}
 
 			length = 0;
@@ -661,8 +649,8 @@ namespace Server.Network
 						// align on byte boundary
 						if ((bitCount & 7) != 0)
 						{
-							bitValue <<= (8 - (bitCount & 7));
-							bitCount += (8 - (bitCount & 7));
+							bitValue <<= 8 - (bitCount & 7);
+							bitCount += 8 - (bitCount & 7);
 						}
 
 						while (bitCount >= 8)
@@ -728,21 +716,21 @@ namespace Server.Network
 		}
 	}
 
-	public sealed class Compressor32 : ICompressor
+	public sealed partial class Compressor32 : ICompressor
 	{
-		internal class SafeNativeMethods
+		internal partial class SafeNativeMethods
 		{
-			[DllImport("zlibwapi32")]
-			internal static extern string zlibVersion();
+			[LibraryImport("zlibwapi32", StringMarshalling = StringMarshalling.Utf16)]
+			internal static partial string zlibVersion();
 
-			[DllImport("zlibwapi32")]
-			internal static extern ZLibError compress(byte[] dest, ref int destLength, byte[] source, int sourceLength);
+			[LibraryImport("zlibwapi32")]
+			internal static partial ZLibError compress(byte[] dest, ref int destLength, byte[] source, int sourceLength);
 
-			[DllImport("zlibwapi32")]
-			internal static extern ZLibError compress2(byte[] dest, ref int destLength, byte[] source, int sourceLength, ZLibQuality quality);
+			[LibraryImport("zlibwapi32")]
+			internal static partial ZLibError compress2(byte[] dest, ref int destLength, byte[] source, int sourceLength, ZLibQuality quality);
 
-			[DllImport("zlibwapi32")]
-			internal static extern ZLibError uncompress(byte[] dest, ref int destLen, byte[] source, int sourceLen);
+			[LibraryImport("zlibwapi32")]
+			internal static partial ZLibError uncompress(byte[] dest, ref int destLen, byte[] source, int sourceLen);
 		}
 
 		public Compressor32()
@@ -767,21 +755,21 @@ namespace Server.Network
 		}
 	}
 
-	public sealed class Compressor64 : ICompressor
+	public sealed partial class Compressor64 : ICompressor
 	{
-		internal class SafeNativeMethods
+		internal partial class SafeNativeMethods
 		{
-			[DllImport("zlibwapi64")]
-			internal static extern string zlibVersion();
+			[LibraryImport("zlibwapi64", StringMarshalling = StringMarshalling.Utf16)]
+			internal static partial string zlibVersion();
 
-			[DllImport("zlibwapi64")]
-			internal static extern ZLibError compress(byte[] dest, ref int destLength, byte[] source, int sourceLength);
+			[LibraryImport("zlibwapi64")]
+			internal static partial ZLibError compress(byte[] dest, ref int destLength, byte[] source, int sourceLength);
 
-			[DllImport("zlibwapi64")]
-			internal static extern ZLibError compress2(byte[] dest, ref int destLength, byte[] source, int sourceLength, ZLibQuality quality);
+			[LibraryImport("zlibwapi64")]
+			internal static partial ZLibError compress2(byte[] dest, ref int destLength, byte[] source, int sourceLength, ZLibQuality quality);
 
-			[DllImport("zlibwapi64")]
-			internal static extern ZLibError uncompress(byte[] dest, ref int destLen, byte[] source, int sourceLen);
+			[LibraryImport("zlibwapi64")]
+			internal static partial ZLibError uncompress(byte[] dest, ref int destLen, byte[] source, int sourceLen);
 		}
 
 		public Compressor64()
@@ -806,21 +794,21 @@ namespace Server.Network
 		}
 	}
 
-	public sealed class CompressorUnix32 : ICompressor
+	public sealed partial class CompressorUnix32 : ICompressor
 	{
-		internal class SafeNativeMethods
+		internal partial class SafeNativeMethods
 		{
-			[DllImport("libz")]
-			internal static extern string zlibVersion();
+			[LibraryImport("libz", StringMarshalling = StringMarshalling.Utf16)]
+			internal static partial string zlibVersion();
 
-			[DllImport("libz")]
-			internal static extern ZLibError compress(byte[] dest, ref int destLength, byte[] source, int sourceLength);
+			[LibraryImport("libz")]
+			internal static partial ZLibError compress(byte[] dest, ref int destLength, byte[] source, int sourceLength);
 
-			[DllImport("libz")]
-			internal static extern ZLibError compress2(byte[] dest, ref int destLength, byte[] source, int sourceLength, ZLibQuality quality);
+			[LibraryImport("libz")]
+			internal static partial ZLibError compress2(byte[] dest, ref int destLength, byte[] source, int sourceLength, ZLibQuality quality);
 
-			[DllImport("libz")]
-			internal static extern ZLibError uncompress(byte[] dest, ref int destLen, byte[] source, int sourceLen);
+			[LibraryImport("libz")]
+			internal static partial ZLibError uncompress(byte[] dest, ref int destLen, byte[] source, int sourceLen);
 		}
 
 		public CompressorUnix32()
@@ -845,21 +833,21 @@ namespace Server.Network
 		}
 	}
 
-	public sealed class CompressorUnix64 : ICompressor
+	public sealed partial class CompressorUnix64 : ICompressor
 	{
-		internal class SafeNativeMethods
+		internal partial class SafeNativeMethods
 		{
-			[DllImport("libz")]
-			internal static extern string zlibVersion();
+			[LibraryImport("libz", StringMarshalling = StringMarshalling.Utf16)]
+			internal static partial string zlibVersion();
 
-			[DllImport("libz")]
-			internal static extern ZLibError compress(byte[] dest, ref ulong destLength, byte[] source, int sourceLength);
+			[LibraryImport("libz")]
+			internal static partial ZLibError compress(byte[] dest, ref ulong destLength, byte[] source, int sourceLength);
 
-			[DllImport("libz")]
-			internal static extern ZLibError compress2(byte[] dest, ref ulong destLength, byte[] source, int sourceLength, ZLibQuality quality);
+			[LibraryImport("libz")]
+			internal static partial ZLibError compress2(byte[] dest, ref ulong destLength, byte[] source, int sourceLength, ZLibQuality quality);
 
-			[DllImport("libz")]
-			internal static extern ZLibError uncompress(byte[] dest, ref ulong destLen, byte[] source, int sourceLen);
+			[LibraryImport("libz")]
+			internal static partial ZLibError uncompress(byte[] dest, ref ulong destLen, byte[] source, int sourceLen);
 		}
 
 		public CompressorUnix64()
@@ -901,33 +889,23 @@ namespace Server.Network
 
 	public class PacketHandler
 	{
-		private readonly int m_PacketID;
-		private readonly int m_Length;
-		private readonly bool m_Ingame;
-		private readonly OnPacketReceive m_OnReceive;
-		private ThrottlePacketCallback m_ThrottleCallback;
-
 		public PacketHandler(int packetID, int length, bool ingame, OnPacketReceive onReceive)
 		{
-			m_PacketID = packetID;
-			m_Length = length;
-			m_Ingame = ingame;
-			m_OnReceive = onReceive;
+			PacketID = packetID;
+			Length = length;
+			Ingame = ingame;
+			OnReceive = onReceive;
 		}
 
-		public int PacketID => m_PacketID;
+		public int PacketID { get; }
 
-		public int Length => m_Length;
+		public int Length { get; }
 
-		public OnPacketReceive OnReceive => m_OnReceive;
+		public OnPacketReceive OnReceive { get; }
 
-		public ThrottlePacketCallback ThrottleCallback
-		{
-			get => m_ThrottleCallback;
-			set => m_ThrottleCallback = value;
-		}
+		public ThrottlePacketCallback ThrottleCallback { get; set; }
 
-		public bool Ingame => m_Ingame;
+		public bool Ingame { get; }
 	}
 
 	public enum MessageType
@@ -950,7 +928,6 @@ namespace Server.Network
 
 	public static class PacketHandlers
 	{
-		private static readonly PacketHandler[] m_Handlers;
 		private static readonly PacketHandler[] m_6017Handlers;
 
 		private static readonly PacketHandler[] m_ExtendedHandlersLow;
@@ -959,11 +936,11 @@ namespace Server.Network
 		private static readonly EncodedPacketHandler[] m_EncodedHandlersLow;
 		private static readonly Dictionary<int, EncodedPacketHandler> m_EncodedHandlersHigh;
 
-		public static PacketHandler[] Handlers => m_Handlers;
+		public static PacketHandler[] Handlers { get; private set; }
 
 		static PacketHandlers()
 		{
-			m_Handlers = new PacketHandler[0x100];
+			Handlers = new PacketHandler[0x100];
 			m_6017Handlers = new PacketHandler[0x100];
 
 			m_ExtendedHandlersLow = new PacketHandler[0x100];
@@ -1069,7 +1046,7 @@ namespace Server.Network
 
 		public static void Register(int packetID, int length, bool ingame, OnPacketReceive onReceive)
 		{
-			m_Handlers[packetID] = new PacketHandler(packetID, length, ingame, onReceive);
+			Handlers[packetID] = new PacketHandler(packetID, length, ingame, onReceive);
 
 			if (m_6017Handlers[packetID] == null)
 			{
@@ -1079,7 +1056,7 @@ namespace Server.Network
 
 		public static PacketHandler GetHandler(int packetID)
 		{
-			return m_Handlers[packetID];
+			return Handlers[packetID];
 		}
 
 		public static void Register6017(int packetID, int length, bool ingame, OnPacketReceive onReceive)
@@ -1094,7 +1071,7 @@ namespace Server.Network
 
 		public static void RegisterExtended(int packetID, bool ingame, OnPacketReceive onReceive)
 		{
-			if (packetID >= 0 && packetID < 0x100)
+			if (packetID is >= 0 and < 0x100)
 			{
 				m_ExtendedHandlersLow[packetID] = new PacketHandler(packetID, 0, ingame, onReceive);
 			}
@@ -1106,33 +1083,33 @@ namespace Server.Network
 
 		public static PacketHandler GetExtendedHandler(int packetID)
 		{
-			if (packetID >= 0 && packetID < 0x100)
+			if (packetID is >= 0 and < 0x100)
 			{
 				return m_ExtendedHandlersLow[packetID];
 			}
 			else
 			{
 				PacketHandler handler;
-				m_ExtendedHandlersHigh.TryGetValue(packetID, out handler);
+				_ = m_ExtendedHandlersHigh.TryGetValue(packetID, out handler);
 				return handler;
 			}
 		}
 
 		public static void RemoveExtendedHandler(int packetID)
 		{
-			if (packetID >= 0 && packetID < 0x100)
+			if (packetID is >= 0 and < 0x100)
 			{
 				m_ExtendedHandlersLow[packetID] = null;
 			}
 			else
 			{
-				m_ExtendedHandlersHigh.Remove(packetID);
+				_ = m_ExtendedHandlersHigh.Remove(packetID);
 			}
 		}
 
 		public static void RegisterEncoded(int packetID, bool ingame, OnEncodedPacketReceive onReceive)
 		{
-			if (packetID >= 0 && packetID < 0x100)
+			if (packetID is >= 0 and < 0x100)
 			{
 				m_EncodedHandlersLow[packetID] = new EncodedPacketHandler(packetID, ingame, onReceive);
 			}
@@ -1144,27 +1121,27 @@ namespace Server.Network
 
 		public static EncodedPacketHandler GetEncodedHandler(int packetID)
 		{
-			if (packetID >= 0 && packetID < 0x100)
+			if (packetID is >= 0 and < 0x100)
 			{
 				return m_EncodedHandlersLow[packetID];
 			}
 			else
 			{
 				EncodedPacketHandler handler;
-				m_EncodedHandlersHigh.TryGetValue(packetID, out handler);
+				_ = m_EncodedHandlersHigh.TryGetValue(packetID, out handler);
 				return handler;
 			}
 		}
 
 		public static void RemoveEncodedHandler(int packetID)
 		{
-			if (packetID >= 0 && packetID < 0x100)
+			if (packetID is >= 0 and < 0x100)
 			{
 				m_EncodedHandlersLow[packetID] = null;
 			}
 			else
 			{
-				m_EncodedHandlersHigh.Remove(packetID);
+				_ = m_EncodedHandlersHigh.Remove(packetID);
 			}
 		}
 
@@ -1200,17 +1177,17 @@ namespace Server.Network
 
 		public static void GuildGumpRequest(NetState state, IEntity e, EncodedReader reader)
 		{
-			EventSink.InvokeGuildGumpRequest(new GuildGumpRequestArgs(state.Mobile));
+			EventSink.InvokeGuildGumpRequest(new GuildGumpRequestEventArgs(state.Mobile));
 		}
 
 		public static void QuestGumpRequest(NetState state, IEntity e, EncodedReader reader)
 		{
-			EventSink.InvokeQuestGumpRequest(new QuestGumpRequestArgs(state.Mobile));
+			EventSink.InvokeQuestGumpRequest(new QuestGumpRequestEventArgs(state.Mobile));
 		}
 
 		public static void EncodedCommand(NetState state, PacketReader pvSrc)
 		{
-			var e = World.FindEntity(pvSrc.ReadInt32());
+			var e = pvSrc.ReadEntity();
 			int packetID = pvSrc.ReadUInt16();
 
 			var ph = GetEncodedHandler(packetID);
@@ -1219,7 +1196,7 @@ namespace Server.Network
 			{
 				if (ph.Ingame && state.Mobile == null)
 				{
-					Console.WriteLine("Client: {0}: Sent ingame packet (0xD7x{1:X2}) before having been attached to a mobile", state, packetID);
+					Console.WriteLine($"Client: {state}: Sent ingame packet (0xD7x{packetID:X2}) before having been attached to a mobile");
 					state.Dispose();
 				}
 				else if (ph.Ingame && state.Mobile.Deleted)
@@ -1240,7 +1217,7 @@ namespace Server.Network
 		public static void RenameRequest(NetState state, PacketReader pvSrc)
 		{
 			var from = state.Mobile;
-			var targ = World.FindMobile(pvSrc.ReadInt32());
+			var targ = pvSrc.ReadMobile();
 
 			if (targ != null)
 			{
@@ -1259,11 +1236,9 @@ namespace Server.Network
 			{
 				case 1: // Cancel
 					{
-						Serial serial = pvSrc.ReadInt32();
+						var serial = pvSrc.ReadSerial();
 
-						var cont = World.FindItem(serial) as SecureTradeContainer;
-
-						if (cont != null && cont.Trade != null && (cont.Trade.From.Mobile == state.Mobile || cont.Trade.To.Mobile == state.Mobile))
+						if (World.FindItem(serial) is SecureTradeContainer cont && cont.Trade != null && (cont.Trade.From.Mobile == state.Mobile || cont.Trade.To.Mobile == state.Mobile))
 						{
 							cont.Trade.Cancel();
 						}
@@ -1272,15 +1247,13 @@ namespace Server.Network
 					}
 				case 2: // Check
 					{
-						Serial serial = pvSrc.ReadInt32();
+						var serial = pvSrc.ReadSerial();
 
-						var cont = World.FindItem(serial) as SecureTradeContainer;
-
-						if (cont != null)
+						if (World.FindItem(serial) is SecureTradeContainer cont)
 						{
 							var trade = cont.Trade;
 
-							var value = (pvSrc.ReadInt32() != 0);
+							var value = pvSrc.ReadInt32() != 0;
 
 							if (trade != null && trade.From.Mobile == state.Mobile)
 							{
@@ -1298,11 +1271,9 @@ namespace Server.Network
 					}
 				case 3: // Update Gold
 					{
-						Serial serial = pvSrc.ReadInt32();
+						var serial = pvSrc.ReadSerial();
 
-						var cont = World.FindItem(serial) as SecureTradeContainer;
-
-						if (cont != null)
+						if (World.FindItem(serial) is SecureTradeContainer cont)
 						{
 							var gold = pvSrc.ReadInt32();
 							var plat = pvSrc.ReadInt32();
@@ -1326,16 +1297,17 @@ namespace Server.Network
 							}
 						}
 					}
+
 					break;
 			}
 		}
 
 		public static void VendorBuyReply(NetState state, PacketReader pvSrc)
 		{
-			pvSrc.Seek(1, SeekOrigin.Begin);
+			_ = pvSrc.Seek(1, SeekOrigin.Begin);
 
 			int msgSize = pvSrc.ReadUInt16();
-			var vendor = World.FindMobile(pvSrc.ReadInt32());
+			var vendor = pvSrc.ReadMobile();
 			var flag = pvSrc.ReadByte();
 
 			if (vendor == null)
@@ -1360,8 +1332,8 @@ namespace Server.Network
 				var buyList = new List<BuyItemResponse>(msgSize / 7);
 				for (; msgSize > 0; msgSize -= 7)
 				{
-					var layer = pvSrc.ReadByte();
-					Serial serial = pvSrc.ReadInt32();
+					_ = pvSrc.ReadByte();
+					var serial = pvSrc.ReadSerial();
 					int amount = pvSrc.ReadInt16();
 
 					buyList.Add(new BuyItemResponse(serial, amount));
@@ -1369,9 +1341,7 @@ namespace Server.Network
 
 				if (buyList.Count > 0)
 				{
-					var v = vendor as IVendor;
-
-					if (v != null && v.OnBuyItems(state.Mobile, buyList))
+					if (vendor is IVendor v && v.OnBuyItems(state.Mobile, buyList))
 					{
 						state.Send(new EndVendorBuy(vendor));
 					}
@@ -1385,7 +1355,7 @@ namespace Server.Network
 
 		public static void VendorSellReply(NetState state, PacketReader pvSrc)
 		{
-			Serial serial = pvSrc.ReadInt32();
+			var serial = pvSrc.ReadSerial();
 			var vendor = World.FindMobile(serial);
 
 			if (vendor == null)
@@ -1405,7 +1375,7 @@ namespace Server.Network
 
 				for (var i = 0; i < count; i++)
 				{
-					var item = World.FindItem(pvSrc.ReadInt32());
+					var item = pvSrc.ReadItem();
 					int Amount = pvSrc.ReadInt16();
 
 					if (item != null && Amount > 0)
@@ -1416,9 +1386,7 @@ namespace Server.Network
 
 				if (sellList.Count > 0)
 				{
-					var v = vendor as IVendor;
-
-					if (v != null && v.OnSellItems(state.Mobile, sellList))
+					if (vendor is IVendor v && v.OnSellItems(state.Mobile, sellList))
 					{
 						state.Send(new EndVendorSell(vendor));
 					}
@@ -1428,7 +1396,7 @@ namespace Server.Network
 
 		public static void DeleteCharacter(NetState state, PacketReader pvSrc)
 		{
-			pvSrc.Seek(30, SeekOrigin.Current);
+			_ = pvSrc.Seek(30, SeekOrigin.Current);
 			var index = pvSrc.ReadInt32();
 
 			EventSink.InvokeDeleteRequest(new DeleteRequestEventArgs(state, index));
@@ -1448,7 +1416,7 @@ namespace Server.Network
 				int type = pvSrc.ReadByte();
 				var num1 = pvSrc.ReadInt32();
 
-				Console.WriteLine("God Client: {0}: Game central moniter", state);
+				Console.WriteLine($"God Client: {state}: Game central moniter");
 				Console.WriteLine(" - Type: {0}", type);
 				Console.WriteLine(" - Number: {0}", num1);
 
@@ -1460,7 +1428,7 @@ namespace Server.Network
 		{
 			if (VerifyGC(state))
 			{
-				Console.WriteLine("God Client: {0}: Godview query 0x{1:X}", state, pvSrc.ReadByte());
+				Console.WriteLine($"God Client: {state}: Godview query 0x{pvSrc.ReadByte():X}");
 			}
 		}
 
@@ -1481,9 +1449,9 @@ namespace Server.Network
 		{
 			var from = state.Mobile;
 
-			Serial serial = pvSrc.ReadInt32();
-			int unk = pvSrc.ReadByte();
-			var lang = pvSrc.ReadString(3);
+			var serial = pvSrc.ReadSerial();
+			_ = pvSrc.ReadByte();
+			_ = pvSrc.ReadString(3);
 
 			if (serial.IsItem)
 			{
@@ -1507,7 +1475,7 @@ namespace Server.Network
 
 		public static void MobileNameRequest(NetState state, PacketReader pvSrc)
 		{
-			var m = World.FindMobile(pvSrc.ReadInt32());
+			var m = pvSrc.ReadMobile();
 
 			if (m != null && Utility.InUpdateRange(state.Mobile, m) && state.Mobile.CanSee(m))
 			{
@@ -1517,14 +1485,14 @@ namespace Server.Network
 
 		public static void RequestScrollWindow(NetState state, PacketReader pvSrc)
 		{
-			int lastTip = pvSrc.ReadInt16();
-			int type = pvSrc.ReadByte();
+			_ = pvSrc.ReadInt16();
+			_ = pvSrc.ReadByte();
 		}
 
 		public static void AttackReq(NetState state, PacketReader pvSrc)
 		{
 			var from = state.Mobile;
-			var m = World.FindMobile(pvSrc.ReadInt32());
+			var m = pvSrc.ReadMobile();
 
 			if (m != null)
 			{
@@ -1535,7 +1503,7 @@ namespace Server.Network
 		public static void HuePickerResponse(NetState state, PacketReader pvSrc)
 		{
 			var serial = pvSrc.ReadInt32();
-			int value = pvSrc.ReadInt16();
+			_ = pvSrc.ReadInt16();
 			var hue = pvSrc.ReadInt16() & 0x3FFF;
 
 			hue = Utility.ClipDyedHue(hue);
@@ -1556,7 +1524,7 @@ namespace Server.Network
 		public static void TripTime(NetState state, PacketReader pvSrc)
 		{
 			int unk1 = pvSrc.ReadByte();
-			var unk2 = pvSrc.ReadInt32();
+			_ = pvSrc.ReadInt32();
 
 			state.Send(new TripTimeResponse(unk1));
 		}
@@ -1564,7 +1532,7 @@ namespace Server.Network
 		public static void UTripTime(NetState state, PacketReader pvSrc)
 		{
 			int unk1 = pvSrc.ReadByte();
-			var unk2 = pvSrc.ReadInt32();
+			_ = pvSrc.ReadInt32();
 
 			state.Send(new UTripTimeResponse(unk1));
 		}
@@ -1577,24 +1545,24 @@ namespace Server.Network
 				int y = pvSrc.ReadInt16();
 				int z = pvSrc.ReadSByte();
 
-				Console.WriteLine("God Client: {0}: Change Z ({1}, {2}, {3})", state, x, y, z);
+				Console.WriteLine($"God Client: {state}: Change Z ({x}, {y}, {z})");
 			}
 		}
 
 		public static void SystemInfo(NetState state, PacketReader pvSrc)
 		{
-			int v1 = pvSrc.ReadByte();
-			int v2 = pvSrc.ReadUInt16();
-			int v3 = pvSrc.ReadByte();
-			var s1 = pvSrc.ReadString(32);
-			var s2 = pvSrc.ReadString(32);
-			var s3 = pvSrc.ReadString(32);
-			var s4 = pvSrc.ReadString(32);
-			int v4 = pvSrc.ReadUInt16();
-			int v5 = pvSrc.ReadUInt16();
-			var v6 = pvSrc.ReadInt32();
-			var v7 = pvSrc.ReadInt32();
-			var v8 = pvSrc.ReadInt32();
+			_ = pvSrc.ReadByte();
+			_ = pvSrc.ReadUInt16();
+			_ = pvSrc.ReadByte();
+			_ = pvSrc.ReadString(32);
+			_ = pvSrc.ReadString(32);
+			_ = pvSrc.ReadString(32);
+			_ = pvSrc.ReadString(32);
+			_ = pvSrc.ReadUInt16();
+			_ = pvSrc.ReadUInt16();
+			_ = pvSrc.ReadInt32();
+			_ = pvSrc.ReadInt32();
+			_ = pvSrc.ReadInt32();
 		}
 
 		public static void Edit(NetState state, PacketReader pvSrc)
@@ -1608,7 +1576,7 @@ namespace Server.Network
 				int z = pvSrc.ReadSByte();
 				int hue = pvSrc.ReadUInt16();
 
-				Console.WriteLine("God Client: {0}: Edit {6} ({1}, {2}, {3}) 0x{4:X} (0x{5:X})", state, x, y, z, id, hue, type);
+				Console.WriteLine($"God Client: {state}: Edit {type} ({x}, {y}, {z}) 0x{id:X} (0x{hue:X})");
 			}
 		}
 
@@ -1621,7 +1589,7 @@ namespace Server.Network
 				int z = pvSrc.ReadInt16();
 				int id = pvSrc.ReadUInt16();
 
-				Console.WriteLine("God Client: {0}: Delete Static ({1}, {2}, {3}) 0x{4:X}", state, x, y, z, id);
+				Console.WriteLine($"God Client: {state}: Delete Static ({x}, {y}, {z}) 0x{id:X}");
 			}
 		}
 
@@ -1629,7 +1597,7 @@ namespace Server.Network
 		{
 			if (VerifyGC(state))
 			{
-				Console.WriteLine("God Client: {0}: New tile animation", state);
+				Console.WriteLine($"God Client: {state}: New tile animation");
 
 				pvSrc.Trace(state);
 			}
@@ -1645,7 +1613,7 @@ namespace Server.Network
 				int width = pvSrc.ReadInt16();
 				int height = pvSrc.ReadInt16();
 
-				Console.WriteLine("God Client: {0}: New Terrain ({1}, {2})+({3}, {4}) 0x{5:X4}", state, x, y, width, height, id);
+				Console.WriteLine($"God Client: {state}: New Terrain ({x}, {y})+({width}, {height}) 0x{id:X4}");
 			}
 		}
 
@@ -1654,21 +1622,21 @@ namespace Server.Network
 			if (VerifyGC(state))
 			{
 				var name = pvSrc.ReadString(40);
-				var unk = pvSrc.ReadInt32();
-				int x = pvSrc.ReadInt16();
-				int y = pvSrc.ReadInt16();
-				int width = pvSrc.ReadInt16();
-				int height = pvSrc.ReadInt16();
-				int zStart = pvSrc.ReadInt16();
-				int zEnd = pvSrc.ReadInt16();
+				_ = pvSrc.ReadInt32();
+				_ = pvSrc.ReadInt16();
+				_ = pvSrc.ReadInt16();
+				_ = pvSrc.ReadInt16();
+				_ = pvSrc.ReadInt16();
+				_ = pvSrc.ReadInt16();
+				_ = pvSrc.ReadInt16();
 				var desc = pvSrc.ReadString(40);
-				int soundFX = pvSrc.ReadInt16();
-				int music = pvSrc.ReadInt16();
-				int nightFX = pvSrc.ReadInt16();
-				int dungeon = pvSrc.ReadByte();
-				int light = pvSrc.ReadInt16();
+				_ = pvSrc.ReadInt16();
+				_ = pvSrc.ReadInt16();
+				_ = pvSrc.ReadInt16();
+				_ = pvSrc.ReadByte();
+				_ = pvSrc.ReadInt16();
 
-				Console.WriteLine("God Client: {0}: New Region '{1}' ('{2}')", state, name, desc);
+				Console.WriteLine($"God Client: {state}: New Region '{name}' ('{desc}')");
 			}
 		}
 
@@ -1682,7 +1650,7 @@ namespace Server.Network
 			{
 				if (state.Running)
 				{
-					Console.WriteLine("Warning: {0}: Player using godclient, disconnecting", state);
+					Console.WriteLine($"Warning: {state}: Player using godclient, disconnecting");
 				}
 
 				state.Dispose();
@@ -1753,7 +1721,7 @@ namespace Server.Network
 							break;
 						}
 
-						Skills.UseSkill(m, skillIndex);
+						_ = Skills.UseSkill(m, skillIndex);
 
 						break;
 					}
@@ -1777,7 +1745,7 @@ namespace Server.Network
 						if (split.Length > 0)
 						{
 							var spellID = (SpellName)Utility.ToInt32(split[0]) - 1;
-							var serial = split.Length > 1 ? Utility.ToInt32(split[1]) : -1;
+							var serial = split.Length > 1 ? Utility.ToSerial(split[1]) : Serial.MinusOne;
 							var book = World.FindItem(serial) as ISpellbook;
 
 							EventSink.InvokeCastSpellRequest(new CastSpellRequestEventArgs(m, spellID, book));
@@ -1821,7 +1789,7 @@ namespace Server.Network
 					}
 				default:
 					{
-						Console.WriteLine("Client: {0}: Unknown text-command type 0x{1:X2}: {2}", state, type, command);
+						Console.WriteLine($"Client: {state}: Unknown text-command type 0x{type:X2}: {command}");
 						break;
 					}
 			}
@@ -1867,10 +1835,10 @@ namespace Server.Network
 
 		public static void UnicodePromptResponse(NetState state, PacketReader pvSrc)
 		{
-			var serial = pvSrc.ReadInt32();
+			var serial = pvSrc.ReadSerial();
 			var prompt = pvSrc.ReadInt32();
 			var type = pvSrc.ReadInt32();
-			var lang = pvSrc.ReadString(4);
+			_ = pvSrc.ReadString(4);
 			var text = pvSrc.ReadUnicodeStringLESafe();
 
 			if (text.Length > 128)
@@ -1898,11 +1866,11 @@ namespace Server.Network
 
 		public static void MenuResponse(NetState state, PacketReader pvSrc)
 		{
-			var serial = pvSrc.ReadInt32();
-			int menuID = pvSrc.ReadInt16(); // unused in our implementation
+			var serial = pvSrc.ReadSerial();
+			_ = pvSrc.ReadInt16(); // unused in our implementation
 			int index = pvSrc.ReadInt16();
-			int itemID = pvSrc.ReadInt16();
-			int hue = pvSrc.ReadInt16();
+			_ = pvSrc.ReadInt16();
+			_ = pvSrc.ReadInt16();
 
 			index -= 1; // convert from 1-based to 0-based
 
@@ -1929,7 +1897,7 @@ namespace Server.Network
 		public static void ProfileReq(NetState state, PacketReader pvSrc)
 		{
 			int type = pvSrc.ReadByte();
-			Serial serial = pvSrc.ReadInt32();
+			var serial = pvSrc.ReadSerial();
 
 			var beholder = state.Mobile;
 			var beheld = World.FindMobile(serial);
@@ -1949,7 +1917,7 @@ namespace Server.Network
 					}
 				case 0x01: // edit request
 					{
-						pvSrc.ReadInt16(); // Skip
+						_ = pvSrc.ReadInt16(); // Skip
 						int length = pvSrc.ReadUInt16();
 
 						if (length > 511)
@@ -1968,19 +1936,15 @@ namespace Server.Network
 
 		public static void Disconnect(NetState state, PacketReader pvSrc)
 		{
-			var minusOne = pvSrc.ReadInt32();
+			_ = pvSrc.ReadInt32();
 		}
 
 		public static void LiftReq(NetState state, PacketReader pvSrc)
 		{
-			Serial serial = pvSrc.ReadInt32();
+			var serial = pvSrc.ReadSerial();
 			int amount = pvSrc.ReadUInt16();
 			var item = World.FindItem(serial);
-
-			bool rejected;
-			LRReason reject;
-
-			state.Mobile.Lift(item, amount, out rejected, out reject);
+			state.Mobile.Lift(item, amount, out _, out _);
 		}
 
 		public static void EquipReq(NetState state, PacketReader pvSrc)
@@ -1988,7 +1952,7 @@ namespace Server.Network
 			var from = state.Mobile;
 			var item = from.Holding;
 
-			var valid = (item != null && item.HeldBy == from && item.Map == Map.Internal);
+			var valid = item != null && item.HeldBy == from && item.Map == Map.Internal;
 
 			from.Holding = null;
 
@@ -1997,13 +1961,10 @@ namespace Server.Network
 				return;
 			}
 
-			pvSrc.Seek(5, SeekOrigin.Current);
-			var to = World.FindMobile(pvSrc.ReadInt32());
+			_ = pvSrc.Seek(5, SeekOrigin.Current);
+			var to = pvSrc.ReadMobile();
 
-			if (to == null)
-			{
-				to = from;
-			}
+			to ??= from;
 
 			if (!to.AllowEquipFrom(from) || !to.EquipItem(item))
 			{
@@ -2015,11 +1976,11 @@ namespace Server.Network
 
 		public static void DropReq(NetState state, PacketReader pvSrc)
 		{
-			pvSrc.ReadInt32(); // serial, ignored
+			_ = pvSrc.ReadSerial(); // serial, ignored
 			int x = pvSrc.ReadInt16();
 			int y = pvSrc.ReadInt16();
 			int z = pvSrc.ReadSByte();
-			Serial dest = pvSrc.ReadInt32();
+			var dest = pvSrc.ReadSerial();
 
 			var loc = new Point3D(x, y, z);
 
@@ -2027,37 +1988,37 @@ namespace Server.Network
 
 			if (dest.IsMobile)
 			{
-				from.Drop(World.FindMobile(dest), loc);
+				_ = from.Drop(World.FindMobile(dest), loc);
 			}
 			else if (dest.IsItem)
 			{
 				var item = World.FindItem(dest);
 
-				if (item is BaseMulti && ((BaseMulti)item).AllowsRelativeDrop)
+				if (item is BaseMulti bm && bm.AllowsRelativeDrop)
 				{
 					loc.m_X += item.X;
 					loc.m_Y += item.Y;
-					from.Drop(loc);
+					_ = from.Drop(loc);
 				}
 				else
 				{
-					from.Drop(item, loc);
+					_ = from.Drop(item, loc);
 				}
 			}
 			else
 			{
-				from.Drop(loc);
+				_ = from.Drop(loc);
 			}
 		}
 
 		public static void DropReq6017(NetState state, PacketReader pvSrc)
 		{
-			pvSrc.ReadInt32(); // serial, ignored
+			_ = pvSrc.ReadSerial(); // serial, ignored
 			int x = pvSrc.ReadInt16();
 			int y = pvSrc.ReadInt16();
 			int z = pvSrc.ReadSByte();
-			pvSrc.ReadByte(); // Grid Location?
-			Serial dest = pvSrc.ReadInt32();
+			_ = pvSrc.ReadByte(); // Grid Location?
+			var dest = pvSrc.ReadSerial();
 
 			var loc = new Point3D(x, y, z);
 
@@ -2065,26 +2026,26 @@ namespace Server.Network
 
 			if (dest.IsMobile)
 			{
-				from.Drop(World.FindMobile(dest), loc);
+				_ = from.Drop(World.FindMobile(dest), loc);
 			}
 			else if (dest.IsItem)
 			{
 				var item = World.FindItem(dest);
 
-				if (item is BaseMulti && ((BaseMulti)item).AllowsRelativeDrop)
+				if (item is BaseMulti bm && bm.AllowsRelativeDrop)
 				{
 					loc.m_X += item.X;
 					loc.m_Y += item.Y;
-					from.Drop(loc);
+					_ = from.Drop(loc);
 				}
 				else
 				{
-					from.Drop(item, loc);
+					_ = from.Drop(item, loc);
 				}
 			}
 			else
 			{
-				from.Drop(loc);
+				_ = from.Drop(loc);
 			}
 		}
 
@@ -2101,10 +2062,7 @@ namespace Server.Network
 		{
 			var s = state.Mobile.Skills[pvSrc.ReadInt16()];
 
-			if (s != null)
-			{
-				s.SetLockNoRelay((SkillLock)pvSrc.ReadByte());
-			}
+			s?.SetLockNoRelay((SkillLock)pvSrc.ReadByte());
 		}
 
 		public static void HelpRequest(NetState state, PacketReader pvSrc)
@@ -2116,8 +2074,8 @@ namespace Server.Network
 		{
 			int type = pvSrc.ReadByte();
 			var targetID = pvSrc.ReadInt32();
-			int flags = pvSrc.ReadByte();
-			Serial serial = pvSrc.ReadInt32();
+			_ = pvSrc.ReadByte();
+			var serial = pvSrc.ReadSerial();
 			int x = pvSrc.ReadInt16(), y = pvSrc.ReadInt16(), z = pvSrc.ReadInt16();
 			int graphic = pvSrc.ReadUInt16();
 
@@ -2134,10 +2092,7 @@ namespace Server.Network
 			{
 				var prof = TargetProfile.Acquire(t.GetType());
 
-				if (prof != null)
-				{
-					prof.Start();
-				}
+				prof?.Start();
 
 				try
 				{
@@ -2226,10 +2181,7 @@ namespace Server.Network
 				}
 				finally
 				{
-					if (prof != null)
-					{
-						prof.Finish();
-					}
+					prof?.Finish();
 				}
 			}
 		}
@@ -2250,13 +2202,13 @@ namespace Server.Network
 					{
 						foreach (var e in gump.Entries)
 						{
-							if (e is GumpButton && ((GumpButton)e).ButtonID == buttonID)
+							if (e is GumpButton gb && gb.ButtonID == buttonID)
 							{
 								buttonExists = true;
 								break;
 							}
 
-							if (e is GumpImageTileButton && ((GumpImageTileButton)e).ButtonID == buttonID)
+							if (e is GumpImageTileButton gbi && gbi.ButtonID == buttonID)
 							{
 								buttonExists = true;
 								break;
@@ -2318,29 +2270,23 @@ namespace Server.Network
 
 					var prof = GumpProfile.Acquire(gump.GetType());
 
-					if (prof != null)
-					{
-						prof.Start();
-					}
+					prof?.Start();
 
 					gump.OnResponse(state, new RelayInfo(buttonID, switches, textEntries));
 
-					if (prof != null)
-					{
-						prof.Finish();
-					}
+					prof?.Finish();
 
 					return;
 				}
 			}
 
-			if (typeID == 461)
-			{ // Virtue gump
+			if (typeID == 461) // Virtue gump
+			{
 				var switchCount = pvSrc.ReadInt32();
 
 				if (buttonID == 1 && switchCount > 0)
 				{
-					var beheld = World.FindMobile(pvSrc.ReadInt32());
+					var beheld = pvSrc.ReadMobile();
 
 					if (beheld != null)
 					{
@@ -2349,7 +2295,7 @@ namespace Server.Network
 				}
 				else
 				{
-					var beheld = World.FindMobile(serial);
+					var beheld = World.FindMobile(new Serial(serial));
 
 					if (beheld != null)
 					{
@@ -2386,7 +2332,7 @@ namespace Server.Network
 			m.ClearFastwalkStack();
 		}
 
-		private static readonly int[] m_EmptyInts = new int[0];
+		private static readonly int[] m_EmptyInts = Array.Empty<int>();
 
 		public static void AsciiSpeech(NetState state, PacketReader pvSrc)
 		{
@@ -2394,10 +2340,10 @@ namespace Server.Network
 
 			var type = (MessageType)pvSrc.ReadByte();
 			int hue = pvSrc.ReadInt16();
-			pvSrc.ReadInt16(); // font
+			_ = pvSrc.ReadInt16(); // font
 			var text = pvSrc.ReadStringSafe().Trim();
 
-			if (text.Length <= 0 || text.Length > 128)
+			if (text.Length is <= 0 or > 128)
 			{
 				return;
 			}
@@ -2410,7 +2356,7 @@ namespace Server.Network
 			from.DoSpeech(text, m_EmptyInts, type, Utility.ClipDyedHue(hue));
 		}
 
-		private static readonly KeywordList m_KeywordList = new KeywordList();
+		private static readonly KeywordList m_KeywordList = new();
 
 		public static void UnicodeSpeech(NetState state, PacketReader pvSrc)
 		{
@@ -2418,7 +2364,7 @@ namespace Server.Network
 
 			var type = (MessageType)pvSrc.ReadByte();
 			int hue = pvSrc.ReadInt16();
-			pvSrc.ReadInt16(); // font
+			_ = pvSrc.ReadInt16(); // font
 			var lang = pvSrc.ReadString(4);
 			string text;
 
@@ -2431,7 +2377,7 @@ namespace Server.Network
 				var count = (value & 0xFFF0) >> 4;
 				var hold = value & 0xF;
 
-				if (count < 0 || count > 50)
+				if (count is < 0 or > 50)
 				{
 					return;
 				}
@@ -2475,7 +2421,7 @@ namespace Server.Network
 
 			text = text.Trim();
 
-			if (text.Length <= 0 || text.Length > 128)
+			if (text.Length is <= 0 or > 128)
 			{
 				return;
 			}
@@ -2497,15 +2443,15 @@ namespace Server.Network
 
 			if (from.AccessLevel >= AccessLevel.Counselor || Core.TickCount - from.NextActionTime >= 0)
 			{
-				var value = pvSrc.ReadInt32();
+				var value = pvSrc.ReadSerial();
 
-				if ((value & ~0x7FFFFFFF) != 0)
+				if ((value.Value & ~0x7FFFFFFF) != 0)
 				{
 					from.OnPaperdollRequest();
 				}
 				else
 				{
-					Serial s = value;
+					var s = value;
 
 					if (s.IsMobile)
 					{
@@ -2535,19 +2481,13 @@ namespace Server.Network
 			}
 		}
 
-		private static bool m_SingleClickProps;
-
-		public static bool SingleClickProps
-		{
-			get => m_SingleClickProps;
-			set => m_SingleClickProps = value;
-		}
+		public static bool SingleClickProps { get; set; }
 
 		public static void LookReq(NetState state, PacketReader pvSrc)
 		{
 			var from = state.Mobile;
 
-			Serial s = pvSrc.ReadInt32();
+			var s = pvSrc.ReadSerial();
 
 			if (s.IsMobile)
 			{
@@ -2555,7 +2495,7 @@ namespace Server.Network
 
 				if (m != null && from.CanSee(m) && Utility.InUpdateRange(from, m))
 				{
-					if (m_SingleClickProps)
+					if (SingleClickProps)
 					{
 						m.OnAosSingleClick(from);
 					}
@@ -2574,15 +2514,15 @@ namespace Server.Network
 
 				if (item != null && !item.Deleted && from.CanSee(item) && Utility.InUpdateRange(from.Location, item.GetWorldLocation()))
 				{
-					if (m_SingleClickProps)
+					if (SingleClickProps)
 					{
 						item.OnAosSingleClick(from);
 					}
 					else if (from.Region.OnSingleClick(from, item))
 					{
-						if (item.Parent is Item)
+						if (item.Parent is Item ip)
 						{
-							((Item)item.Parent).OnSingleClickContained(from, item);
+							ip.OnSingleClickContained(from, item);
 						}
 
 						item.OnSingleClick(from);
@@ -2601,14 +2541,11 @@ namespace Server.Network
 			state.Send(ChangeUpdateRange.Instantiate(18));
 		}
 
-		private const int BadFood = unchecked((int)0xBAADF00D);
-		private const int BadUOTD = unchecked((int)0xFFCEFFCE);
-
 		public static void MovementReq(NetState state, PacketReader pvSrc)
 		{
 			var dir = (Direction)pvSrc.ReadByte();
 			int seq = pvSrc.ReadByte();
-			var key = pvSrc.ReadInt32();
+			_ = pvSrc.ReadInt32();
 
 			var m = state.Mobile;
 
@@ -2632,22 +2569,20 @@ namespace Server.Network
 			}
 		}
 
-		public static int[] m_ValidAnimations = new int[]
-			{
-				6, 21, 32, 33,
-				100, 101, 102,
-				103, 104, 105,
-				106, 107, 108,
-				109, 110, 111,
-				112, 113, 114,
-				115, 116, 117,
-				118, 119, 120,
-				121, 123, 124,
-				125, 126, 127,
-				128
-			};
-
-		public static int[] ValidAnimations { get => m_ValidAnimations; set => m_ValidAnimations = value; }
+		public static int[] ValidAnimations { get; set; } =
+		{
+			6, 21, 32, 33,
+			100, 101, 102,
+			103, 104, 105,
+			106, 107, 108,
+			109, 110, 111,
+			112, 113, 114,
+			115, 116, 117,
+			118, 119, 120,
+			121, 123, 124,
+			125, 126, 127,
+			128
+		};
 
 		public static void Animate(NetState state, PacketReader pvSrc)
 		{
@@ -2656,9 +2591,9 @@ namespace Server.Network
 
 			var ok = false;
 
-			for (var i = 0; !ok && i < m_ValidAnimations.Length; ++i)
+			for (var i = 0; !ok && i < ValidAnimations.Length; ++i)
 			{
-				ok = (action == m_ValidAnimations[i]);
+				ok = action == ValidAnimations[i];
 			}
 
 			if (from != null && ok && from.Alive && from.Body.IsHuman && !from.Mounted)
@@ -2688,7 +2623,7 @@ namespace Server.Network
 			{
 				if (ph.Ingame && state.Mobile == null)
 				{
-					Console.WriteLine("Client: {0}: Sent ingame packet (0xBFx{1:X2}) before having been attached to a mobile", state, packetID);
+					Console.WriteLine($"Client: {state}: Sent ingame packet (0xBFx{packetID:X2}) before having been attached to a mobile");
 					state.Dispose();
 				}
 				else if (ph.Ingame && state.Mobile.Deleted)
@@ -2719,7 +2654,7 @@ namespace Server.Network
 
 			if (pvSrc.ReadInt16() == 1)
 			{
-				spellbook = World.FindItem(pvSrc.ReadInt32()) as ISpellbook;
+				spellbook = pvSrc.ReadItem() as ISpellbook;
 			}
 
 			var spellID = (SpellName)(pvSrc.ReadInt16() - 1);
@@ -2738,14 +2673,14 @@ namespace Server.Network
 
 			if (from.AccessLevel >= AccessLevel.Counselor || Core.TickCount - from.NextActionTime >= 0)
 			{
-				var bandage = World.FindItem(pvSrc.ReadInt32());
+				var bandage = pvSrc.ReadItem();
 
 				if (bandage == null)
 				{
 					return;
 				}
 
-				var target = World.FindMobile(pvSrc.ReadInt32());
+				var target = pvSrc.ReadMobile();
 
 				if (target == null)
 				{
@@ -2787,7 +2722,7 @@ namespace Server.Network
 
 			for (var i = 0; i < count; ++i)
 			{
-				Serial s = pvSrc.ReadInt32();
+				var s = pvSrc.ReadSerial();
 
 				if (s.IsMobile)
 				{
@@ -2819,7 +2754,7 @@ namespace Server.Network
 
 			var from = state.Mobile;
 
-			Serial s = pvSrc.ReadInt32();
+			var s = pvSrc.ReadSerial();
 
 			if (s.IsMobile)
 			{
@@ -2863,58 +2798,37 @@ namespace Server.Network
 
 		public static void PartyMessage_AddMember(NetState state, PacketReader pvSrc)
 		{
-			if (PartyCommands.Handler != null)
-			{
-				PartyCommands.Handler.OnAdd(state.Mobile);
-			}
+			PartyCommands.Handler?.OnAdd(state.Mobile);
 		}
 
 		public static void PartyMessage_RemoveMember(NetState state, PacketReader pvSrc)
 		{
-			if (PartyCommands.Handler != null)
-			{
-				PartyCommands.Handler.OnRemove(state.Mobile, World.FindMobile(pvSrc.ReadInt32()));
-			}
+			PartyCommands.Handler?.OnRemove(state.Mobile, pvSrc.ReadMobile());
 		}
 
 		public static void PartyMessage_PrivateMessage(NetState state, PacketReader pvSrc)
 		{
-			if (PartyCommands.Handler != null)
-			{
-				PartyCommands.Handler.OnPrivateMessage(state.Mobile, World.FindMobile(pvSrc.ReadInt32()), pvSrc.ReadUnicodeStringSafe());
-			}
+			PartyCommands.Handler?.OnPrivateMessage(state.Mobile, pvSrc.ReadMobile(), pvSrc.ReadUnicodeStringSafe());
 		}
 
 		public static void PartyMessage_PublicMessage(NetState state, PacketReader pvSrc)
 		{
-			if (PartyCommands.Handler != null)
-			{
-				PartyCommands.Handler.OnPublicMessage(state.Mobile, pvSrc.ReadUnicodeStringSafe());
-			}
+			PartyCommands.Handler?.OnPublicMessage(state.Mobile, pvSrc.ReadUnicodeStringSafe());
 		}
 
 		public static void PartyMessage_SetCanLoot(NetState state, PacketReader pvSrc)
 		{
-			if (PartyCommands.Handler != null)
-			{
-				PartyCommands.Handler.OnSetCanLoot(state.Mobile, pvSrc.ReadBoolean());
-			}
+			PartyCommands.Handler?.OnSetCanLoot(state.Mobile, pvSrc.ReadBoolean());
 		}
 
 		public static void PartyMessage_Accept(NetState state, PacketReader pvSrc)
 		{
-			if (PartyCommands.Handler != null)
-			{
-				PartyCommands.Handler.OnAccept(state.Mobile, World.FindMobile(pvSrc.ReadInt32()));
-			}
+			PartyCommands.Handler?.OnAccept(state.Mobile, pvSrc.ReadMobile());
 		}
 
 		public static void PartyMessage_Decline(NetState state, PacketReader pvSrc)
 		{
-			if (PartyCommands.Handler != null)
-			{
-				PartyCommands.Handler.OnDecline(state.Mobile, World.FindMobile(pvSrc.ReadInt32()));
-			}
+			PartyCommands.Handler?.OnDecline(state.Mobile, pvSrc.ReadMobile());
 		}
 
 		public static void StunRequest(NetState state, PacketReader pvSrc)
@@ -2952,8 +2866,8 @@ namespace Server.Network
 
 		public static void ScreenSize(NetState state, PacketReader pvSrc)
 		{
-			var width = pvSrc.ReadInt32();
-			var unk = pvSrc.ReadInt32();
+			_ = pvSrc.ReadInt32();
+			_ = pvSrc.ReadInt32();
 		}
 
 		public static void ContextMenuResponse(NetState state, PacketReader pvSrc)
@@ -2968,7 +2882,7 @@ namespace Server.Network
 
 				if (menu != null && from != null && from == menu.From)
 				{
-					var entity = World.FindEntity(pvSrc.ReadInt32());
+					var entity = pvSrc.ReadEntity();
 
 					if (entity != null && entity == menu.Target && from.CanSee(entity))
 					{
@@ -2978,9 +2892,9 @@ namespace Server.Network
 						{
 							p = entity.Location;
 						}
-						else if (entity is Item)
+						else if (entity is Item ei)
 						{
-							p = ((Item)entity).GetWorldLocation();
+							p = ei.GetWorldLocation();
 						}
 						else
 						{
@@ -2993,16 +2907,23 @@ namespace Server.Network
 						{
 							var e = menu.Entries[index];
 
-							var range = e.Range;
+							var args = new ContextMenuResponseEventArgs(from, entity, e);
 
-							if (range == -1)
-							{
-								range = 18;
-							}
+							EventSink.InvokeContextMenuResponse(args);
 
-							if (e.Enabled && from.InRange(p, range))
+							if (e.Enabled && !args.Blocked)
 							{
-								e.OnClick();
+								var range = e.Range;
+
+								if (range < 0)
+								{
+									range = 18;
+								}
+
+								if (from.InRange(p, range))
+								{
+									e.OnClick();
+								}
 							}
 						}
 					}
@@ -3013,7 +2934,7 @@ namespace Server.Network
 		public static void ContextMenuRequest(NetState state, PacketReader pvSrc)
 		{
 			var from = state.Mobile;
-			var target = World.FindEntity(pvSrc.ReadInt32());
+			var target = pvSrc.ReadEntity();
 
 			if (from != null && target != null && from.Map == target.Map && from.CanSee(target))
 			{
@@ -3021,7 +2942,8 @@ namespace Server.Network
 				{
 					return;
 				}
-				else if (target is Item && !Utility.InUpdateRange(from.Location, ((Item)target).GetWorldLocation()))
+
+				if (target is Item ti && !Utility.InUpdateRange(from.Location, ti.GetWorldLocation()))
 				{
 					return;
 				}
@@ -3035,18 +2957,13 @@ namespace Server.Network
 
 				if (c.Entries.Length > 0)
 				{
-					if (target is Item)
+					if (target is Item item && item.RootParent is Mobile root && root != from && root.AccessLevel >= from.AccessLevel)
 					{
-						object root = ((Item)target).RootParent;
-
-						if (root is Mobile && root != from && ((Mobile)root).AccessLevel >= from.AccessLevel)
+						for (var i = 0; i < c.Entries.Length; ++i)
 						{
-							for (var i = 0; i < c.Entries.Length; ++i)
+							if (!c.Entries[i].NonLocalUse)
 							{
-								if (!c.Entries[i].NonLocalUse)
-								{
-									c.Entries[i].Enabled = false;
-								}
+								c.Entries[i].Enabled = false;
 							}
 						}
 					}
@@ -3058,7 +2975,7 @@ namespace Server.Network
 
 		public static void CloseStatus(NetState state, PacketReader pvSrc)
 		{
-			Serial serial = pvSrc.ReadInt32();
+			_ = pvSrc.ReadSerial();
 		}
 
 		public static void Language(NetState state, PacketReader pvSrc)
@@ -3073,34 +2990,34 @@ namespace Server.Network
 
 		public static void AssistVersion(NetState state, PacketReader pvSrc)
 		{
-			var unk = pvSrc.ReadInt32();
-			var av = pvSrc.ReadString();
+			_ = pvSrc.ReadInt32();
+			_ = pvSrc.ReadString();
 		}
 
 		public static void ClientVersion(NetState state, PacketReader pvSrc)
 		{
 			var version = state.Version = new CV(pvSrc.ReadString());
 
-			EventSink.InvokeClientVersionReceived(new ClientVersionReceivedArgs(state, version));
+			EventSink.InvokeClientVersionReceived(new ClientVersionReceivedEventArgs(state, version));
 		}
 
 		public static void ClientType(NetState state, PacketReader pvSrc)
 		{
-			pvSrc.ReadUInt16();
+			_ = pvSrc.ReadUInt16();
+			_ = pvSrc.ReadUInt16();
 
-			int type = pvSrc.ReadUInt16();
 			var version = state.Version = new CV(pvSrc.ReadString());
 
-			//EventSink.InvokeClientVersionReceived( new ClientVersionReceivedArgs( state, version ) );//todo
+			EventSink.InvokeClientVersionReceived(new ClientVersionReceivedEventArgs(state, version));
 		}
 
 		public static void MobileQuery(NetState state, PacketReader pvSrc)
 		{
 			var from = state.Mobile;
 
-			pvSrc.ReadInt32(); // 0xEDEDEDED
+			_ = pvSrc.ReadInt32(); // 0xEDEDEDED
 			int type = pvSrc.ReadByte();
-			var m = World.FindMobile(pvSrc.ReadInt32());
+			var m = pvSrc.ReadMobile();
 
 			if (m != null)
 			{
@@ -3110,7 +3027,7 @@ namespace Server.Network
 						{
 							if (VerifyGC(state))
 							{
-								Console.WriteLine("God Client: {0}: Query 0x{1:X2} on {2} '{3}'", state, type, m.Serial, m.Name);
+								Console.WriteLine($"God Client: {state}: Query 0x{type:X2} on {m.Serial} '{m.Name}'");
 							}
 
 							break;
@@ -3136,15 +3053,16 @@ namespace Server.Network
 
 		public delegate void PlayCharCallback(NetState state, bool val);
 
-		public static PlayCharCallback ThirdPartyAuthCallback = null, ThirdPartyHackedCallback = null;
+		public static PlayCharCallback ThirdPartyAuthCallback { get; set; }
+		public static PlayCharCallback ThirdPartyHackedCallback { get; set; }
 
-		private static readonly byte[] m_ThirdPartyAuthKey = new byte[]
-			{
-				0x9, 0x11, 0x83, (byte)'+', 0x4, 0x17, 0x83,
-				0x5, 0x24, 0x85,
-				0x7, 0x17, 0x87,
-				0x6, 0x19, 0x88,
-			};
+		private static readonly byte[] m_ThirdPartyAuthKey =
+		{
+			0x9, 0x11, 0x83, (byte)'+', 0x4, 0x17, 0x83,
+			0x5, 0x24, 0x85,
+			0x7, 0x17, 0x87,
+			0x6, 0x19, 0x88,
+		};
 
 		private class LoginTimer : Timer
 		{
@@ -3175,11 +3093,11 @@ namespace Server.Network
 
 		public static void PlayCharacter(NetState state, PacketReader pvSrc)
 		{
-			pvSrc.ReadInt32(); // 0xEDEDEDED
+			_ = pvSrc.ReadInt32(); // 0xEDEDEDED
 
 			var name = pvSrc.ReadString(30);
 
-			pvSrc.Seek(2, SeekOrigin.Current);
+			_ = pvSrc.Seek(2, SeekOrigin.Current);
 			var flags = pvSrc.ReadInt32();
 
 			if (FeatureProtection.DisabledFeatures != 0 && ThirdPartyAuthCallback != null)
@@ -3203,19 +3121,19 @@ namespace Server.Network
 				}
 				else
 				{
-					pvSrc.Seek(16, SeekOrigin.Current);
+					_ = pvSrc.Seek(16, SeekOrigin.Current);
 				}
 
 				ThirdPartyAuthCallback(state, authOK);
 			}
 			else
 			{
-				pvSrc.Seek(24, SeekOrigin.Current);
+				_ = pvSrc.Seek(24, SeekOrigin.Current);
 			}
 
 			if (ThirdPartyHackedCallback != null)
 			{
-				pvSrc.Seek(-2, SeekOrigin.Current);
+				_ = pvSrc.Seek(-2, SeekOrigin.Current);
 				if (pvSrc.ReadUInt16() == 0xDEAD)
 				{
 					ThirdPartyHackedCallback(state, true);
@@ -3228,7 +3146,7 @@ namespace Server.Network
 			}
 
 			var charSlot = pvSrc.ReadInt32();
-			var clientIP = pvSrc.ReadInt32();
+			_ = pvSrc.ReadInt32();
 
 			var a = state.Account;
 
@@ -3247,7 +3165,7 @@ namespace Server.Network
 
 					if (check != null && check.Map != Map.Internal && check != m)
 					{
-						Console.WriteLine("Login: {0}: Account in use", state);
+						Console.WriteLine($"Login: {state}: Account in use");
 						state.Send(new PopupMessage(PMMessage.CharInWorld));
 						return;
 					}
@@ -3259,10 +3177,7 @@ namespace Server.Network
 				}
 				else
 				{
-					if (m.NetState != null)
-					{
-						m.NetState.Dispose();
-					}
+					m.NetState?.Dispose();
 
 					NetState.ProcessDisposedQueue();
 
@@ -3307,17 +3222,17 @@ namespace Server.Network
 				state.Send(new MobileUpdate(m));
 
 				state.Send(new MobileIncoming(m, m));
-				//state.Send( new MobileAttributes( m ) );
+				//state.Send(new MobileAttributes(m));
 				state.Send(new MobileStatus(m, m));
-				state.Send(Server.Network.SetWarMode.Instantiate(m.Warmode));
+				state.Send(Network.SetWarMode.Instantiate(m.Warmode));
 
 				m.SendEverything();
 
 				state.Send(SupportedFeatures.Instantiate(state));
 				state.Send(new MobileUpdate(m));
-				//state.Send( new MobileAttributes( m ) );
+				//state.Send(new MobileAttributes(m));
 				state.Send(new MobileStatus(m, m));
-				state.Send(Server.Network.SetWarMode.Instantiate(m.Warmode));
+				state.Send(Network.SetWarMode.Instantiate(m.Warmode));
 				state.Send(new MobileIncoming(m, m));
 			}
 			else if (state.StygianAbyss)
@@ -3330,17 +3245,17 @@ namespace Server.Network
 				state.Send(new MobileUpdate(m));
 
 				state.Send(new MobileIncomingSA(m, m));
-				//state.Send( new MobileAttributes( m ) );
+				//state.Send(new MobileAttributes(m));
 				state.Send(new MobileStatus(m, m));
-				state.Send(Server.Network.SetWarMode.Instantiate(m.Warmode));
+				state.Send(Network.SetWarMode.Instantiate(m.Warmode));
 
 				m.SendEverything();
 
 				state.Send(SupportedFeatures.Instantiate(state));
 				state.Send(new MobileUpdate(m));
-				//state.Send( new MobileAttributes( m ) );
+				//state.Send(new MobileAttributes(m));
 				state.Send(new MobileStatus(m, m));
-				state.Send(Server.Network.SetWarMode.Instantiate(m.Warmode));
+				state.Send(Network.SetWarMode.Instantiate(m.Warmode));
 				state.Send(new MobileIncomingSA(m, m));
 			}
 			else
@@ -3353,17 +3268,17 @@ namespace Server.Network
 				state.Send(new MobileUpdateOld(m));
 
 				state.Send(new MobileIncomingOld(m, m));
-				//state.Send( new MobileAttributes( m ) );
+				//state.Send(new MobileAttributes(m));
 				state.Send(new MobileStatus(m, m));
-				state.Send(Server.Network.SetWarMode.Instantiate(m.Warmode));
+				state.Send(Network.SetWarMode.Instantiate(m.Warmode));
 
 				m.SendEverything();
 
 				state.Send(SupportedFeatures.Instantiate(state));
 				state.Send(new MobileUpdateOld(m));
-				//state.Send( new MobileAttributes( m ) );
+				//state.Send(new MobileAttributes(m));
 				state.Send(new MobileStatus(m, m));
-				state.Send(Server.Network.SetWarMode.Instantiate(m.Warmode));
+				state.Send(Network.SetWarMode.Instantiate(m.Warmode));
 				state.Send(new MobileIncomingOld(m, m));
 			}
 
@@ -3379,16 +3294,16 @@ namespace Server.Network
 
 		public static void CreateCharacter(NetState state, PacketReader pvSrc)
 		{
-			var unk1 = pvSrc.ReadInt32();
-			var unk2 = pvSrc.ReadInt32();
-			int unk3 = pvSrc.ReadByte();
+			_ = pvSrc.ReadInt32();
+			_ = pvSrc.ReadInt32();
+			_ = pvSrc.ReadByte();
 			var name = pvSrc.ReadString(30);
 
-			pvSrc.Seek(2, SeekOrigin.Current);
+			_ = pvSrc.Seek(2, SeekOrigin.Current);
 			var flags = pvSrc.ReadInt32();
-			pvSrc.Seek(8, SeekOrigin.Current);
+			_ = pvSrc.Seek(8, SeekOrigin.Current);
 			int prof = pvSrc.ReadByte();
-			pvSrc.Seek(15, SeekOrigin.Current);
+			_ = pvSrc.Seek(15, SeekOrigin.Current);
 
 			//bool female = pvSrc.ReadBoolean();
 
@@ -3408,10 +3323,10 @@ namespace Server.Network
 			int hairHue = pvSrc.ReadInt16();
 			int hairValf = pvSrc.ReadInt16();
 			int hairHuef = pvSrc.ReadInt16();
-			pvSrc.ReadByte();
+			_ = pvSrc.ReadByte();
 			int cityIndex = pvSrc.ReadByte();
-			var charSlot = pvSrc.ReadInt32();
-			var clientIP = pvSrc.ReadInt32();
+			_ = pvSrc.ReadInt32();
+			_ = pvSrc.ReadInt32();
 			int shirtHue = pvSrc.ReadInt16();
 			int pantsHue = pvSrc.ReadInt16();
 
@@ -3427,10 +3342,9 @@ namespace Server.Network
 			0x05, 0x06 -> Gargoyle Male, Gargoyle Female
 			*/
 
-			var female = ((genderRace % 2) != 0);
+			var female = (genderRace % 2) != 0;
 
-			Race race = null;
-
+			Race race;
 			if (state.StygianAbyss)
 			{
 				var raceID = (byte)(genderRace < 4 ? 0 : ((genderRace / 2) - 1));
@@ -3441,10 +3355,7 @@ namespace Server.Network
 				race = Race.Races[(byte)(genderRace / 2)];
 			}
 
-			if (race == null)
-			{
-				race = Race.DefaultRace;
-			}
+			race ??= Race.DefaultRace;
 
 			var info = state.CityInfo;
 			var a = state.Account;
@@ -3470,23 +3381,14 @@ namespace Server.Network
 
 				state.Flags = (ClientFlags)flags;
 
-				var args = new CharacterCreatedEventArgs(
-					state, a,
-					name, female, hue,
-					str, dex, intl,
-					info[cityIndex],
-					new SkillNameValue[3]
-					{
-						new SkillNameValue( (SkillName)is1, vs1 ),
-						new SkillNameValue( (SkillName)is2, vs2 ),
-						new SkillNameValue( (SkillName)is3, vs3 ),
-					},
-					shirtHue, pantsHue,
-					hairVal, hairHue,
-					hairValf, hairHuef,
-					prof,
-					race
-					);
+				var skills = new[]
+				{
+					new SkillNameValue((SkillName)is1, vs1),
+					new SkillNameValue((SkillName)is2, vs2),
+					new SkillNameValue((SkillName)is3, vs3),
+				};
+
+				var args = new CharacterCreatedEventArgs(state, a, name, female, hue, str, dex, intl, info[cityIndex], skills, shirtHue, pantsHue, hairVal, hairHue, hairValf, hairHuef, prof, race);
 
 				state.Send(new ClientVersionReq());
 
@@ -3512,16 +3414,16 @@ namespace Server.Network
 
 		public static void CreateCharacter70160(NetState state, PacketReader pvSrc)
 		{
-			var unk1 = pvSrc.ReadInt32();
-			var unk2 = pvSrc.ReadInt32();
-			int unk3 = pvSrc.ReadByte();
+			_ = pvSrc.ReadInt32();
+			_ = pvSrc.ReadInt32();
+			_ = pvSrc.ReadByte();
 			var name = pvSrc.ReadString(30);
 
-			pvSrc.Seek(2, SeekOrigin.Current);
+			_ = pvSrc.Seek(2, SeekOrigin.Current);
 			var flags = pvSrc.ReadInt32();
-			pvSrc.Seek(8, SeekOrigin.Current);
+			_ = pvSrc.Seek(8, SeekOrigin.Current);
 			int prof = pvSrc.ReadByte();
-			pvSrc.Seek(15, SeekOrigin.Current);
+			_ = pvSrc.Seek(15, SeekOrigin.Current);
 
 			int genderRace = pvSrc.ReadByte();
 
@@ -3542,10 +3444,10 @@ namespace Server.Network
 			int hairHue = pvSrc.ReadInt16();
 			int hairValf = pvSrc.ReadInt16();
 			int hairHuef = pvSrc.ReadInt16();
-			pvSrc.ReadByte();
+			_ = pvSrc.ReadByte();
 			int cityIndex = pvSrc.ReadByte();
-			var charSlot = pvSrc.ReadInt32();
-			var clientIP = pvSrc.ReadInt32();
+			_ = pvSrc.ReadInt32();
+			_ = pvSrc.ReadInt32();
 			int shirtHue = pvSrc.ReadInt16();
 			int pantsHue = pvSrc.ReadInt16();
 
@@ -3556,17 +3458,10 @@ namespace Server.Network
 			0x05, 0x06 -> Gargoyle Male, Gargoyle Female
 			*/
 
-			var female = ((genderRace % 2) != 0);
-
-			Race race = null;
-
+			var female = (genderRace % 2) != 0;
 			var raceID = (byte)(genderRace < 4 ? 0 : ((genderRace / 2) - 1));
-			race = Race.Races[raceID];
-
-			if (race == null)
-			{
-				race = Race.DefaultRace;
-			}
+			var race = Race.Races[raceID];
+			race ??= Race.DefaultRace;
 
 			var info = state.CityInfo;
 			var a = state.Account;
@@ -3592,24 +3487,15 @@ namespace Server.Network
 
 				state.Flags = (ClientFlags)flags;
 
-				var args = new CharacterCreatedEventArgs(
-					state, a,
-					name, female, hue,
-					str, dex, intl,
-					info[cityIndex],
-					new SkillNameValue[4]
-					{
-						new SkillNameValue( (SkillName)is1, vs1 ),
-						new SkillNameValue( (SkillName)is2, vs2 ),
-						new SkillNameValue( (SkillName)is3, vs3 ),
-						new SkillNameValue( (SkillName)is4, vs4 ),
-					},
-					shirtHue, pantsHue,
-					hairVal, hairHue,
-					hairValf, hairHuef,
-					prof,
-					race
-					);
+				var skills = new[]
+				{
+					new SkillNameValue((SkillName)is1, vs1),
+					new SkillNameValue((SkillName)is2, vs2),
+					new SkillNameValue((SkillName)is3, vs3),
+					new SkillNameValue((SkillName)is4, vs4),
+				};
+
+				var args = new CharacterCreatedEventArgs(state, a, name, female, hue, str, dex, intl, info[cityIndex], skills, shirtHue, pantsHue, hairVal, hairHue, hairValf, hairHuef, prof, race);
 
 				state.Send(new ClientVersionReq());
 
@@ -3638,20 +3524,14 @@ namespace Server.Network
 			//state.Mobile.PublicHouseContent = pvSrc.ReadBoolean();
 		}
 
-		private static bool m_ClientVerification = true;
-
-		public static bool ClientVerification
-		{
-			get => m_ClientVerification;
-			set => m_ClientVerification = value;
-		}
+		public static bool ClientVerification { get; set; } = true;
 
 		internal struct AuthIDPersistence
 		{
 			public DateTime Age;
-			public ClientVersion Version;
+			public CV Version;
 
-			public AuthIDPersistence(ClientVersion v)
+			public AuthIDPersistence(CV v)
 			{
 				Age = DateTime.UtcNow;
 				Version = v;
@@ -3659,7 +3539,7 @@ namespace Server.Network
 		}
 
 		private const int m_AuthIDWindowSize = 128;
-		private static readonly Dictionary<int, AuthIDPersistence> m_AuthIDWindow = new Dictionary<int, AuthIDPersistence>(m_AuthIDWindowSize);
+		private static readonly Dictionary<int, AuthIDPersistence> m_AuthIDWindow = new(m_AuthIDWindowSize);
 
 		private static int GenerateAuthID(NetState state)
 		{
@@ -3677,7 +3557,7 @@ namespace Server.Network
 					}
 				}
 
-				m_AuthIDWindow.Remove(oldestID);
+				_ = m_AuthIDWindow.Remove(oldestID);
 			}
 
 			int authID;
@@ -3712,26 +3592,26 @@ namespace Server.Network
 			if (m_AuthIDWindow.ContainsKey(authID))
 			{
 				var ap = m_AuthIDWindow[authID];
-				m_AuthIDWindow.Remove(authID);
+				_ = m_AuthIDWindow.Remove(authID);
 
 				state.Version = ap.Version;
 			}
-			else if (m_ClientVerification)
+			else if (ClientVerification)
 			{
-				Console.WriteLine("Login: {0}: Invalid client detected, disconnecting", state);
+				Console.WriteLine($"Login: {state}: Invalid client detected, disconnecting");
 				state.Dispose();
 				return;
 			}
 
 			if (state.m_AuthID != 0 && authID != state.m_AuthID)
 			{
-				Console.WriteLine("Login: {0}: Invalid client detected, disconnecting", state);
+				Console.WriteLine($"Login: {state}: Invalid client detected, disconnecting");
 				state.Dispose();
 				return;
 			}
 			else if (state.m_AuthID == 0 && authID != state.m_Seed)
 			{
-				Console.WriteLine("Login: {0}: Invalid client detected, disconnecting", state);
+				Console.WriteLine($"Login: {state}: Invalid client detected, disconnecting");
 				state.Dispose();
 				return;
 			}
@@ -3793,7 +3673,7 @@ namespace Server.Network
 
 			if (state.m_Seed == 0)
 			{
-				Console.WriteLine("Login: {0}: Invalid client detected, disconnecting", state);
+				Console.WriteLine($"Login: {state}: Invalid client detected, disconnecting");
 				state.Dispose();
 				return;
 			}
@@ -3803,40 +3683,35 @@ namespace Server.Network
 			var clientRev = pvSrc.ReadInt32();
 			var clientPat = pvSrc.ReadInt32();
 
-			state.Version = new ClientVersion(clientMaj, clientMin, clientRev, clientPat);
+			state.Version = new CV(clientMaj, clientMin, clientRev, clientPat);
 		}
 
 		public static void CrashReport(NetState state, PacketReader pvSrc)
 		{
-			var clientMaj = pvSrc.ReadByte();
-			var clientMin = pvSrc.ReadByte();
-			var clientRev = pvSrc.ReadByte();
-			var clientPat = pvSrc.ReadByte();
+			_ = pvSrc.ReadByte();
+			_ = pvSrc.ReadByte();
+			_ = pvSrc.ReadByte();
+			_ = pvSrc.ReadByte();
+			_ = pvSrc.ReadUInt16();
+			_ = pvSrc.ReadUInt16();
+			_ = pvSrc.ReadSByte();
+			_ = pvSrc.ReadByte();
+			_ = pvSrc.ReadString(32);
+			_ = pvSrc.ReadString(32);
+			_ = pvSrc.ReadString(15);
+			_ = pvSrc.ReadInt32();
+			_ = pvSrc.ReadInt32();
+			_ = pvSrc.ReadString(100);
+			_ = pvSrc.ReadString(100);
 
-			var x = pvSrc.ReadUInt16();
-			var y = pvSrc.ReadUInt16();
-			var z = pvSrc.ReadSByte();
-			var map = pvSrc.ReadByte();
-
-			var account = pvSrc.ReadString(32);
-			var character = pvSrc.ReadString(32);
-			var ip = pvSrc.ReadString(15);
-
-			var unk1 = pvSrc.ReadInt32();
-			var exception = pvSrc.ReadInt32();
-
-			var process = pvSrc.ReadString(100);
-			var report = pvSrc.ReadString(100);
-
-			pvSrc.ReadByte(); // 0x00
-
-			var offset = pvSrc.ReadInt32();
+			_ = pvSrc.ReadByte(); // 0x00
+			_ = pvSrc.ReadInt32();
 
 			int count = pvSrc.ReadByte();
 
 			for (var i = 0; i < count; i++)
 			{
-				var address = pvSrc.ReadInt32();
+				_ = pvSrc.ReadInt32();
 			}
 		}
 
@@ -3906,48 +3781,23 @@ namespace Server.Network
 
 	public class NetState : IComparable<NetState>
 	{
-		private Socket m_Socket;
-		private readonly IPAddress m_Address;
-		private ByteQueue m_Buffer;
 		private byte[] m_RecvBuffer;
 		private readonly SendQueue m_SendQueue;
-		private bool m_Seeded;
-		private bool m_Running;
 
-#if NewAsyncSockets
-		private SocketAsyncEventArgs m_ReceiveEventArgs, m_SendEventArgs;
-#else
 		private AsyncCallback m_OnReceive, m_OnSend;
-#endif
 
 		private readonly MessagePump m_MessagePump;
-		private ServerInfo[] m_ServerInfo;
-		private IAccount m_Account;
-		private Mobile m_Mobile;
-		private CityInfo[] m_CityInfo;
-		private List<Gump> m_Gumps;
-		private List<HuePicker> m_HuePickers;
-		private List<IMenu> m_Menus;
-		private readonly List<SecureTrade> m_Trades;
-		private int m_Sequence;
-		private bool m_CompressionEnabled;
 		private readonly string m_ToString;
-		private ClientVersion m_Version;
-		private bool m_SentFirstPacket;
-		private bool m_BlockAllPackets;
+		private CV m_Version;
 
-		private readonly DateTime m_ConnectedOn;
+		public DateTime ConnectedOn { get; }
 
-		public DateTime ConnectedOn => m_ConnectedOn;
-
-		public TimeSpan ConnectedFor => (DateTime.UtcNow - m_ConnectedOn);
+		public TimeSpan ConnectedFor => DateTime.UtcNow - ConnectedOn;
 
 		internal int m_Seed;
 		internal int m_AuthID;
 
-		public IPAddress Address => m_Address;
-
-		private ClientFlags m_Flags;
+		public IPAddress Address { get; }
 
 		private static bool m_Paused;
 
@@ -3959,43 +3809,19 @@ namespace Server.Network
 		}
 
 		private AsyncState m_AsyncState;
-		private readonly object m_AsyncLock = new object();
+		private readonly object m_AsyncLock = new();
 
-		private IPacketEncoder m_Encoder = null;
+		public IPacketEncoder PacketEncoder { get; set; } = null;
 
-		public IPacketEncoder PacketEncoder
-		{
-			get => m_Encoder;
-			set => m_Encoder = value;
-		}
+		public static NetStateCreatedCallback CreatedCallback { get; set; }
 
-		private static NetStateCreatedCallback m_CreatedCallback;
+		public bool SentFirstPacket { get; set; }
 
-		public static NetStateCreatedCallback CreatedCallback
-		{
-			get => m_CreatedCallback;
-			set => m_CreatedCallback = value;
-		}
+		public bool BlockAllPackets { get; set; }
 
-		public bool SentFirstPacket
-		{
-			get => m_SentFirstPacket;
-			set => m_SentFirstPacket = value;
-		}
+		public ClientFlags Flags { get; set; }
 
-		public bool BlockAllPackets
-		{
-			get => m_BlockAllPackets;
-			set => m_BlockAllPackets = value;
-		}
-
-		public ClientFlags Flags
-		{
-			get => m_Flags;
-			set => m_Flags = value;
-		}
-
-		public ClientVersion Version
+		public CV Version
 		{
 			get => m_Version;
 			set
@@ -4061,20 +3887,20 @@ namespace Server.Network
 			}
 		}
 
-		private static readonly ClientVersion m_Version400a = new ClientVersion("4.0.0a");
-		private static readonly ClientVersion m_Version407a = new ClientVersion("4.0.7a");
-		private static readonly ClientVersion m_Version500a = new ClientVersion("5.0.0a");
-		private static readonly ClientVersion m_Version502b = new ClientVersion("5.0.2b");
-		private static readonly ClientVersion m_Version6000 = new ClientVersion("6.0.0.0");
-		private static readonly ClientVersion m_Version6017 = new ClientVersion("6.0.1.7");
-		private static readonly ClientVersion m_Version60142 = new ClientVersion("6.0.14.2");
-		private static readonly ClientVersion m_Version7000 = new ClientVersion("7.0.0.0");
-		private static readonly ClientVersion m_Version7090 = new ClientVersion("7.0.9.0");
-		private static readonly ClientVersion m_Version70130 = new ClientVersion("7.0.13.0");
-		private static readonly ClientVersion m_Version70160 = new ClientVersion("7.0.16.0");
-		private static readonly ClientVersion m_Version70300 = new ClientVersion("7.0.30.0");
-		private static readonly ClientVersion m_Version70331 = new ClientVersion("7.0.33.1");
-		private static readonly ClientVersion m_Version704565 = new ClientVersion("7.0.45.65");
+		private static readonly CV m_Version400a = new("4.0.0a");
+		private static readonly CV m_Version407a = new("4.0.7a");
+		private static readonly CV m_Version500a = new("5.0.0a");
+		private static readonly CV m_Version502b = new("5.0.2b");
+		private static readonly CV m_Version6000 = new("6.0.0.0");
+		private static readonly CV m_Version6017 = new("6.0.1.7");
+		private static readonly CV m_Version60142 = new("6.0.14.2");
+		private static readonly CV m_Version7000 = new("7.0.0.0");
+		private static readonly CV m_Version7090 = new("7.0.9.0");
+		private static readonly CV m_Version70130 = new("7.0.13.0");
+		private static readonly CV m_Version70160 = new("7.0.16.0");
+		private static readonly CV m_Version70300 = new("7.0.30.0");
+		private static readonly CV m_Version70331 = new("7.0.33.1");
+		private static readonly CV m_Version704565 = new("7.0.45.65");
 
 		private ProtocolChanges _ProtocolChanges;
 
@@ -4111,37 +3937,37 @@ namespace Server.Network
 			Version704565 = Version70331 | NewSecureTrading
 		}
 
-		public bool NewSpellbook => ((_ProtocolChanges & ProtocolChanges.NewSpellbook) != 0);
-		public bool DamagePacket => ((_ProtocolChanges & ProtocolChanges.DamagePacket) != 0);
-		public bool Unpack => ((_ProtocolChanges & ProtocolChanges.Unpack) != 0);
-		public bool BuffIcon => ((_ProtocolChanges & ProtocolChanges.BuffIcon) != 0);
-		public bool NewHaven => ((_ProtocolChanges & ProtocolChanges.NewHaven) != 0);
-		public bool ContainerGridLines => ((_ProtocolChanges & ProtocolChanges.ContainerGridLines) != 0);
-		public bool ExtendedSupportedFeatures => ((_ProtocolChanges & ProtocolChanges.ExtendedSupportedFeatures) != 0);
-		public bool StygianAbyss => ((_ProtocolChanges & ProtocolChanges.StygianAbyss) != 0);
-		public bool HighSeas => ((_ProtocolChanges & ProtocolChanges.HighSeas) != 0);
-		public bool NewCharacterList => ((_ProtocolChanges & ProtocolChanges.NewCharacterList) != 0);
-		public bool NewCharacterCreation => ((_ProtocolChanges & ProtocolChanges.NewCharacterCreation) != 0);
-		public bool ExtendedStatus => ((_ProtocolChanges & ProtocolChanges.ExtendedStatus) != 0);
-		public bool NewMobileIncoming => ((_ProtocolChanges & ProtocolChanges.NewMobileIncoming) != 0);
-		public bool NewSecureTrading => ((_ProtocolChanges & ProtocolChanges.NewSecureTrading) != 0);
+		public bool NewSpellbook => (_ProtocolChanges & ProtocolChanges.NewSpellbook) != 0;
+		public bool DamagePacket => (_ProtocolChanges & ProtocolChanges.DamagePacket) != 0;
+		public bool Unpack => (_ProtocolChanges & ProtocolChanges.Unpack) != 0;
+		public bool BuffIcon => (_ProtocolChanges & ProtocolChanges.BuffIcon) != 0;
+		public bool NewHaven => (_ProtocolChanges & ProtocolChanges.NewHaven) != 0;
+		public bool ContainerGridLines => (_ProtocolChanges & ProtocolChanges.ContainerGridLines) != 0;
+		public bool ExtendedSupportedFeatures => (_ProtocolChanges & ProtocolChanges.ExtendedSupportedFeatures) != 0;
+		public bool StygianAbyss => (_ProtocolChanges & ProtocolChanges.StygianAbyss) != 0;
+		public bool HighSeas => (_ProtocolChanges & ProtocolChanges.HighSeas) != 0;
+		public bool NewCharacterList => (_ProtocolChanges & ProtocolChanges.NewCharacterList) != 0;
+		public bool NewCharacterCreation => (_ProtocolChanges & ProtocolChanges.NewCharacterCreation) != 0;
+		public bool ExtendedStatus => (_ProtocolChanges & ProtocolChanges.ExtendedStatus) != 0;
+		public bool NewMobileIncoming => (_ProtocolChanges & ProtocolChanges.NewMobileIncoming) != 0;
+		public bool NewSecureTrading => (_ProtocolChanges & ProtocolChanges.NewSecureTrading) != 0;
 
-		public bool IsUOTDClient => ((m_Flags & ClientFlags.UOTD) != 0 || (m_Version != null && m_Version.Type == ClientType.UOTD));
+		public bool IsUOTDClient => (Flags & ClientFlags.UOTD) != 0 || (m_Version != null && m_Version.Type == ClientType.UOTD);
 
-		public bool IsSAClient => (m_Version != null && m_Version.Type == ClientType.SA);
+		public bool IsSAClient => m_Version != null && m_Version.Type == ClientType.SA;
 
-		public List<SecureTrade> Trades => m_Trades;
+		public List<SecureTrade> Trades { get; }
 
 		public void ValidateAllTrades()
 		{
-			for (var i = m_Trades.Count - 1; i >= 0; --i)
+			for (var i = Trades.Count - 1; i >= 0; --i)
 			{
-				if (i >= m_Trades.Count)
+				if (i >= Trades.Count)
 				{
 					continue;
 				}
 
-				var trade = m_Trades[i];
+				var trade = Trades[i];
 
 				if (trade.From.Mobile.Deleted || trade.To.Mobile.Deleted || !trade.From.Mobile.Alive || !trade.To.Mobile.Alive || !trade.From.Mobile.InRange(trade.To.Mobile, 2) || trade.From.Mobile.Map != trade.To.Mobile.Map)
 				{
@@ -4152,25 +3978,25 @@ namespace Server.Network
 
 		public void CancelAllTrades()
 		{
-			for (var i = m_Trades.Count - 1; i >= 0; --i)
+			for (var i = Trades.Count - 1; i >= 0; --i)
 			{
-				if (i < m_Trades.Count)
+				if (i < Trades.Count)
 				{
-					m_Trades[i].Cancel();
+					Trades[i].Cancel();
 				}
 			}
 		}
 
 		public void RemoveTrade(SecureTrade trade)
 		{
-			m_Trades.Remove(trade);
+			_ = Trades.Remove(trade);
 		}
 
 		public SecureTrade FindTrade(Mobile m)
 		{
-			for (var i = 0; i < m_Trades.Count; ++i)
+			for (var i = 0; i < Trades.Count; ++i)
 			{
-				var trade = m_Trades[i];
+				var trade = Trades[i];
 
 				if (trade.From.Mobile == m || trade.To.Mobile == m)
 				{
@@ -4183,18 +4009,18 @@ namespace Server.Network
 
 		public SecureTradeContainer FindTradeContainer(Mobile m)
 		{
-			for (var i = 0; i < m_Trades.Count; ++i)
+			for (var i = 0; i < Trades.Count; ++i)
 			{
-				var trade = m_Trades[i];
+				var trade = Trades[i];
 
 				var from = trade.From;
 				var to = trade.To;
 
-				if (from.Mobile == m_Mobile && to.Mobile == m)
+				if (from.Mobile == Mobile && to.Mobile == m)
 				{
 					return from.Container;
 				}
-				else if (from.Mobile == m && to.Mobile == m_Mobile)
+				else if (from.Mobile == m && to.Mobile == Mobile)
 				{
 					return to.Container;
 				}
@@ -4205,55 +4031,33 @@ namespace Server.Network
 
 		public SecureTradeContainer AddTrade(NetState state)
 		{
-			var newTrade = new SecureTrade(m_Mobile, state.m_Mobile);
+			var newTrade = new SecureTrade(Mobile, state.Mobile);
 
-			m_Trades.Add(newTrade);
-			state.m_Trades.Add(newTrade);
+			Trades.Add(newTrade);
+			state.Trades.Add(newTrade);
 
 			return newTrade.From.Container;
 		}
 
-		public bool CompressionEnabled
-		{
-			get => m_CompressionEnabled;
-			set => m_CompressionEnabled = value;
-		}
+		public bool CompressionEnabled { get; set; }
 
-		public int Sequence
-		{
-			get => m_Sequence;
-			set => m_Sequence = value;
-		}
+		public int Sequence { get; set; }
 
-		public List<Gump> Gumps => m_Gumps;
+		public List<Gump> Gumps { get; private set; }
 
-		public List<HuePicker> HuePickers => m_HuePickers;
+		public List<HuePicker> HuePickers { get; private set; }
 
-		public List<IMenu> Menus => m_Menus;
+		public List<IMenu> Menus { get; private set; }
 
-		private static int m_GumpCap = 512, m_HuePickerCap = 512, m_MenuCap = 512;
+		public static int GumpCap { get; set; } = 512;
 
-		public static int GumpCap
-		{
-			get => m_GumpCap;
-			set => m_GumpCap = value;
-		}
+		public static int HuePickerCap { get; set; } = 512;
 
-		public static int HuePickerCap
-		{
-			get => m_HuePickerCap;
-			set => m_HuePickerCap = value;
-		}
-
-		public static int MenuCap
-		{
-			get => m_MenuCap;
-			set => m_MenuCap = value;
-		}
+		public static int MenuCap { get; set; } = 512;
 
 		public void WriteConsole(string text)
 		{
-			Console.WriteLine("Client: {0}: {1}", this, text);
+			Console.WriteLine($"Client: {this}: {text}");
 		}
 
 		public void WriteConsole(string format, params object[] args)
@@ -4263,14 +4067,11 @@ namespace Server.Network
 
 		public void AddMenu(IMenu menu)
 		{
-			if (m_Menus == null)
-			{
-				m_Menus = new List<IMenu>();
-			}
+			Menus ??= new List<IMenu>();
 
-			if (m_Menus.Count < m_MenuCap)
+			if (Menus.Count < MenuCap)
 			{
-				m_Menus.Add(menu);
+				Menus.Add(menu);
 			}
 			else
 			{
@@ -4281,38 +4082,26 @@ namespace Server.Network
 
 		public void RemoveMenu(IMenu menu)
 		{
-			if (m_Menus != null)
-			{
-				m_Menus.Remove(menu);
-			}
+			_ = Menus?.Remove(menu);
 		}
 
 		public void RemoveMenu(int index)
 		{
-			if (m_Menus != null)
-			{
-				m_Menus.RemoveAt(index);
-			}
+			Menus?.RemoveAt(index);
 		}
 
 		public void ClearMenus()
 		{
-			if (m_Menus != null)
-			{
-				m_Menus.Clear();
-			}
+			Menus?.Clear();
 		}
 
 		public void AddHuePicker(HuePicker huePicker)
 		{
-			if (m_HuePickers == null)
-			{
-				m_HuePickers = new List<HuePicker>();
-			}
+			HuePickers ??= new List<HuePicker>();
 
-			if (m_HuePickers.Count < m_HuePickerCap)
+			if (HuePickers.Count < HuePickerCap)
 			{
-				m_HuePickers.Add(huePicker);
+				HuePickers.Add(huePicker);
 			}
 			else
 			{
@@ -4323,38 +4112,26 @@ namespace Server.Network
 
 		public void RemoveHuePicker(HuePicker huePicker)
 		{
-			if (m_HuePickers != null)
-			{
-				m_HuePickers.Remove(huePicker);
-			}
+			_ = HuePickers?.Remove(huePicker);
 		}
 
 		public void RemoveHuePicker(int index)
 		{
-			if (m_HuePickers != null)
-			{
-				m_HuePickers.RemoveAt(index);
-			}
+			HuePickers?.RemoveAt(index);
 		}
 
 		public void ClearHuePickers()
 		{
-			if (m_HuePickers != null)
-			{
-				m_HuePickers.Clear();
-			}
+			HuePickers?.Clear();
 		}
 
 		public void AddGump(Gump gump)
 		{
-			if (m_Gumps == null)
-			{
-				m_Gumps = new List<Gump>();
-			}
+			Gumps ??= new List<Gump>();
 
-			if (m_Gumps.Count < m_GumpCap)
+			if (Gumps.Count < GumpCap)
 			{
-				m_Gumps.Add(gump);
+				Gumps.Add(gump);
 			}
 			else
 			{
@@ -4365,26 +4142,17 @@ namespace Server.Network
 
 		public void RemoveGump(Gump gump)
 		{
-			if (m_Gumps != null)
-			{
-				m_Gumps.Remove(gump);
-			}
+			_ = Gumps?.Remove(gump);
 		}
 
 		public void RemoveGump(int index)
 		{
-			if (m_Gumps != null)
-			{
-				m_Gumps.RemoveAt(index);
-			}
+			Gumps?.RemoveAt(index);
 		}
 
 		public void ClearGumps()
 		{
-			if (m_Gumps != null)
-			{
-				m_Gumps.Clear();
-			}
+			Gumps?.Clear();
 		}
 
 		public void LaunchBrowser(string url)
@@ -4393,93 +4161,71 @@ namespace Server.Network
 			Send(new LaunchBrowser(url));
 		}
 
-		public CityInfo[] CityInfo
-		{
-			get => m_CityInfo;
-			set => m_CityInfo = value;
-		}
+		public CityInfo[] CityInfo { get; set; }
 
-		public Mobile Mobile
-		{
-			get => m_Mobile;
-			set => m_Mobile = value;
-		}
+		public Mobile Mobile { get; set; }
 
-		public ServerInfo[] ServerInfo
-		{
-			get => m_ServerInfo;
-			set => m_ServerInfo = value;
-		}
+		public ServerInfo[] ServerInfo { get; set; }
 
-		public IAccount Account
-		{
-			get => m_Account;
-			set => m_Account = value;
-		}
+		public IAccount Account { get; set; }
 
 		public override string ToString()
 		{
 			return m_ToString;
 		}
 
-		private static readonly List<NetState> m_Instances = new List<NetState>();
+		public static List<NetState> Instances { get; } = new List<NetState>();
 
-		public static List<NetState> Instances => m_Instances;
-
-		private static readonly BufferPool m_ReceiveBufferPool = new BufferPool("Receive", 2048, 2048);
+		private static readonly BufferPool m_ReceiveBufferPool = new("Receive", 2048, 2048);
 
 		public NetState(Socket socket, MessagePump messagePump)
 		{
-			m_Socket = socket;
-			m_Buffer = new ByteQueue();
-			m_Seeded = false;
-			m_Running = false;
+			Socket = socket;
+			Buffer = new ByteQueue();
+			Seeded = false;
+			Running = false;
 			m_RecvBuffer = m_ReceiveBufferPool.AcquireBuffer();
 			m_MessagePump = messagePump;
-			m_Gumps = new List<Gump>();
-			m_HuePickers = new List<HuePicker>();
-			m_Menus = new List<IMenu>();
-			m_Trades = new List<SecureTrade>();
+			Gumps = new List<Gump>();
+			HuePickers = new List<HuePicker>();
+			Menus = new List<IMenu>();
+			Trades = new List<SecureTrade>();
 
 			m_SendQueue = new SendQueue();
 
 			m_NextCheckActivity = Core.TickCount + 30000;
 
-			m_Instances.Add(this);
+			Instances.Add(this);
 
 			try
 			{
-				m_Address = Utility.Intern(((IPEndPoint)m_Socket.RemoteEndPoint).Address);
-				m_ToString = m_Address.ToString();
+				Address = Utility.Intern(((IPEndPoint)Socket.RemoteEndPoint).Address);
+				m_ToString = Address.ToString();
 			}
 			catch (Exception ex)
 			{
 				TraceException(ex);
-				m_Address = IPAddress.None;
+				Address = IPAddress.None;
 				m_ToString = "(error)";
 			}
 
-			m_ConnectedOn = DateTime.UtcNow;
+			ConnectedOn = DateTime.UtcNow;
 
-			if (m_CreatedCallback != null)
-			{
-				m_CreatedCallback(this);
-			}
+			CreatedCallback?.Invoke(this);
 		}
 
 		private bool _sending;
-		private readonly object _sendL = new object();
+		private readonly object _sendL = new();
 
 		public virtual void Send(Packet p)
 		{
-			if (m_Socket == null || m_BlockAllPackets)
+			if (Socket == null || BlockAllPackets)
 			{
 				p.OnSend();
 				return;
 			}
 
-			int length;
-			var buffer = p.Compile(m_CompressionEnabled, out length);
+			var buffer = p.Compile(CompressionEnabled, out var length);
 
 			if (buffer != null)
 			{
@@ -4496,15 +4242,9 @@ namespace Server.Network
 					prof = PacketSendProfile.Acquire(p.GetType());
 				}
 
-				if (prof != null)
-				{
-					prof.Start();
-				}
+				prof?.Start();
 
-				if (m_Encoder != null)
-				{
-					m_Encoder.EncodeOutgoingPacket(this, ref buffer, ref length);
-				}
+				PacketEncoder?.EncodeOutgoingPacket(this, ref buffer, ref length);
 
 				try
 				{
@@ -4520,250 +4260,51 @@ namespace Server.Network
 						if (gram != null && !_sending)
 						{
 							_sending = true;
-#if NewAsyncSockets
-							m_SendEventArgs.SetBuffer( gram.Buffer, 0, gram.Length );
-							Send_Start();
-#else
+
 							try
 							{
-								m_Socket.BeginSend(gram.Buffer, 0, gram.Length, SocketFlags.None, m_OnSend, m_Socket);
+								_ = Socket.BeginSend(gram.Buffer, 0, gram.Length, SocketFlags.None, m_OnSend, Socket);
 							}
 							catch (Exception ex)
 							{
 								TraceException(ex);
 								Dispose(false);
 							}
-#endif
 						}
 					}
 				}
 				catch (CapacityExceededException)
 				{
-					Console.WriteLine("Client: {0}: Too much data pending, disconnecting...", this);
+					Console.WriteLine($"Client: {this}: Too much data pending, disconnecting...");
 					Dispose(false);
 				}
 
 				p.OnSend();
 
-				if (prof != null)
-				{
-					prof.Finish(length);
-				}
+				prof?.Finish(length);
 			}
 			else
 			{
-				Console.WriteLine("Client: {0}: null buffer send, disconnecting...", this);
+				Console.WriteLine($"Client: {this}: null buffer send, disconnecting...");
+
 				using (var op = new StreamWriter("null_send.log", true))
 				{
-					op.WriteLine("{0} Client: {1}: null buffer send, disconnecting...", DateTime.UtcNow, this);
+					op.WriteLine($"{DateTime.UtcNow} Client: {this}: null buffer send, disconnecting...");
 					op.WriteLine(new System.Diagnostics.StackTrace());
 				}
+
 				Dispose();
 			}
 		}
-
-#if NewAsyncSockets
-		public void Start() {
-			m_ReceiveEventArgs = new SocketAsyncEventArgs();
-			m_ReceiveEventArgs.Completed += new EventHandler<SocketAsyncEventArgs>( Receive_Completion );
-			m_ReceiveEventArgs.SetBuffer( m_RecvBuffer, 0, m_RecvBuffer.Length );
-
-			m_SendEventArgs = new SocketAsyncEventArgs();
-			m_SendEventArgs.Completed += new EventHandler<SocketAsyncEventArgs>( Send_Completion );
-
-			m_Running = true;
-
-			if ( m_Socket == null || m_Paused ) {
-				return;
-			}
-
-			Receive_Start();
-		}
-
-		private void Receive_Start()
-		{
-			try {
-				bool result = false;
-
-				do {
-					lock ( m_AsyncLock ) {
-						if ( ( m_AsyncState & ( AsyncState.Pending | AsyncState.Paused ) ) == 0 ) {
-							m_AsyncState |= AsyncState.Pending;
-							result = !m_Socket.ReceiveAsync( m_ReceiveEventArgs );
-
-							if ( result )
-								Receive_Process( m_ReceiveEventArgs );
-						}
-					}
-				} while ( result );
-			} catch ( Exception ex ) {
-				TraceException( ex );
-				Dispose( false );
-			}
-		}
-
-		private void Receive_Completion( object sender, SocketAsyncEventArgs e )
-		{
-			Receive_Process( e );
-
-			if ( !m_Disposing )
-				Receive_Start();
-		}
-
-		private void Receive_Process( SocketAsyncEventArgs e )
-		{
-			int byteCount = e.BytesTransferred;
-
-			if ( e.SocketError != SocketError.Success || byteCount <= 0 ) {
-				Dispose( false );
-				return;
-			} else if ( m_Disposing ) {
-				return;
-			}
-
-			m_NextCheckActivity = Core.TickCount + 90000;
-
-			byte[] buffer = m_RecvBuffer;
-
-			if ( m_Encoder != null )
-				m_Encoder.DecodeIncomingPacket( this, ref buffer, ref byteCount );
-
-			lock ( m_Buffer )
-				m_Buffer.Enqueue( buffer, 0, byteCount );
-
-			m_MessagePump.OnReceive( this );
-
-			lock ( m_AsyncLock ) {
-				m_AsyncState &= ~AsyncState.Pending;
-			}
-		}
-
-		private void Send_Start()
-		{
-			try {
-				bool result = false;
-
-				do {
-					result = !m_Socket.SendAsync( m_SendEventArgs );
-
-					if ( result )
-						Send_Process( m_SendEventArgs );
-				} while ( result ); 
-			} catch ( Exception ex ) {
-				TraceException( ex );
-				Dispose( false );
-			}
-		}
-
-		private void Send_Completion( object sender, SocketAsyncEventArgs e )
-		{
-			Send_Process( e );
-
-			if ( m_Disposing )
-				return;
-
-			if ( m_CoalesceSleep >= 0 ) {
-				Thread.Sleep( m_CoalesceSleep );
-			}
-
-			SendQueue.Gram gram;
-
-			lock ( m_SendQueue ) {
-				gram = m_SendQueue.Dequeue();
-
-				if (gram == null && m_SendQueue.IsFlushReady)
-					gram = m_SendQueue.CheckFlushReady();
-			}
-
-			if ( gram != null ) {
-				m_SendEventArgs.SetBuffer( gram.Buffer, 0, gram.Length );
-				Send_Start();
-			} else {
-				lock (_sendL)
-					_sending = false;
-			}
-		}
-
-		private void Send_Process( SocketAsyncEventArgs e )
-		{
-			int bytes = e.BytesTransferred;
-
-			if ( e.SocketError != SocketError.Success || bytes <= 0 ) {
-				Dispose( false );
-				return;
-			}
-
-			m_NextCheckActivity = Core.TickCount + 90000;
-		}
-
-		public static void Pause() {
-			m_Paused = true;
-
-			for ( int i = 0; i < m_Instances.Count; ++i ) {
-				NetState ns = m_Instances[i];
-
-				lock ( ns.m_AsyncLock ) {
-					ns.m_AsyncState |= AsyncState.Paused;
-				}
-			}
-		}
-
-		public static void Resume() {
-			m_Paused = false;
-
-			for ( int i = 0; i < m_Instances.Count; ++i ) {
-				NetState ns = m_Instances[i];
-
-				if ( ns.m_Socket == null ) {
-					continue;
-				}
-
-				lock ( ns.m_AsyncLock ) {
-					ns.m_AsyncState &= ~AsyncState.Paused;
-
-					if ( ( ns.m_AsyncState & AsyncState.Pending ) == 0 )
-						ns.Receive_Start();
-				}
-			}
-		}
-
-		public bool Flush() {
-			if ( m_Socket == null )
-					return false;
-
-			lock (_sendL) {
-				if (_sending)
-					return false;
-
-				SendQueue.Gram gram;
-
-				lock ( m_SendQueue ) {
-					if (!m_SendQueue.IsFlushReady)
-						return false;
-
-					gram = m_SendQueue.CheckFlushReady();
-				}
-
-				if ( gram != null ) {
-					_sending = true;
-					m_SendEventArgs.SetBuffer( gram.Buffer, 0, gram.Length );
-					Send_Start();
-				}
-			}
-
-			return false;
-		}
-
-#else
 
 		public void Start()
 		{
 			m_OnReceive = new AsyncCallback(OnReceive);
 			m_OnSend = new AsyncCallback(OnSend);
 
-			m_Running = true;
+			Running = true;
 
-			if (m_Socket == null || m_Paused)
+			if (Socket == null || m_Paused)
 			{
 				return;
 			}
@@ -4789,7 +4330,7 @@ namespace Server.Network
 		{
 			m_AsyncState |= AsyncState.Pending;
 
-			m_Socket.BeginReceive(m_RecvBuffer, 0, m_RecvBuffer.Length, SocketFlags.None, m_OnReceive, m_Socket);
+			_ = Socket.BeginReceive(m_RecvBuffer, 0, m_RecvBuffer.Length, SocketFlags.None, m_OnReceive, Socket);
 		}
 
 		private void OnReceive(IAsyncResult asyncResult)
@@ -4806,14 +4347,11 @@ namespace Server.Network
 
 					var buffer = m_RecvBuffer;
 
-					if (m_Encoder != null)
-					{
-						m_Encoder.DecodeIncomingPacket(this, ref buffer, ref byteCount);
-					}
+					PacketEncoder?.DecodeIncomingPacket(this, ref buffer, ref byteCount);
 
-					lock (m_Buffer)
+					lock (Buffer)
 					{
-						m_Buffer.Enqueue(buffer, 0, byteCount);
+						Buffer.Enqueue(buffer, 0, byteCount);
 					}
 
 					m_MessagePump.OnReceive(this);
@@ -4863,9 +4401,9 @@ namespace Server.Network
 
 				m_NextCheckActivity = Core.TickCount + 90000;
 
-				if (m_CoalesceSleep >= 0)
+				if (CoalesceSleep >= 0)
 				{
-					Thread.Sleep(m_CoalesceSleep);
+					Thread.Sleep(CoalesceSleep);
 				}
 
 				SendQueue.Gram gram;
@@ -4884,7 +4422,7 @@ namespace Server.Network
 				{
 					try
 					{
-						s.BeginSend(gram.Buffer, 0, gram.Length, SocketFlags.None, m_OnSend, s);
+						_ = s.BeginSend(gram.Buffer, 0, gram.Length, SocketFlags.None, m_OnSend, s);
 					}
 					catch (Exception ex)
 					{
@@ -4910,9 +4448,9 @@ namespace Server.Network
 		{
 			m_Paused = true;
 
-			for (var i = 0; i < m_Instances.Count; ++i)
+			for (var i = 0; i < Instances.Count; ++i)
 			{
-				var ns = m_Instances[i];
+				var ns = Instances[i];
 
 				lock (ns.m_AsyncLock)
 				{
@@ -4925,11 +4463,11 @@ namespace Server.Network
 		{
 			m_Paused = false;
 
-			for (var i = 0; i < m_Instances.Count; ++i)
+			for (var i = 0; i < Instances.Count; ++i)
 			{
-				var ns = m_Instances[i];
+				var ns = Instances[i];
 
-				if (ns.m_Socket == null)
+				if (ns.Socket == null)
 				{
 					continue;
 				}
@@ -4956,7 +4494,7 @@ namespace Server.Network
 
 		public bool Flush()
 		{
-			if (m_Socket == null)
+			if (Socket == null)
 			{
 				return false;
 			}
@@ -4985,7 +4523,7 @@ namespace Server.Network
 					try
 					{
 						_sending = true;
-						m_Socket.BeginSend(gram.Buffer, 0, gram.Length, SocketFlags.None, m_OnSend, m_Socket);
+						_ = Socket.BeginSend(gram.Buffer, 0, gram.Length, SocketFlags.None, m_OnSend, Socket);
 						return true;
 					}
 					catch (Exception ex)
@@ -4998,7 +4536,6 @@ namespace Server.Network
 
 			return false;
 		}
-#endif
 
 		public PacketHandler GetHandler(int packetID)
 		{
@@ -5014,32 +4551,26 @@ namespace Server.Network
 
 		public static void FlushAll()
 		{
-			if (m_Instances.Count >= 1024)
+			if (Instances.Count >= 1024)
 			{
-				Parallel.ForEach(m_Instances, ns => ns.Flush());
+				_ = Parallel.ForEach(Instances, ns => ns.Flush());
 			}
 			else
 			{
-				for (var i = 0; i < m_Instances.Count; ++i)
+				for (var i = 0; i < Instances.Count; ++i)
 				{
-					m_Instances[i].Flush();
+					_ = Instances[i].Flush();
 				}
 			}
 		}
 
-		private static int m_CoalesceSleep = -1;
-
-		public static int CoalesceSleep
-		{
-			get => m_CoalesceSleep;
-			set => m_CoalesceSleep = value;
-		}
+		public static int CoalesceSleep { get; set; } = -1;
 
 		private long m_NextCheckActivity;
 
 		public void CheckAlive(long curTicks)
 		{
-			if (m_Socket == null)
+			if (Socket == null)
 			{
 				return;
 			}
@@ -5049,7 +4580,7 @@ namespace Server.Network
 				return;
 			}
 
-			Console.WriteLine("Client: {0}: Disconnecting due to inactivity...", this);
+			Console.WriteLine($"Client: {this}: Disconnecting due to inactivity...");
 
 			Dispose();
 			return;
@@ -5064,15 +4595,14 @@ namespace Server.Network
 
 			try
 			{
-				using (var op = new StreamWriter("network-errors.log", true))
-				{
-					op.WriteLine("# {0}", DateTime.UtcNow);
+				using var op = new StreamWriter("network-errors.log", true);
 
-					op.WriteLine(ex);
+				op.WriteLine($"# {DateTime.UtcNow}");
 
-					op.WriteLine();
-					op.WriteLine();
-				}
+				op.WriteLine(ex);
+
+				op.WriteLine();
+				op.WriteLine();
 			}
 			catch
 			{
@@ -5087,9 +4617,7 @@ namespace Server.Network
 			}
 		}
 
-		private bool m_Disposing;
-
-		public bool IsDisposing => m_Disposing;
+		public bool IsDisposing { get; private set; }
 
 		public void Dispose()
 		{
@@ -5098,21 +4626,21 @@ namespace Server.Network
 
 		public virtual void Dispose(bool flush)
 		{
-			if (m_Socket == null || m_Disposing)
+			if (Socket == null || IsDisposing)
 			{
 				return;
 			}
 
-			m_Disposing = true;
+			IsDisposing = true;
 
 			if (flush)
 			{
-				flush = Flush();
+				_ = Flush();
 			}
 
 			try
 			{
-				m_Socket.Shutdown(SocketShutdown.Both);
+				Socket.Shutdown(SocketShutdown.Both);
 			}
 			catch (SocketException ex)
 			{
@@ -5121,7 +4649,7 @@ namespace Server.Network
 
 			try
 			{
-				m_Socket.Close();
+				Socket.Close();
 			}
 			catch (SocketException ex)
 			{
@@ -5136,20 +4664,15 @@ namespace Server.Network
 				}
 			}
 
-			m_Socket = null;
+			Socket = null;
 
-			m_Buffer = null;
+			Buffer = null;
 			m_RecvBuffer = null;
 
-#if NewAsyncSockets
-			m_ReceiveEventArgs = null;
-			m_SendEventArgs = null;
-#else
 			m_OnReceive = null;
 			m_OnSend = null;
-#endif
 
-			m_Running = false;
+			Running = false;
 
 			lock (m_Disposed)
 			{
@@ -5158,7 +4681,7 @@ namespace Server.Network
 
 			lock (m_SendQueue)
 			{
-				if ( /*!flush &&*/ !m_SendQueue.IsEmpty)
+				if (!m_SendQueue.IsEmpty)
 				{
 					m_SendQueue.Clear();
 				}
@@ -5167,7 +4690,7 @@ namespace Server.Network
 
 		public static void Initialize()
 		{
-			Timer.DelayCall(TimeSpan.FromMinutes(1.0), TimeSpan.FromMinutes(1.5), CheckAllAlive);
+			_ = Timer.DelayCall(TimeSpan.FromMinutes(1.0), TimeSpan.FromMinutes(1.5), CheckAllAlive);
 		}
 
 		public static void CheckAllAlive()
@@ -5176,15 +4699,15 @@ namespace Server.Network
 			{
 				var curTicks = Core.TickCount;
 
-				if (m_Instances.Count >= 1024)
+				if (Instances.Count >= 1024)
 				{
-					Parallel.ForEach(m_Instances, ns => ns.CheckAlive(curTicks));
+					_ = Parallel.ForEach(Instances, ns => ns.CheckAlive(curTicks));
 				}
 				else
 				{
-					for (var i = 0; i < m_Instances.Count; ++i)
+					for (var i = 0; i < Instances.Count; ++i)
 					{
-						m_Instances[i].CheckAlive(curTicks);
+						Instances[i].CheckAlive(curTicks);
 					}
 				}
 			}
@@ -5194,7 +4717,7 @@ namespace Server.Network
 			}
 		}
 
-		private static readonly Queue<NetState> m_Disposed = new Queue<NetState>();
+		private static readonly Queue<NetState> m_Disposed = new();
 
 		public static void ProcessDisposedQueue()
 		{
@@ -5207,47 +4730,43 @@ namespace Server.Network
 					++breakout;
 					var ns = m_Disposed.Dequeue();
 
-					var m = ns.m_Mobile;
-					var a = ns.m_Account;
+					var m = ns.Mobile;
+					var a = ns.Account;
 
 					if (m != null)
 					{
 						m.NetState = null;
-						ns.m_Mobile = null;
+						ns.Mobile = null;
 					}
 
-					ns.m_Gumps.Clear();
-					ns.m_Menus.Clear();
-					ns.m_HuePickers.Clear();
-					ns.m_Account = null;
-					ns.m_ServerInfo = null;
-					ns.m_CityInfo = null;
+					ns.Gumps.Clear();
+					ns.Menus.Clear();
+					ns.HuePickers.Clear();
+					ns.Account = null;
+					ns.ServerInfo = null;
+					ns.CityInfo = null;
 
-					m_Instances.Remove(ns);
+					_ = Instances.Remove(ns);
 
 					if (a != null)
 					{
-						ns.WriteConsole("Disconnected. [{0} Online] [{1}]", m_Instances.Count, a);
+						ns.WriteConsole($"Disconnected. [{Instances.Count} Online] [{a}]");
 					}
 					else
 					{
-						ns.WriteConsole("Disconnected. [{0} Online]", m_Instances.Count);
+						ns.WriteConsole($"Disconnected. [{Instances.Count} Online]");
 					}
 				}
 			}
 		}
 
-		public bool Running => m_Running;
+		public bool Running { get; private set; }
 
-		public bool Seeded
-		{
-			get => m_Seeded;
-			set => m_Seeded = value;
-		}
+		public bool Seeded { get; set; }
 
-		public Socket Socket => m_Socket;
+		public Socket Socket { get; private set; }
 
-		public ByteQueue Buffer => m_Buffer;
+		public ByteQueue Buffer { get; private set; }
 
 		public ExpansionInfo ExpansionInfo
 		{
@@ -5278,10 +4797,10 @@ namespace Server.Network
 
 			if (info.RequiredClient != null)
 			{
-				return (Version >= info.RequiredClient);
+				return Version >= info.RequiredClient;
 			}
 
-			return ((Flags & info.ClientFlags) != 0);
+			return (Flags & info.ClientFlags) != 0;
 		}
 
 		public bool SupportsExpansion(Expansion ex, bool checkCoreExpansion)
@@ -5314,22 +4833,18 @@ namespace Server.Network
 
 	public class EncodedPacketHandler
 	{
-		private readonly int m_PacketID;
-		private readonly bool m_Ingame;
-		private readonly OnEncodedPacketReceive m_OnReceive;
-
 		public EncodedPacketHandler(int packetID, bool ingame, OnEncodedPacketReceive onReceive)
 		{
-			m_PacketID = packetID;
-			m_Ingame = ingame;
-			m_OnReceive = onReceive;
+			PacketID = packetID;
+			Ingame = ingame;
+			OnReceive = onReceive;
 		}
 
-		public int PacketID => m_PacketID;
+		public int PacketID { get; }
 
-		public OnEncodedPacketReceive OnReceive => m_OnReceive;
+		public OnEncodedPacketReceive OnReceive { get; }
 
-		public bool Ingame => m_Ingame;
+		public bool Ingame { get; }
 	}
 
 	public class EncodedReader
@@ -5398,7 +4913,7 @@ namespace Server.Network
 	/// </summary>
 	public class PacketWriter
 	{
-		private static readonly Stack<PacketWriter> m_Pool = new Stack<PacketWriter>();
+		private static readonly Stack<PacketWriter> m_Pool = new();
 
 		public static PacketWriter CreateInstance()
 		{
@@ -5418,15 +4933,12 @@ namespace Server.Network
 					if (pw != null)
 					{
 						pw.m_Capacity = capacity;
-						pw.m_Stream.SetLength(0);
+						pw.UnderlyingStream.SetLength(0);
 					}
 				}
 			}
 
-			if (pw == null)
-			{
-				pw = new PacketWriter(capacity);
-			}
+			pw ??= new PacketWriter(capacity);
 
 			return pw;
 		}
@@ -5443,10 +4955,9 @@ namespace Server.Network
 				{
 					try
 					{
-						using (var op = new StreamWriter("neterr.log"))
-						{
-							op.WriteLine("{0}\tInstance pool contains writer", DateTime.UtcNow);
-						}
+						using var op = new StreamWriter("neterr.log");
+
+						op.WriteLine($"{DateTime.UtcNow}\tInstance pool contains writer");
 					}
 					catch
 					{
@@ -5455,11 +4966,6 @@ namespace Server.Network
 				}
 			}
 		}
-
-		/// <summary>
-		/// Internal stream which holds the entire packet.
-		/// </summary>
-		private readonly MemoryStream m_Stream;
 
 		private int m_Capacity;
 
@@ -5481,7 +4987,7 @@ namespace Server.Network
 		/// <param name="capacity">Initial capacity for the internal stream.</param>
 		public PacketWriter(int capacity)
 		{
-			m_Stream = new MemoryStream(capacity);
+			UnderlyingStream = new MemoryStream(capacity);
 			m_Capacity = capacity;
 		}
 
@@ -5490,7 +4996,7 @@ namespace Server.Network
 		/// </summary>
 		public void Write(bool value)
 		{
-			m_Stream.WriteByte((byte)(value ? 1 : 0));
+			UnderlyingStream.WriteByte((byte)(value ? 1 : 0));
 		}
 
 		/// <summary>
@@ -5498,7 +5004,7 @@ namespace Server.Network
 		/// </summary>
 		public void Write(byte value)
 		{
-			m_Stream.WriteByte(value);
+			UnderlyingStream.WriteByte(value);
 		}
 
 		/// <summary>
@@ -5506,7 +5012,7 @@ namespace Server.Network
 		/// </summary>
 		public void Write(sbyte value)
 		{
-			m_Stream.WriteByte((byte)value);
+			UnderlyingStream.WriteByte((byte)value);
 		}
 
 		/// <summary>
@@ -5517,7 +5023,7 @@ namespace Server.Network
 			m_Buffer[0] = (byte)(value >> 8);
 			m_Buffer[1] = (byte)value;
 
-			m_Stream.Write(m_Buffer, 0, 2);
+			UnderlyingStream.Write(m_Buffer, 0, 2);
 		}
 
 		/// <summary>
@@ -5528,7 +5034,7 @@ namespace Server.Network
 			m_Buffer[0] = (byte)(value >> 8);
 			m_Buffer[1] = (byte)value;
 
-			m_Stream.Write(m_Buffer, 0, 2);
+			UnderlyingStream.Write(m_Buffer, 0, 2);
 		}
 
 		/// <summary>
@@ -5541,7 +5047,7 @@ namespace Server.Network
 			m_Buffer[2] = (byte)(value >> 8);
 			m_Buffer[3] = (byte)value;
 
-			m_Stream.Write(m_Buffer, 0, 4);
+			UnderlyingStream.Write(m_Buffer, 0, 4);
 		}
 
 		/// <summary>
@@ -5554,7 +5060,7 @@ namespace Server.Network
 			m_Buffer[2] = (byte)(value >> 8);
 			m_Buffer[3] = (byte)value;
 
-			m_Stream.Write(m_Buffer, 0, 4);
+			UnderlyingStream.Write(m_Buffer, 0, 4);
 		}
 
 		/// <summary>
@@ -5562,7 +5068,7 @@ namespace Server.Network
 		/// </summary>
 		public void Write(byte[] buffer, int offset, int size)
 		{
-			m_Stream.Write(buffer, offset, size);
+			UnderlyingStream.Write(buffer, offset, size);
 		}
 
 		/// <summary>
@@ -5578,29 +5084,17 @@ namespace Server.Network
 
 			var length = value.Length;
 
-			m_Stream.SetLength(m_Stream.Length + size);
+			UnderlyingStream.SetLength(UnderlyingStream.Length + size);
 
 			if (length >= size)
 			{
-				m_Stream.Position += Encoding.ASCII.GetBytes(value, 0, size, m_Stream.GetBuffer(), (int)m_Stream.Position);
+				UnderlyingStream.Position += Encoding.ASCII.GetBytes(value, 0, size, UnderlyingStream.GetBuffer(), (int)UnderlyingStream.Position);
 			}
 			else
 			{
-				Encoding.ASCII.GetBytes(value, 0, length, m_Stream.GetBuffer(), (int)m_Stream.Position);
-				m_Stream.Position += size;
+				_ = Encoding.ASCII.GetBytes(value, 0, length, UnderlyingStream.GetBuffer(), (int)UnderlyingStream.Position);
+				UnderlyingStream.Position += size;
 			}
-
-			/*byte[] buffer = Encoding.ASCII.GetBytes( value );
-
-			if ( buffer.Length >= size )
-			{
-				m_Stream.Write( buffer, 0, size );
-			}
-			else
-			{
-				m_Stream.Write( buffer, 0, buffer.Length );
-				Fill( size - buffer.Length );
-			}*/
 		}
 
 		/// <summary>
@@ -5616,15 +5110,10 @@ namespace Server.Network
 
 			var length = value.Length;
 
-			m_Stream.SetLength(m_Stream.Length + length + 1);
+			UnderlyingStream.SetLength(UnderlyingStream.Length + length + 1);
 
-			Encoding.ASCII.GetBytes(value, 0, length, m_Stream.GetBuffer(), (int)m_Stream.Position);
-			m_Stream.Position += length + 1;
-
-			/*byte[] buffer = Encoding.ASCII.GetBytes( value );
-
-			m_Stream.Write( buffer, 0, buffer.Length );
-			m_Stream.WriteByte( 0 );*/
+			_ = Encoding.ASCII.GetBytes(value, 0, length, UnderlyingStream.GetBuffer(), (int)UnderlyingStream.Position);
+			UnderlyingStream.Position += length + 1;
 		}
 
 		/// <summary>
@@ -5640,18 +5129,10 @@ namespace Server.Network
 
 			var length = value.Length;
 
-			m_Stream.SetLength(m_Stream.Length + ((length + 1) * 2));
+			UnderlyingStream.SetLength(UnderlyingStream.Length + ((length + 1) * 2));
 
-			m_Stream.Position += Encoding.Unicode.GetBytes(value, 0, length, m_Stream.GetBuffer(), (int)m_Stream.Position);
-			m_Stream.Position += 2;
-
-			/*byte[] buffer = Encoding.Unicode.GetBytes( value );
-
-			m_Stream.Write( buffer, 0, buffer.Length );
-
-			m_Buffer[0] = 0;
-			m_Buffer[1] = 0;
-			m_Stream.Write( m_Buffer, 0, 2 );*/
+			UnderlyingStream.Position += Encoding.Unicode.GetBytes(value, 0, length, UnderlyingStream.GetBuffer(), (int)UnderlyingStream.Position);
+			UnderlyingStream.Position += 2;
 		}
 
 		/// <summary>
@@ -5669,31 +5150,17 @@ namespace Server.Network
 
 			var length = value.Length;
 
-			m_Stream.SetLength(m_Stream.Length + size);
+			UnderlyingStream.SetLength(UnderlyingStream.Length + size);
 
-			if ((length * 2) >= size)
+			if (length * 2 >= size)
 			{
-				m_Stream.Position += Encoding.Unicode.GetBytes(value, 0, length, m_Stream.GetBuffer(), (int)m_Stream.Position);
+				UnderlyingStream.Position += Encoding.Unicode.GetBytes(value, 0, length, UnderlyingStream.GetBuffer(), (int)UnderlyingStream.Position);
 			}
 			else
 			{
-				Encoding.Unicode.GetBytes(value, 0, length, m_Stream.GetBuffer(), (int)m_Stream.Position);
-				m_Stream.Position += size;
+				_ = Encoding.Unicode.GetBytes(value, 0, length, UnderlyingStream.GetBuffer(), (int)UnderlyingStream.Position);
+				UnderlyingStream.Position += size;
 			}
-
-			/*size *= 2;
-
-			byte[] buffer = Encoding.Unicode.GetBytes( value );
-
-			if ( buffer.Length >= size )
-			{
-				m_Stream.Write( buffer, 0, size );
-			}
-			else
-			{
-				m_Stream.Write( buffer, 0, buffer.Length );
-				Fill( size - buffer.Length );
-			}*/
 		}
 
 		/// <summary>
@@ -5709,18 +5176,10 @@ namespace Server.Network
 
 			var length = value.Length;
 
-			m_Stream.SetLength(m_Stream.Length + ((length + 1) * 2));
+			UnderlyingStream.SetLength(UnderlyingStream.Length + ((length + 1) * 2));
 
-			m_Stream.Position += Encoding.BigEndianUnicode.GetBytes(value, 0, length, m_Stream.GetBuffer(), (int)m_Stream.Position);
-			m_Stream.Position += 2;
-
-			/*byte[] buffer = Encoding.BigEndianUnicode.GetBytes( value );
-
-			m_Stream.Write( buffer, 0, buffer.Length );
-
-			m_Buffer[0] = 0;
-			m_Buffer[1] = 0;
-			m_Stream.Write( m_Buffer, 0, 2 );*/
+			UnderlyingStream.Position += Encoding.BigEndianUnicode.GetBytes(value, 0, length, UnderlyingStream.GetBuffer(), (int)UnderlyingStream.Position);
+			UnderlyingStream.Position += 2;
 		}
 
 		/// <summary>
@@ -5738,31 +5197,17 @@ namespace Server.Network
 
 			var length = value.Length;
 
-			m_Stream.SetLength(m_Stream.Length + size);
+			UnderlyingStream.SetLength(UnderlyingStream.Length + size);
 
-			if ((length * 2) >= size)
+			if (length * 2 >= size)
 			{
-				m_Stream.Position += Encoding.BigEndianUnicode.GetBytes(value, 0, length, m_Stream.GetBuffer(), (int)m_Stream.Position);
+				UnderlyingStream.Position += Encoding.BigEndianUnicode.GetBytes(value, 0, length, UnderlyingStream.GetBuffer(), (int)UnderlyingStream.Position);
 			}
 			else
 			{
-				Encoding.BigEndianUnicode.GetBytes(value, 0, length, m_Stream.GetBuffer(), (int)m_Stream.Position);
-				m_Stream.Position += size;
+				_ = Encoding.BigEndianUnicode.GetBytes(value, 0, length, UnderlyingStream.GetBuffer(), (int)UnderlyingStream.Position);
+				UnderlyingStream.Position += size;
 			}
-
-			/*size *= 2;
-
-			byte[] buffer = Encoding.BigEndianUnicode.GetBytes( value );
-
-			if ( buffer.Length >= size )
-			{
-				m_Stream.Write( buffer, 0, size );
-			}
-			else
-			{
-				m_Stream.Write( buffer, 0, buffer.Length );
-				Fill( size - buffer.Length );
-			}*/
 		}
 
 		/// <summary>
@@ -5770,7 +5215,7 @@ namespace Server.Network
 		/// </summary>
 		public void Fill()
 		{
-			Fill((int)(m_Capacity - m_Stream.Length));
+			Fill((int)(m_Capacity - UnderlyingStream.Length));
 		}
 
 		/// <summary>
@@ -5778,42 +5223,42 @@ namespace Server.Network
 		/// </summary>
 		public void Fill(int length)
 		{
-			if (m_Stream.Position == m_Stream.Length)
+			if (UnderlyingStream.Position == UnderlyingStream.Length)
 			{
-				m_Stream.SetLength(m_Stream.Length + length);
-				m_Stream.Seek(0, SeekOrigin.End);
+				UnderlyingStream.SetLength(UnderlyingStream.Length + length);
+				_ = UnderlyingStream.Seek(0, SeekOrigin.End);
 			}
 			else
 			{
-				m_Stream.Write(new byte[length], 0, length);
+				UnderlyingStream.Write(new byte[length], 0, length);
 			}
 		}
 
 		/// <summary>
 		/// Gets the total stream length.
 		/// </summary>
-		public long Length => m_Stream.Length;
+		public long Length => UnderlyingStream.Length;
 
 		/// <summary>
 		/// Gets or sets the current stream position.
 		/// </summary>
 		public long Position
 		{
-			get => m_Stream.Position;
-			set => m_Stream.Position = value;
+			get => UnderlyingStream.Position;
+			set => UnderlyingStream.Position = value;
 		}
 
 		/// <summary>
 		/// The internal stream used by this PacketWriter instance.
 		/// </summary>
-		public MemoryStream UnderlyingStream => m_Stream;
+		public MemoryStream UnderlyingStream { get; }
 
 		/// <summary>
 		/// Offsets the current position from an origin.
 		/// </summary>
 		public long Seek(long offset, SeekOrigin origin)
 		{
-			return m_Stream.Seek(offset, origin);
+			return UnderlyingStream.Seek(offset, origin);
 		}
 
 		/// <summary>
@@ -5821,48 +5266,44 @@ namespace Server.Network
 		/// </summary>
 		public byte[] ToArray()
 		{
-			return m_Stream.ToArray();
+			return UnderlyingStream.ToArray();
 		}
 	}
 
 	public class PacketReader
 	{
-		private readonly byte[] m_Data;
-		private readonly int m_Size;
 		private int m_Index;
 
 		public PacketReader(byte[] data, int size, bool fixedSize)
 		{
-			m_Data = data;
-			m_Size = size;
+			Buffer = data;
+			Size = size;
 			m_Index = fixedSize ? 1 : 3;
 		}
 
-		public byte[] Buffer => m_Data;
+		public byte[] Buffer { get; }
 
-		public int Size => m_Size;
+		public int Size { get; }
 
 		public void Trace(NetState state)
 		{
 			try
 			{
-				using (var sw = new StreamWriter("Packets.log", true))
+				using var sw = new StreamWriter("Packets.log", true);
+				var buffer = Buffer;
+
+				if (buffer.Length > 0)
 				{
-					var buffer = m_Data;
-
-					if (buffer.Length > 0)
-					{
-						sw.WriteLine("Client: {0}: Unhandled packet 0x{1:X2}", state, buffer[0]);
-					}
-
-					using (var ms = new MemoryStream(buffer))
-					{
-						Utility.FormatBuffer(sw, ms, buffer.Length);
-					}
-
-					sw.WriteLine();
-					sw.WriteLine();
+					sw.WriteLine($"Client: {state}: Unhandled packet 0x{buffer[0]:X2}");
 				}
+
+				using (var ms = new MemoryStream(buffer))
+				{
+					Utility.FormatBuffer(sw, ms, buffer.Length);
+				}
+
+				sw.WriteLine();
+				sw.WriteLine();
 			}
 			catch
 			{
@@ -5875,83 +5316,103 @@ namespace Server.Network
 			{
 				case SeekOrigin.Begin: m_Index = offset; break;
 				case SeekOrigin.Current: m_Index += offset; break;
-				case SeekOrigin.End: m_Index = m_Size - offset; break;
+				case SeekOrigin.End: m_Index = Size - offset; break;
 			}
 
 			return m_Index;
 		}
 
+		public IEntity ReadEntity()
+		{
+			return World.FindEntity(ReadSerial());
+		}
+
+		public Mobile ReadMobile()
+		{
+			return World.FindMobile(ReadSerial());
+		}
+
+		public Item ReadItem()
+		{
+			return World.FindItem(ReadSerial());
+		}
+
+		public Serial ReadSerial()
+		{
+			return new Serial(ReadInt32());
+		}
+
 		public int ReadInt32()
 		{
-			if ((m_Index + 4) > m_Size)
+			if ((m_Index + 4) > Size)
 			{
 				return 0;
 			}
 
-			return (m_Data[m_Index++] << 24)
-				 | (m_Data[m_Index++] << 16)
-				 | (m_Data[m_Index++] << 8)
-				 | m_Data[m_Index++];
+			return (Buffer[m_Index++] << 24)
+				 | (Buffer[m_Index++] << 16)
+				 | (Buffer[m_Index++] << 8)
+				 | Buffer[m_Index++];
 		}
 
 		public short ReadInt16()
 		{
-			if ((m_Index + 2) > m_Size)
+			if ((m_Index + 2) > Size)
 			{
 				return 0;
 			}
 
-			return (short)((m_Data[m_Index++] << 8) | m_Data[m_Index++]);
+			return (short)((Buffer[m_Index++] << 8) | Buffer[m_Index++]);
 		}
 
 		public byte ReadByte()
 		{
-			if ((m_Index + 1) > m_Size)
+			if ((m_Index + 1) > Size)
 			{
 				return 0;
 			}
 
-			return m_Data[m_Index++];
+			return Buffer[m_Index++];
 		}
 
 		public uint ReadUInt32()
 		{
-			if ((m_Index + 4) > m_Size)
+			if ((m_Index + 4) > Size)
 			{
 				return 0;
 			}
 
-			return (uint)((m_Data[m_Index++] << 24) | (m_Data[m_Index++] << 16) | (m_Data[m_Index++] << 8) | m_Data[m_Index++]);
+			return (uint)((Buffer[m_Index++] << 24) | (Buffer[m_Index++] << 16) | (Buffer[m_Index++] << 8) | Buffer[m_Index++]);
 		}
 
 		public ushort ReadUInt16()
 		{
-			if ((m_Index + 2) > m_Size)
+			if ((m_Index + 2) > Size)
 			{
 				return 0;
 			}
 
-			return (ushort)((m_Data[m_Index++] << 8) | m_Data[m_Index++]);
+			return (ushort)((Buffer[m_Index++] << 8) | Buffer[m_Index++]);
 		}
 
 		public sbyte ReadSByte()
 		{
-			if ((m_Index + 1) > m_Size)
+			if ((m_Index + 1) > Size)
 			{
 				return 0;
 			}
 
-			return (sbyte)m_Data[m_Index++];
+			return (sbyte)Buffer[m_Index++];
 		}
 
 		public bool ReadBoolean()
 		{
-			if ((m_Index + 1) > m_Size)
+			if ((m_Index + 1) > Size)
 			{
 				return false;
 			}
 
-			return (m_Data[m_Index++] != 0);
+			return Buffer[m_Index++] != 0;
 		}
 
 		public string ReadUnicodeStringLE()
@@ -5960,9 +5421,9 @@ namespace Server.Network
 
 			int c;
 
-			while ((m_Index + 1) < m_Size && (c = (m_Data[m_Index++] | (m_Data[m_Index++] << 8))) != 0)
+			while ((m_Index + 1) < Size && (c = Buffer[m_Index++] | (Buffer[m_Index++] << 8)) != 0)
 			{
-				sb.Append((char)c);
+				_ = sb.Append((char)c);
 			}
 
 			return sb.ToString();
@@ -5973,20 +5434,20 @@ namespace Server.Network
 			var bound = m_Index + (fixedLength << 1);
 			var end = bound;
 
-			if (bound > m_Size)
+			if (bound > Size)
 			{
-				bound = m_Size;
+				bound = Size;
 			}
 
 			var sb = new StringBuilder();
 
 			int c;
 
-			while ((m_Index + 1) < bound && (c = (m_Data[m_Index++] | (m_Data[m_Index++] << 8))) != 0)
+			while ((m_Index + 1) < bound && (c = Buffer[m_Index++] | (Buffer[m_Index++] << 8)) != 0)
 			{
 				if (IsSafeChar(c))
 				{
-					sb.Append((char)c);
+					_ = sb.Append((char)c);
 				}
 			}
 
@@ -6001,11 +5462,11 @@ namespace Server.Network
 
 			int c;
 
-			while ((m_Index + 1) < m_Size && (c = (m_Data[m_Index++] | (m_Data[m_Index++] << 8))) != 0)
+			while ((m_Index + 1) < Size && (c = Buffer[m_Index++] | (Buffer[m_Index++] << 8)) != 0)
 			{
 				if (IsSafeChar(c))
 				{
-					sb.Append((char)c);
+					_ = sb.Append((char)c);
 				}
 			}
 
@@ -6018,11 +5479,11 @@ namespace Server.Network
 
 			int c;
 
-			while ((m_Index + 1) < m_Size && (c = ((m_Data[m_Index++] << 8) | m_Data[m_Index++])) != 0)
+			while ((m_Index + 1) < Size && (c = (Buffer[m_Index++] << 8) | Buffer[m_Index++]) != 0)
 			{
 				if (IsSafeChar(c))
 				{
-					sb.Append((char)c);
+					_ = sb.Append((char)c);
 				}
 			}
 
@@ -6035,40 +5496,39 @@ namespace Server.Network
 
 			int c;
 
-			while ((m_Index + 1) < m_Size && (c = ((m_Data[m_Index++] << 8) | m_Data[m_Index++])) != 0)
+			while ((m_Index + 1) < Size && (c = (Buffer[m_Index++] << 8) | Buffer[m_Index++]) != 0)
 			{
-				sb.Append((char)c);
+				_ = sb.Append((char)c);
 			}
 
 			return sb.ToString();
 		}
 
-		public bool IsSafeChar(int c)
+		public static bool IsSafeChar(int c)
 		{
-			return (c >= 0x20 && c < 0xFFFE);
+			return c is >= 0x20 and < 0xFFFE;
 		}
 
 		public string ReadUTF8StringSafe(int fixedLength)
 		{
-			if (m_Index >= m_Size)
+			if (m_Index >= Size)
 			{
 				m_Index += fixedLength;
 				return String.Empty;
 			}
 
 			var bound = m_Index + fixedLength;
-			//int end   = bound;
 
-			if (bound > m_Size)
+			if (bound > Size)
 			{
-				bound = m_Size;
+				bound = Size;
 			}
 
 			var count = 0;
 			var index = m_Index;
 			var start = m_Index;
 
-			while (index < bound && m_Data[index++] != 0)
+			while (index < bound && Buffer[index++] != 0)
 			{
 				++count;
 			}
@@ -6076,9 +5536,10 @@ namespace Server.Network
 			index = 0;
 
 			var buffer = new byte[count];
-			var value = 0;
 
-			while (m_Index < bound && (value = m_Data[m_Index++]) != 0)
+			int value;
+
+			while (m_Index < bound && (value = Buffer[m_Index++]) != 0)
 			{
 				buffer[index++] = (byte)value;
 			}
@@ -6105,7 +5566,7 @@ namespace Server.Network
 			{
 				if (IsSafeChar(s[i]))
 				{
-					sb.Append(s[i]);
+					_ = sb.Append(s[i]);
 				}
 			}
 
@@ -6114,7 +5575,7 @@ namespace Server.Network
 
 		public string ReadUTF8StringSafe()
 		{
-			if (m_Index >= m_Size)
+			if (m_Index >= Size)
 			{
 				return String.Empty;
 			}
@@ -6122,7 +5583,7 @@ namespace Server.Network
 			var count = 0;
 			var index = m_Index;
 
-			while (index < m_Size && m_Data[index++] != 0)
+			while (index < Size && Buffer[index++] != 0)
 			{
 				++count;
 			}
@@ -6130,9 +5591,10 @@ namespace Server.Network
 			index = 0;
 
 			var buffer = new byte[count];
-			var value = 0;
 
-			while (m_Index < m_Size && (value = m_Data[m_Index++]) != 0)
+			int value;
+
+			while (m_Index < Size && (value = Buffer[m_Index++]) != 0)
 			{
 				buffer[index++] = (byte)value;
 			}
@@ -6157,7 +5619,7 @@ namespace Server.Network
 			{
 				if (IsSafeChar(s[i]))
 				{
-					sb.Append(s[i]);
+					_ = sb.Append(s[i]);
 				}
 			}
 
@@ -6166,7 +5628,7 @@ namespace Server.Network
 
 		public string ReadUTF8String()
 		{
-			if (m_Index >= m_Size)
+			if (m_Index >= Size)
 			{
 				return String.Empty;
 			}
@@ -6174,7 +5636,7 @@ namespace Server.Network
 			var count = 0;
 			var index = m_Index;
 
-			while (index < m_Size && m_Data[index++] != 0)
+			while (index < Size && Buffer[index++] != 0)
 			{
 				++count;
 			}
@@ -6182,9 +5644,8 @@ namespace Server.Network
 			index = 0;
 
 			var buffer = new byte[count];
-			var value = 0;
-
-			while (m_Index < m_Size && (value = m_Data[m_Index++]) != 0)
+			int value;
+			while (m_Index < Size && (value = Buffer[m_Index++]) != 0)
 			{
 				buffer[index++] = (byte)value;
 			}
@@ -6198,9 +5659,9 @@ namespace Server.Network
 
 			int c;
 
-			while (m_Index < m_Size && (c = m_Data[m_Index++]) != 0)
+			while (m_Index < Size && (c = Buffer[m_Index++]) != 0)
 			{
-				sb.Append((char)c);
+				_ = sb.Append((char)c);
 			}
 
 			return sb.ToString();
@@ -6212,11 +5673,11 @@ namespace Server.Network
 
 			int c;
 
-			while (m_Index < m_Size && (c = m_Data[m_Index++]) != 0)
+			while (m_Index < Size && (c = Buffer[m_Index++]) != 0)
 			{
 				if (IsSafeChar(c))
 				{
-					sb.Append((char)c);
+					_ = sb.Append((char)c);
 				}
 			}
 
@@ -6228,20 +5689,20 @@ namespace Server.Network
 			var bound = m_Index + (fixedLength << 1);
 			var end = bound;
 
-			if (bound > m_Size)
+			if (bound > Size)
 			{
-				bound = m_Size;
+				bound = Size;
 			}
 
 			var sb = new StringBuilder();
 
 			int c;
 
-			while ((m_Index + 1) < bound && (c = ((m_Data[m_Index++] << 8) | m_Data[m_Index++])) != 0)
+			while ((m_Index + 1) < bound && (c = (Buffer[m_Index++] << 8) | Buffer[m_Index++]) != 0)
 			{
 				if (IsSafeChar(c))
 				{
-					sb.Append((char)c);
+					_ = sb.Append((char)c);
 				}
 			}
 
@@ -6255,18 +5716,18 @@ namespace Server.Network
 			var bound = m_Index + (fixedLength << 1);
 			var end = bound;
 
-			if (bound > m_Size)
+			if (bound > Size)
 			{
-				bound = m_Size;
+				bound = Size;
 			}
 
 			var sb = new StringBuilder();
 
 			int c;
 
-			while ((m_Index + 1) < bound && (c = ((m_Data[m_Index++] << 8) | m_Data[m_Index++])) != 0)
+			while ((m_Index + 1) < bound && (c = (Buffer[m_Index++] << 8) | Buffer[m_Index++]) != 0)
 			{
-				sb.Append((char)c);
+				_ = sb.Append((char)c);
 			}
 
 			m_Index = end;
@@ -6279,20 +5740,20 @@ namespace Server.Network
 			var bound = m_Index + fixedLength;
 			var end = bound;
 
-			if (bound > m_Size)
+			if (bound > Size)
 			{
-				bound = m_Size;
+				bound = Size;
 			}
 
 			var sb = new StringBuilder();
 
 			int c;
 
-			while (m_Index < bound && (c = m_Data[m_Index++]) != 0)
+			while (m_Index < bound && (c = Buffer[m_Index++]) != 0)
 			{
 				if (IsSafeChar(c))
 				{
-					sb.Append((char)c);
+					_ = sb.Append((char)c);
 				}
 			}
 
@@ -6306,18 +5767,18 @@ namespace Server.Network
 			var bound = m_Index + fixedLength;
 			var end = bound;
 
-			if (bound > m_Size)
+			if (bound > Size)
 			{
-				bound = m_Size;
+				bound = Size;
 			}
 
 			var sb = new StringBuilder();
 
 			int c;
 
-			while (m_Index < bound && (c = m_Data[m_Index++]) != 0)
+			while (m_Index < bound && (c = Buffer[m_Index++]) != 0)
 			{
-				sb.Append((char)c);
+				_ = sb.Append((char)c);
 			}
 
 			m_Index = end;
@@ -6331,26 +5792,18 @@ namespace Server.Network
 	/// </summary>
 	public class Listener : IDisposable
 	{
-		private Socket m_Listener;
+		private static readonly Socket[] m_EmptySockets = Array.Empty<Socket>();
+
+		public static IPEndPoint[] EndPoints { get; set; }
 
 		private readonly Queue<Socket> m_Accepted;
 		private readonly object m_AcceptedSyncRoot;
 
-#if NewAsyncSockets
-		private SocketAsyncEventArgs m_EventArgs;
-#else
 		private readonly AsyncCallback m_OnAccept;
-#endif
 
-		private static readonly Socket[] m_EmptySockets = new Socket[0];
+		private Socket m_Listener;
 
-		private static IPEndPoint[] m_EndPoints;
-
-		public static IPEndPoint[] EndPoints
-		{
-			get => m_EndPoints;
-			set => m_EndPoints = value;
-		}
+		public bool IsListening => m_Listener?.IsBound == true;
 
 		public Listener(IPEndPoint ipep)
 		{
@@ -6366,12 +5819,8 @@ namespace Server.Network
 
 			DisplayListener();
 
-#if NewAsyncSockets
-			m_EventArgs = new SocketAsyncEventArgs();
-			m_EventArgs.Completed += new EventHandler<SocketAsyncEventArgs>( Accept_Completion );
-			Accept_Start();
-#else
 			m_OnAccept = new AsyncCallback(OnAccept);
+
 			try
 			{
 				var res = m_Listener.BeginAccept(m_OnAccept, m_Listener);
@@ -6383,10 +5832,9 @@ namespace Server.Network
 			catch (ObjectDisposedException)
 			{
 			}
-#endif
 		}
 
-		private Socket Bind(IPEndPoint ipep)
+		private static Socket Bind(IPEndPoint ipep)
 		{
 			var s = new Socket(ipep.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 
@@ -6402,17 +5850,15 @@ namespace Server.Network
 			}
 			catch (Exception e)
 			{
-				if (e is SocketException)
+				if (e is SocketException se)
 				{
-					var se = (SocketException)e;
-
-					if (se.ErrorCode == 10048)
-					{ // WSAEADDRINUSE
-						Console.WriteLine("Listener Failed: {0}:{1} (In Use)", ipep.Address, ipep.Port);
+					if (se.ErrorCode == 10048) // WSAEADDRINUSE
+					{
+						Console.WriteLine($"Listener Failed: {ipep.Address}:{ipep.Port} (In Use)");
 					}
-					else if (se.ErrorCode == 10049)
-					{ // WSAEADDRNOTAVAIL
-						Console.WriteLine("Listener Failed: {0}:{1} (Unavailable)", ipep.Address, ipep.Port);
+					else if (se.ErrorCode == 10049) // WSAEADDRNOTAVAIL
+					{
+						Console.WriteLine($"Listener Failed: {ipep.Address}:{ipep.Port} (Unavailable)");
 					}
 					else
 					{
@@ -6427,9 +5873,7 @@ namespace Server.Network
 
 		private void DisplayListener()
 		{
-			var ipep = m_Listener.LocalEndPoint as IPEndPoint;
-
-			if (ipep == null)
+			if (m_Listener.LocalEndPoint is not IPEndPoint ipep)
 			{
 				return;
 			}
@@ -6437,73 +5881,25 @@ namespace Server.Network
 			if (ipep.Address.Equals(IPAddress.Any) || ipep.Address.Equals(IPAddress.IPv6Any))
 			{
 				var adapters = NetworkInterface.GetAllNetworkInterfaces();
+
 				foreach (var adapter in adapters)
 				{
 					var properties = adapter.GetIPProperties();
+
 					foreach (IPAddressInformation unicast in properties.UnicastAddresses)
 					{
 						if (ipep.AddressFamily == unicast.Address.AddressFamily)
 						{
-							Console.WriteLine("Listening: {0}:{1}", unicast.Address, ipep.Port);
+							Console.WriteLine($"Listening: {unicast.Address}:{ipep.Port}");
 						}
 					}
 				}
-				/*
-				try {
-					Console.WriteLine( "Listening: {0}:{1}", IPAddress.Loopback, ipep.Port );
-					IPHostEntry iphe = Dns.GetHostEntry( Dns.GetHostName() );
-					IPAddress[] ip = iphe.AddressList;
-					for ( int i = 0; i < ip.Length; ++i )
-						Console.WriteLine( "Listening: {0}:{1}", ip[i], ipep.Port );
-				}
-				catch { }
-				*/
 			}
 			else
 			{
-				Console.WriteLine("Listening: {0}:{1}", ipep.Address, ipep.Port);
+				Console.WriteLine($"Listening: {ipep.Address}:{ipep.Port}");
 			}
 		}
-
-#if NewAsyncSockets
-		private void Accept_Start()
-		{
-			bool result = false;
-
-			do {
-				try {
-					result = !m_Listener.AcceptAsync( m_EventArgs );
-				} catch ( SocketException ex ) {
-					NetState.TraceException( ex );
-					break;
-				} catch ( ObjectDisposedException ) {
-					break;
-				}
-
-				if ( result )
-					Accept_Process( m_EventArgs );
-			} while ( result );
-		}
-
-		private void Accept_Completion( object sender, SocketAsyncEventArgs e )
-		{
-			Accept_Process( e );
-
-			Accept_Start();
-		}
-
-		private void Accept_Process( SocketAsyncEventArgs e )
-		{
-			if ( e.SocketError == SocketError.Success && VerifySocket( e.AcceptSocket ) ) {
-				Enqueue( e.AcceptSocket );
-			} else {
-				Release( e.AcceptSocket );
-			}
-
-			e.AcceptSocket = null;
-		}
-
-#else
 
 		private void OnAccept(IAsyncResult asyncResult)
 		{
@@ -6538,7 +5934,7 @@ namespace Server.Network
 
 			try
 			{
-				listener.BeginAccept(m_OnAccept, listener);
+				_ = listener.BeginAccept(m_OnAccept, listener);
 			}
 			catch (SocketException ex)
 			{
@@ -6548,9 +5944,8 @@ namespace Server.Network
 			{
 			}
 		}
-#endif
 
-		private bool VerifySocket(Socket socket)
+		private static bool VerifySocket(Socket socket)
 		{
 			try
 			{
@@ -6578,7 +5973,7 @@ namespace Server.Network
 			Core.Set();
 		}
 
-		private void Release(Socket socket)
+		private static void Release(Socket socket)
 		{
 			try
 			{
@@ -6621,12 +6016,9 @@ namespace Server.Network
 		{
 			if (disposing)
 			{
-				var socket = Interlocked.Exchange<Socket>(ref m_Listener, null);
+				var socket = Interlocked.Exchange(ref m_Listener, null);
 
-				if (socket != null)
-				{
-					socket.Close();
-				}
+				socket?.Close();
 			}
 		}
 
@@ -6637,80 +6029,90 @@ namespace Server.Network
 		}
 	}
 
-	public class MessagePump
+	public class MessagePump : IDisposable
 	{
-		private Listener[] m_Listeners;
-		private Queue<NetState> m_Queue;
-		private Queue<NetState> m_WorkingQueue;
-		private readonly Queue<NetState> m_Throttled;
+		private volatile ConcurrentQueue<NetState> m_Queue = new();
+		private volatile ConcurrentQueue<NetState> m_WorkingQueue = new();
+		private volatile ConcurrentQueue<NetState> m_Throttled = new();
+
+		private volatile Listener[] m_Listeners = Array.Empty<Listener>();
+
+		public Listener[] Listeners => m_Listeners;
 
 		public MessagePump()
 		{
-			var ipep = Listener.EndPoints;
+		}
 
-			m_Listeners = new Listener[ipep.Length];
+		public void Listen()
+		{
+			var bind = new List<IPEndPoint>(Listener.EndPoints);
+			var list = new List<Listener>(bind.Count);
 
-			var success = false;
+			var retry = 10;
+			var interval = 3000;
 
 			do
 			{
-				for (var i = 0; i < ipep.Length; i++)
+				var i = bind.Count;
+
+				while (--i >= 0)
 				{
-					var l = new Listener(ipep[i]);
-					if (!success && l != null)
+					try
 					{
-						success = true;
+						var l = new Listener(bind[i]);
+
+						if (l.IsListening)
+						{
+							list.Add(l);
+
+							bind.RemoveAt(i);
+						}
 					}
-
-					m_Listeners[i] = l;
+					catch
+					{
+						bind.RemoveAt(i);
+					}
 				}
 
-				if (!success)
+				if (bind.Count > 0 && retry > 0)
 				{
-					Console.WriteLine("Retrying...");
-					Thread.Sleep(10000);
+					Utility.PushColor(ConsoleColor.Yellow);
+					Console.WriteLine("Network Bind Retrying...");
+					Utility.PopColor();
+
+					Thread.Sleep(interval);
 				}
-			} while (!success);
-
-			m_Queue = new Queue<NetState>();
-			m_WorkingQueue = new Queue<NetState>();
-			m_Throttled = new Queue<NetState>();
-		}
-
-		public Listener[] Listeners
-		{
-			get => m_Listeners;
-			set => m_Listeners = value;
-		}
-
-		public void AddListener(Listener l)
-		{
-			var old = m_Listeners;
-
-			m_Listeners = new Listener[old.Length + 1];
-
-			for (var i = 0; i < old.Length; ++i)
-			{
-				m_Listeners[i] = old[i];
 			}
+			while (bind.Count > 0 && --retry >= 0);
 
-			m_Listeners[old.Length] = l;
+			m_Listeners = list.ToArray();
+
+			list.Clear();
+			list.TrimExcess();
+
+			if (m_Listeners.Length == 0)
+			{
+				Utility.PushColor(ConsoleColor.Red);
+				Console.WriteLine("Network Bind Failed!");
+				Utility.PopColor();
+			}
 		}
 
 		private void CheckListener()
 		{
-			for (var j = 0; j < m_Listeners.Length; ++j)
+			foreach (var l in m_Listeners)
 			{
-				var accepted = m_Listeners[j].Slice();
+				var accepted = l.Slice();
 
-				for (var i = 0; i < accepted.Length; ++i)
+				foreach (var s in accepted)
 				{
-					var ns = new NetState(accepted[i], this);
+					var ns = new NetState(s, this);
+
 					ns.Start();
 
 					if (ns.Running)
 					{
-						Console.WriteLine("Client: {0}: Connected. [{1} Online]", ns, NetState.Instances.Count);
+						Console.WriteLine($"Client: {ns}: Connected. [{NetState.Instances.Count} Online]");
 					}
 				}
 			}
@@ -6718,10 +6120,7 @@ namespace Server.Network
 
 		public void OnReceive(NetState ns)
 		{
-			lock (this)
-			{
-				m_Queue.Enqueue(ns);
-			}
+			m_Queue.Enqueue(ns);
 
 			Core.Set();
 		}
@@ -6730,36 +6129,27 @@ namespace Server.Network
 		{
 			CheckListener();
 
-			lock (this)
-			{
-				var temp = m_WorkingQueue;
-				m_WorkingQueue = m_Queue;
-				m_Queue = temp;
-			}
+			(m_Queue, m_WorkingQueue) = (m_WorkingQueue, m_Queue);
 
-			while (m_WorkingQueue.Count > 0)
+			while (m_WorkingQueue.TryDequeue(out var ns))
 			{
-				var ns = m_WorkingQueue.Dequeue();
-
 				if (ns.Running)
 				{
 					HandleReceive(ns);
 				}
 			}
 
-			lock (this)
+			while (m_Throttled.TryDequeue(out var ns))
 			{
-				while (m_Throttled.Count > 0)
-				{
-					m_Queue.Enqueue(m_Throttled.Dequeue());
-				}
+				m_Queue.Enqueue(ns);
 			}
 		}
 
 		private const int BufferSize = 4096;
-		private readonly BufferPool m_Buffers = new BufferPool("Processor", 4, BufferSize);
 
-		private bool HandleSeed(NetState ns, ByteQueue buffer)
+		private readonly BufferPool m_Buffers = new("Processor", 4, BufferSize);
+
+		private static bool HandleSeed(NetState ns, ByteQueue buffer)
 		{
 			if (buffer.GetPacketID() == 0xEF)
 			{
@@ -6768,17 +6158,18 @@ namespace Server.Network
 				ns.Seeded = true;
 				return true;
 			}
-			else if (buffer.Length >= 4)
+
+			if (buffer.Length >= 4)
 			{
 				var m_Peek = new byte[4];
 
-				buffer.Dequeue(m_Peek, 0, 4);
+				_ = buffer.Dequeue(m_Peek, 0, 4);
 
 				var seed = (m_Peek[0] << 24) | (m_Peek[1] << 16) | (m_Peek[2] << 8) | m_Peek[3];
 
 				if (seed == 0)
 				{
-					Console.WriteLine("Login: {0}: Invalid client detected, disconnecting", ns);
+					Console.WriteLine($"Login: {ns}: Invalid client detected, disconnecting");
 					ns.Dispose();
 					return false;
 				}
@@ -6787,20 +6178,19 @@ namespace Server.Network
 				ns.Seeded = true;
 				return true;
 			}
-			else
-			{
-				return false;
-			}
+
+			return false;
 		}
 
-		private bool CheckEncrypted(NetState ns, int packetID)
+		private static bool CheckEncrypted(NetState ns, int packetID)
 		{
 			if (!ns.SentFirstPacket && packetID != 0xF0 && packetID != 0xF1 && packetID != 0xCF && packetID != 0x80 && packetID != 0x91 && packetID != 0xA4 && packetID != 0xEF)
 			{
-				Console.WriteLine("Client: {0}: Encrypted client detected, disconnecting", ns);
+				Console.WriteLine($"Client: {ns}: Encrypted client detected, disconnecting");
 				ns.Dispose();
 				return true;
 			}
+
 			return false;
 		}
 
@@ -6864,76 +6254,116 @@ namespace Server.Network
 						}
 					}
 
-					if (length >= packetLength)
-					{
-						if (handler.Ingame)
-						{
-							if (ns.Mobile == null)
-							{
-								Console.WriteLine("Client: {0}: Sent ingame packet (0x{1:X2}) before having been attached to a mobile", ns, packetID);
-								ns.Dispose();
-								break;
-							}
-							else if (ns.Mobile.Deleted)
-							{
-								ns.Dispose();
-								break;
-							}
-						}
-
-						var throttler = handler.ThrottleCallback;
-
-						if (throttler != null && !throttler(ns))
-						{
-							m_Throttled.Enqueue(ns);
-							return;
-						}
-
-						PacketReceiveProfile prof = null;
-
-						if (Core.Profiling)
-						{
-							prof = PacketReceiveProfile.Acquire(packetID);
-						}
-
-						if (prof != null)
-						{
-							prof.Start();
-						}
-
-						byte[] packetBuffer;
-
-						if (BufferSize >= packetLength)
-						{
-							packetBuffer = m_Buffers.AcquireBuffer();
-						}
-						else
-						{
-							packetBuffer = new byte[packetLength];
-						}
-
-						packetLength = buffer.Dequeue(packetBuffer, 0, packetLength);
-
-						var r = new PacketReader(packetBuffer, packetLength, handler.Length != 0);
-
-						handler.OnReceive(ns, r);
-						length = buffer.Length;
-
-						if (BufferSize >= packetLength)
-						{
-							m_Buffers.ReleaseBuffer(packetBuffer);
-						}
-
-						if (prof != null)
-						{
-							prof.Finish(packetLength);
-						}
-					}
-					else
+					if (length < packetLength)
 					{
 						break;
 					}
+
+					if (handler.Ingame)
+					{
+						if (ns.Mobile == null)
+						{
+							Console.WriteLine("Client: {0}: Sent ingame packet (0x{1:X2}) before having been attached to a mobile", ns, packetID);
+							ns.Dispose();
+							break;
+						}
+
+						if (ns.Mobile.Deleted)
+						{
+							ns.Dispose();
+							break;
+						}
+					}
+
+					var throttler = handler.ThrottleCallback;
+
+					if (throttler != null && !throttler(ns))
+					{
+						m_Throttled.Enqueue(ns);
+						return;
+					}
+
+					PacketReceiveProfile prof = null;
+
+					if (Core.Profiling)
+					{
+						prof = PacketReceiveProfile.Acquire(packetID);
+					}
+
+					prof?.Start();
+
+					byte[] packetBuffer;
+
+					if (BufferSize >= packetLength)
+					{
+						packetBuffer = m_Buffers.AcquireBuffer();
+					}
+					else
+					{
+						packetBuffer = new byte[packetLength];
+					}
+
+					packetLength = buffer.Dequeue(packetBuffer, 0, packetLength);
+
+					var r = new PacketReader(packetBuffer, packetLength, handler.Length != 0);
+
+					try
+					{
+						handler.OnReceive(ns, r);
+					}
+					catch (Exception x)
+					{
+						ns.WriteConsole($"\n{x}");
+					}
+
+					length = buffer.Length;
+
+					if (BufferSize >= packetLength)
+					{
+						m_Buffers.ReleaseBuffer(packetBuffer);
+					}
+
+					prof?.Finish(packetLength);
 				}
+			}
+		}
+
+		public void Dispose()
+		{
+			GC.SuppressFinalize(this);
+
+			try
+			{
+				Slice();
+			}
+			catch
+			{
+			}
+			finally
+			{
+				m_Queue.Clear();
+				m_Queue = null;
+
+				m_WorkingQueue.Clear();
+				m_WorkingQueue = null;
+
+				m_Throttled.Clear();
+				m_Throttled = null;
+
+				foreach (var listener in m_Listeners)
+				{
+					try
+					{
+						listener.Dispose();
+					}
+					catch
+					{
+					}
+				}
+
+				Array.Clear(m_Listeners);
+
+				m_Listeners = null;
 			}
 		}
 	}

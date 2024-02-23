@@ -611,7 +611,7 @@ namespace Server.Engines.Reports
 				lblFormat.FormatFlags |= StringFormatFlags.NoClip;
 
 				// Draw vertical label at the top of y-axis and place it in the middle top of y-axis
-				lblFont = new Font(_fontFamily, _labelFontSize + 2.0f, FontStyle.Bold);
+				lblFont = new Font(_fontFamily, _labelFontSize + 2.0f, System.Drawing.FontStyle.Bold);
 				var recVLabel = new RectangleF(0, _yOrigin - 2 * _spacer - lblFont.Height, _xOrigin * 2, lblFont.Height);
 				sfVLabel.Alignment = StringAlignment.Center;
 				sfVLabel.FormatFlags |= StringFormatFlags.NoClip;
@@ -738,7 +738,7 @@ namespace Server.Engines.Reports
 					};
 					//					sfVLabel.FormatFlags=StringFormatFlags.DirectionVertical;
 
-					lblFont = new Font(_fontFamily, _labelFontSize + 2.0f, FontStyle.Bold);
+					lblFont = new Font(_fontFamily, _labelFontSize + 2.0f, System.Drawing.FontStyle.Bold);
 					graph.DrawString(_xTitle, lblFont, brs, new RectangleF(_xOrigin, _yOrigin + _graphHeight + 14.0f + (_renderMode == BarGraphRenderMode.Bars ? 10.0f : 0.0f) + ((DataPoints.Count / _interval) > 24 ? 16.0f : 0.0f), _graphWidth, 20.0f), lblFormat);
 				}
 
@@ -1337,7 +1337,7 @@ namespace Server.Engines.Reports
 				}
 
 				//Draw Total under legend
-				using (var fntb = new Font(_legendFontStyle, _legendFontSize, FontStyle.Bold))
+				using (var fntb = new Font(_legendFontStyle, _legendFontSize, System.Drawing.FontStyle.Bold))
 				{
 					grp.DrawString("Total", fntb,
 						Brushes.Black, perimeter + _bufferSpace + 30, (_chartItems.Count + 1) * _legendFontHeight, sf);

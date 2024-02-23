@@ -1,6 +1,5 @@
 ﻿using Server.ContextMenus;
 using Server.Engines.PartySystem;
-using Server.Engines.Quests.Definitions;
 using Server.Guilds;
 using Server.Items;
 using Server.Misc;
@@ -1259,49 +1258,14 @@ namespace Server.Items
 				}
 				#endregion
 
-				if (!CheckLoot(from, null))
+				if (CheckLoot(from, null))
 				{
-					return;
+					base.OnDoubleClick(from);
 				}
-
-				#region Quests
-				var player = from as PlayerMobile;
-
-				if (player != null)
-				{
-					var qs = player.Quest;
-
-					if (qs is TheSummoningQuest)
-					{
-						var obj = qs.FindObjective(typeof(VanquishDaemonObjective_TheSummoningQuest)) as VanquishDaemonObjective_TheSummoningQuest;
-
-						if (obj != null && obj.Completed && obj.CorpseWithSkull == this)
-						{
-							var sk = new GoldenSkull();
-
-							if (player.PlaceInBackpack(sk))
-							{
-								obj.CorpseWithSkull = null;
-								player.SendLocalizedMessage(1050022); // For your valor in combating the devourer, you have been awarded a golden skull.
-								qs.Complete();
-							}
-							else
-							{
-								sk.Delete();
-								player.SendLocalizedMessage(1050023); // You find a golden skull, but your backpack is too full to carry it.
-							}
-						}
-					}
-				}
-
-				#endregion
-
-				base.OnDoubleClick(from);
 			}
 			else
 			{
 				from.SendLocalizedMessage(500446); // That is too far away.
-				return;
 			}
 		}
 

@@ -428,7 +428,7 @@ namespace Server.Items
 			}
 		}
 
-		public override void OnMapChange()
+		public override void OnMapChange(Map oldMap)
 		{
 			if (m_Statue != null)
 			{

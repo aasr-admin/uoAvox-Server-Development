@@ -1268,7 +1268,7 @@ namespace Server.Engines.BulkOrders
 		private readonly PlayerMobile m_From;
 		private readonly BulkOrderBook m_Book;
 
-		private const int LabelColor = 0x7FFF;
+		private const short LabelColor16 = 0x7FFF;
 
 		private static readonly int[,] m_MaterialFilters = new int[,]
 			{
@@ -1350,7 +1350,7 @@ namespace Server.Engines.BulkOrders
 					isSelected = (filterValue == 0);
 				}
 
-				AddHtmlLocalized(x + 35 + xOffsets[i % xOffsets.Length], y + ((i / xOffsets.Length) * yOffset), xWidths[i % xOffsets.Length], 32, number, isSelected ? 16927 : LabelColor, false, false);
+				AddHtmlLocalized(x + 35 + xOffsets[i % xOffsets.Length], y + ((i / xOffsets.Length) * yOffset), xWidths[i % xOffsets.Length], 32, number, isSelected ? (short)0x421F : LabelColor16, false, false);
 				AddButton(x + xOffsets[i % xOffsets.Length], y + ((i / xOffsets.Length) * yOffset), 4005, 4007, 4 + filterIndex + (i * 4), GumpButtonType.Reply, 0);
 			}
 		}
@@ -1447,30 +1447,30 @@ namespace Server.Engines.BulkOrders
 			AddImage(5, 424, 10460);
 			AddImage(585, 424, 10460);
 
-			AddHtmlLocalized(270, 32, 200, 32, 1062223, LabelColor, false, false); // Filter Preference
+			AddHtmlLocalized(270, 32, 200, 32, 1062223, LabelColor16, false, false); // Filter Preference
 
-			AddHtmlLocalized(26, 64, 120, 32, 1062228, LabelColor, false, false); // Bulk Order Type
+			AddHtmlLocalized(26, 64, 120, 32, 1062228, LabelColor16, false, false); // Bulk Order Type
 			AddFilterList(25, 96, m_XOffsets_Type, 40, m_TypeFilters, m_XWidths_Small, f.Type, 0);
 
-			AddHtmlLocalized(320, 64, 50, 32, 1062215, LabelColor, false, false); // Quality
+			AddHtmlLocalized(320, 64, 50, 32, 1062215, LabelColor16, false, false); // Quality
 			AddFilterList(320, 96, m_XOffsets_Quality, 40, m_QualityFilters, m_XWidths_Small, f.Quality, 1);
 
-			AddHtmlLocalized(26, 160, 120, 32, 1062232, LabelColor, false, false); // Material Type
+			AddHtmlLocalized(26, 160, 120, 32, 1062232, LabelColor16, false, false); // Material Type
 			AddFilterList(25, 192, m_XOffsets_Material, 40, m_MaterialFilters, m_XWidths_Large, f.Material, 2);
 
-			AddHtmlLocalized(26, 320, 120, 32, 1062217, LabelColor, false, false); // Amount
+			AddHtmlLocalized(26, 320, 120, 32, 1062217, LabelColor16, false, false); // Amount
 			AddFilterList(25, 352, m_XOffsets_Amount, 40, m_AmountFilters, m_XWidths_Small, f.Quantity, 3);
 
-			AddHtmlLocalized(75, 416, 120, 32, 1062477, (from.UseOwnFilter ? LabelColor : 16927), false, false); // Set Book Filter
+			AddHtmlLocalized(75, 416, 120, 32, 1062477, (from.UseOwnFilter ? LabelColor16 : (short)0x421F), false, false); // Set Book Filter
 			AddButton(40, 416, 4005, 4007, 1, GumpButtonType.Reply, 0);
 
-			AddHtmlLocalized(235, 416, 120, 32, 1062478, (from.UseOwnFilter ? 16927 : LabelColor), false, false); // Set Your Filter
+			AddHtmlLocalized(235, 416, 120, 32, 1062478, (from.UseOwnFilter ? (short)0x421F : LabelColor16), false, false); // Set Your Filter
 			AddButton(200, 416, 4005, 4007, 2, GumpButtonType.Reply, 0);
 
-			AddHtmlLocalized(405, 416, 120, 32, 1062231, LabelColor, false, false); // Clear Filter
+			AddHtmlLocalized(405, 416, 120, 32, 1062231, LabelColor16, false, false); // Clear Filter
 			AddButton(370, 416, 4005, 4007, 3, GumpButtonType.Reply, 0);
 
-			AddHtmlLocalized(540, 416, 50, 32, 1011046, LabelColor, false, false); // APPLY
+			AddHtmlLocalized(540, 416, 50, 32, 1011046, LabelColor16, false, false); // APPLY
 			AddButton(505, 416, 4017, 4018, 0, GumpButtonType.Reply, 0);
 		}
 	}

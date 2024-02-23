@@ -58,7 +58,7 @@
 				case 0:
 					{
 						from.SendAsciiMessage("You create a wedge from the block of cheese");
-						from.AddToBackpack(new CheeseWedgeItem(2));
+						from.AddToBackpack(new CheeseWedgeItem());
 						Consume();
 						break;
 					}

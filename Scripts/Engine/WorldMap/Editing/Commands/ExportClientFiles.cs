@@ -53,13 +53,8 @@ namespace Server.Engine.Facet
 
 			Console.Write("Exporting Client Files...");
 
-			foreach (KeyValuePair<int, MapRegistry.MapDefinition> kvp in MapRegistry.Definitions)
+			foreach (var kvp in MapRegistry.Associations)
 			{
-				if (!MapRegistry.MapAssociations.ContainsKey(kvp.Key))
-				{
-					continue;
-				}
-
 				string filename = string.Format("map{0}.mul", kvp.Key);
 
 				GenericWriter writer = new BinaryFileWriter(Path.Combine(FacetEditingSettings.ModifiedClientFilesSavePath, filename), true);
@@ -70,6 +65,7 @@ namespace Server.Engine.Facet
 				int blocks = CurrentMatrix.BlockWidth * CurrentMatrix.BlockHeight;
 
 				for (int xblock = 0; xblock < CurrentMatrix.BlockWidth; xblock++)
+				{
 					for (int yblock = 0; yblock < CurrentMatrix.BlockHeight; yblock++)
 					{
 						writer.Write((uint)0);
@@ -91,18 +87,14 @@ namespace Server.Engine.Facet
 							}
 						}
 					}
+				}
 
 				writer.Close();
 			}
 
 			/* Statics */
-			foreach (KeyValuePair<int, MapRegistry.MapDefinition> kvp in MapRegistry.Definitions)
+			foreach (var kvp in MapRegistry.Associations)
 			{
-				if (!MapRegistry.MapAssociations.ContainsKey(kvp.Key))
-				{
-					continue;
-				}
-
 				string filename = string.Format("statics{0}.mul", kvp.Key);
 
 				GenericWriter staticWriter = new BinaryFileWriter(Path.Combine(FacetEditingSettings.ModifiedClientFilesSavePath, filename), true);

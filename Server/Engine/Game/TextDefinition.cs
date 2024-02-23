@@ -15,7 +15,7 @@ namespace Server
 		public int Number => m_Number;
 		public string String => m_String;
 
-		public bool IsEmpty => (m_Number <= 0 && m_String == null);
+		public bool IsEmpty => m_Number <= 0 && m_String == null;
 
 		public TextDefinition() : this(0, null)
 		{
@@ -39,9 +39,10 @@ namespace Server
 		{
 			if (m_Number > 0)
 			{
-				return String.Concat("#", m_Number.ToString());
+				return $"#{m_Number}";
 			}
-			else if (m_String != null)
+			
+			if (m_String != null)
 			{
 				return m_String;
 			}
@@ -53,14 +54,35 @@ namespace Server
 		{
 			if (m_Number > 0)
 			{
-				return String.Format("{0} (0x{0:X})", m_Number);
+				return $"{m_Number} (0x{m_Number:X})";
 			}
-			else if (m_String != null)
+			
+			if (m_String != null)
 			{
-				return String.Format("\"{0}\"", m_String);
+				return $"\"{m_String}\"";
 			}
 
 			return propsGump ? "-empty-" : "empty";
+		}
+
+		public string Combine()
+		{
+			if (m_Number > 0)
+			{
+				var cli = StringList.Localization.GetEntry(m_Number);
+
+				if (cli != null)
+				{
+					if (m_String != null)
+					{
+						return cli.ToString(m_String);
+					}
+
+					return cli.ToString();
+				}
+			}
+
+			return ToString();
 		}
 
 		public string GetValue()
@@ -69,7 +91,8 @@ namespace Server
 			{
 				return m_Number.ToString();
 			}
-			else if (m_String != null)
+			
+			if (m_String != null)
 			{
 				return m_String;
 			}
@@ -130,37 +153,7 @@ namespace Server
 			}
 		}
 
-		public static implicit operator TextDefinition(int v)
-		{
-			return new TextDefinition(v);
-		}
-
-		public static implicit operator TextDefinition(string s)
-		{
-			return new TextDefinition(s);
-		}
-
-		public static implicit operator int(TextDefinition m)
-		{
-			if (m == null)
-			{
-				return 0;
-			}
-
-			return m.m_Number;
-		}
-
-		public static implicit operator string(TextDefinition m)
-		{
-			if (m == null)
-			{
-				return null;
-			}
-
-			return m.m_String;
-		}
-
-		public static void AddHtmlText(Gump g, int x, int y, int width, int height, TextDefinition def, bool back, bool scroll, int numberColor, int stringColor)
+		public static void AddHtmlText(Gump g, int x, int y, int width, int height, TextDefinition def, bool back, bool scroll, short numberColor, int stringColor)
 		{
 			if (def == null)
 			{
@@ -259,7 +252,7 @@ namespace Server
 
 			if (value.StartsWith("0x"))
 			{
-				isInteger = Int32.TryParse(value.Substring(2), NumberStyles.HexNumber, null, out i);
+				isInteger = Int32.TryParse(value.AsSpan(2), NumberStyles.HexNumber, null, out i);
 			}
 			else
 			{
@@ -268,17 +261,35 @@ namespace Server
 
 			if (isInteger)
 			{
-				return new TextDefinition(i);
+				value = null;
 			}
-			else
-			{
-				return new TextDefinition(value);
-			}
+			
+			return new TextDefinition(i, value);
 		}
 
 		public static bool IsNullOrEmpty(TextDefinition def)
 		{
-			return (def == null || def.IsEmpty);
+			return def?.IsEmpty != false;
+		}
+
+		public static implicit operator TextDefinition(int v)
+		{
+			return new TextDefinition(v);
+		}
+
+		public static implicit operator TextDefinition(string s)
+		{
+			return new TextDefinition(s);
+		}
+
+		public static implicit operator int(TextDefinition m)
+		{
+			return m?.m_Number ?? 0;
+		}
+
+		public static implicit operator string(TextDefinition m)
+		{
+			return m?.m_String;
 		}
 	}
 }

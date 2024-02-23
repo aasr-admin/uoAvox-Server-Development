@@ -420,7 +420,7 @@ namespace Server
 
 				#region Huntsman's Forest
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -478,7 +478,7 @@ namespace Server
 
 					#region Blackthorn Castle
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -495,7 +495,7 @@ namespace Server
 					#endregion
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -524,7 +524,7 @@ namespace Server
 					#endregion
 					#region A Wheatfield in Britain 1
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -541,7 +541,7 @@ namespace Server
 					#endregion
 					#region A Wheatfield in Britain 2
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -558,7 +558,7 @@ namespace Server
 					#endregion
 					#region A Wheatfield in Britain 3
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -575,7 +575,7 @@ namespace Server
 					#endregion
 					#region A Carrot Field in Britain 1
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -592,7 +592,7 @@ namespace Server
 					#endregion
 					#region An Onion Field in Britain 1
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -609,7 +609,7 @@ namespace Server
 					#endregion
 					#region A Cabbage Field in Britain 1
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -626,7 +626,7 @@ namespace Server
 					#endregion
 					#region A Turnip Field in Britain 1
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -643,7 +643,7 @@ namespace Server
 					#endregion
 					#region A Wheatfield in Britain 4
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -660,7 +660,7 @@ namespace Server
 					#endregion
 					#region A Wheatfield in Britain 5
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -677,7 +677,7 @@ namespace Server
 					#endregion
 					#region A Turnip Field in Britain 2
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -694,7 +694,7 @@ namespace Server
 					#endregion
 					#region A Carrot Field in Britain 2
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -770,7 +770,7 @@ namespace Server
 
 						#region 
 
-						new("BaseRegion")
+						new("GenericRegion")
 						{
 							{ "RuneName", "" },
 							{ "NoLogoutDelay", true },
@@ -817,7 +817,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -863,7 +863,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -907,7 +907,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -952,7 +952,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -999,7 +999,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -1016,7 +1016,7 @@ namespace Server
 					#endregion
 					#region A Field of Sheep in Yew 1
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "A Field of Sheep in Yew" },
 						{ "NoLogoutDelay", false },
@@ -1033,7 +1033,7 @@ namespace Server
 					#endregion
 					#region A Field of Sheep in Yew 2
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "A Field of Sheep in Yew" },
 						{ "NoLogoutDelay", false },
@@ -1050,7 +1050,7 @@ namespace Server
 					#endregion
 					#region A Farm in Yew
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "A Farm in Yew" },
 						{ "NoLogoutDelay", false },
@@ -1067,7 +1067,7 @@ namespace Server
 					#endregion
 					#region A Wheatfield in Yew 1
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "A Wheatfield in Yew" },
 						{ "NoLogoutDelay", false },
@@ -1084,7 +1084,7 @@ namespace Server
 					#endregion
 					#region A Wheatfield in Yew 2
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "A Wheatfield in Yew" },
 						{ "NoLogoutDelay", false },
@@ -1131,7 +1131,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -1174,7 +1174,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -1213,7 +1213,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -1254,7 +1254,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -1326,7 +1326,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -1373,7 +1373,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -1411,7 +1411,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -1673,7 +1673,7 @@ namespace Server
 
 				#region Cave 1
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -1694,7 +1694,7 @@ namespace Server
 
 				#region Cave 2
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -1712,7 +1712,7 @@ namespace Server
 
 				#region Cave 3
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -1730,7 +1730,7 @@ namespace Server
 
 				#region Cave 4
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -1748,7 +1748,7 @@ namespace Server
 
 				#region Britain Mine 1
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -1766,7 +1766,7 @@ namespace Server
 
 				#region Britain Mine 2
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -1784,7 +1784,7 @@ namespace Server
 
 				#region Minoc Cave 1
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -1802,7 +1802,7 @@ namespace Server
 
 				#region Minoc Cave 2
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -1820,7 +1820,7 @@ namespace Server
 
 				#region Minoc Cave 3
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -1838,7 +1838,7 @@ namespace Server
 
 				#region Minoc Mine
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -1857,7 +1857,7 @@ namespace Server
 
 				#region Avatar Isle Cave
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -1875,7 +1875,7 @@ namespace Server
 
 				#region Ice Isle Cave 1
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -1893,7 +1893,7 @@ namespace Server
 
 				#region Ice Isle Cave 2
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -1912,7 +1912,7 @@ namespace Server
 
 				#region North Territory Cave
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -1930,7 +1930,7 @@ namespace Server
 
 				#region Yew Cave
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -1948,7 +1948,7 @@ namespace Server
 
 				#region North Territory Mine 1
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -1966,7 +1966,7 @@ namespace Server
 
 				#region North Territory Mine 2
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -1984,7 +1984,7 @@ namespace Server
 
 				#region Mt Kendall
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -2004,7 +2004,7 @@ namespace Server
 
 				#region Covetous Mine
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -2125,7 +2125,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -2163,7 +2163,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -2304,7 +2304,7 @@ namespace Server
 
 				#region A Cotton Field in Moonglow
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "A Cotton Field in Moonglow" },
 					{ "NoLogoutDelay", false },
@@ -2322,7 +2322,7 @@ namespace Server
 
 				#region A Wheatfield in Skara Brae 1
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "A Wheatfield in Skara Brae" },
 					{ "NoLogoutDelay", false },
@@ -2340,7 +2340,7 @@ namespace Server
 
 				#region A Carrot Field in Skara Brae
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -2358,7 +2358,7 @@ namespace Server
 
 				#region An Onion Field in Skara Brae
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -2376,7 +2376,7 @@ namespace Server
 
 				#region A Cabbage Field in Skara Brae 1
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -2394,7 +2394,7 @@ namespace Server
 
 				#region A Cabbage Field in Skara Brae 2
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -2412,7 +2412,7 @@ namespace Server
 
 				#region A Wheatfield in Skara Brae 2
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -2430,7 +2430,7 @@ namespace Server
 
 				#region A Cotton Field in Skara Brae
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -2448,7 +2448,7 @@ namespace Server
 
 				#region Shrine of Compassion
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -2466,7 +2466,7 @@ namespace Server
 
 				#region Chaos Shrine
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -2484,7 +2484,7 @@ namespace Server
 
 				#region Shrine of Honesty
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -2502,7 +2502,7 @@ namespace Server
 
 				#region Shrine of Honor
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -2520,7 +2520,7 @@ namespace Server
 
 				#region Shrine of Humility
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -2538,7 +2538,7 @@ namespace Server
 
 				#region Shrine of Justice
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -2556,7 +2556,7 @@ namespace Server
 
 				#region Shrine of Sacrifice
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -2574,7 +2574,7 @@ namespace Server
 
 				#region Shrine of Spirituality
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -2593,7 +2593,7 @@ namespace Server
 
 				#region Shrine of Valor
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -2611,7 +2611,7 @@ namespace Server
 
 				#region South Britannian Sea
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -2689,7 +2689,7 @@ namespace Server
 
 				#region Sea Market
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -3162,7 +3162,7 @@ namespace Server
 
 				#region Bravehorn's drinking pool
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -3180,7 +3180,7 @@ namespace Server
 
 				#region Huntsman's Forest
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -3239,7 +3239,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -3287,7 +3287,7 @@ namespace Server
 					#endregion
 					#region A Wheatfield in Britain 1
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -3304,7 +3304,7 @@ namespace Server
 					#endregion
 					#region A Wheatfield in Britain 2
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -3321,7 +3321,7 @@ namespace Server
 					#endregion
 					#region A Wheatfield in Britain 3
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -3338,7 +3338,7 @@ namespace Server
 					#endregion
 					#region A Carrot Field in Britain 1
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -3355,7 +3355,7 @@ namespace Server
 					#endregion
 					#region An Onion Field in Britain 1
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -3372,7 +3372,7 @@ namespace Server
 					#endregion
 					#region A Cabbage Field in Britain 1
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -3389,7 +3389,7 @@ namespace Server
 					#endregion
 					#region A Turnip Field in Britain 1
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -3406,7 +3406,7 @@ namespace Server
 					#endregion
 					#region A Wheatfield in Britain 4
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -3423,7 +3423,7 @@ namespace Server
 					#endregion
 					#region A Wheatfield in Britain 5
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -3440,7 +3440,7 @@ namespace Server
 					#endregion
 					#region A Turnip Field in Britain 2
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -3457,7 +3457,7 @@ namespace Server
 					#endregion
 					#region A Carrot Field in Britain 2
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -3533,7 +3533,7 @@ namespace Server
 
 						#region 
 
-						new("BaseRegion")
+						new("GenericRegion")
 						{
 							{ "RuneName", "" },
 							{ "NoLogoutDelay", true },
@@ -3580,7 +3580,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -3619,7 +3619,7 @@ namespace Server
 
 					#region Enhanced Tracking Skill
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -3634,7 +3634,7 @@ namespace Server
 
 						#region the New Haven Bard
 
-						new("BaseRegion")
+						new("GenericRegion")
 						{
 							{ "RuneName", "" },
 							{ "NoLogoutDelay", false },
@@ -3652,7 +3652,7 @@ namespace Server
 						#endregion
 						#region the New Haven Carpenter
 
-						new("BaseRegion")
+						new("GenericRegion")
 						{
 							{ "RuneName", "" },
 							{ "NoLogoutDelay", false },
@@ -3669,7 +3669,7 @@ namespace Server
 						#endregion
 						#region the New Haven Farm
 
-						new("BaseRegion")
+						new("GenericRegion")
 						{
 							{ "RuneName", "" },
 							{ "NoLogoutDelay", false },
@@ -3686,7 +3686,7 @@ namespace Server
 						#endregion
 						#region Old Haven Training
 
-						new("BaseRegion")
+						new("GenericRegion")
 						{
 							{ "RuneName", "" },
 							{ "NoLogoutDelay", false },
@@ -3703,7 +3703,7 @@ namespace Server
 						#endregion
 						#region Haven Mountains
 
-						new("BaseRegion")
+						new("GenericRegion")
 						{
 							{ "RuneName", "" },
 							{ "NoLogoutDelay", false },
@@ -3754,7 +3754,7 @@ namespace Server
 
 							#region the New Haven Alchemist
 
-							new("BaseRegion")
+							new("GenericRegion")
 							{
 								{ "RuneName", "" },
 								{ "NoLogoutDelay", false },
@@ -3771,7 +3771,7 @@ namespace Server
 							#endregion
 							#region the New Haven Warrior
 
-							new("BaseRegion")
+							new("GenericRegion")
 							{
 								{ "RuneName", "" },
 								{ "NoLogoutDelay", false },
@@ -3788,7 +3788,7 @@ namespace Server
 
 								#region the New Haven Bowyer
 
-								new("BaseRegion")
+								new("GenericRegion")
 								{
 									{ "RuneName", "" },
 									{ "NoLogoutDelay", false },
@@ -3808,7 +3808,7 @@ namespace Server
 							#endregion
 							#region the New Haven Tailor
 
-							new("BaseRegion")
+							new("GenericRegion")
 							{
 								{ "RuneName", "" },
 								{ "NoLogoutDelay", false },
@@ -3825,7 +3825,7 @@ namespace Server
 							#endregion
 							#region the New Haven Mapmaker
 
-							new("BaseRegion")
+							new("GenericRegion")
 							{
 								{ "RuneName", "" },
 								{ "NoLogoutDelay", false },
@@ -3842,7 +3842,7 @@ namespace Server
 							#endregion
 							#region the New Haven Mage
 
-							new("BaseRegion")
+							new("GenericRegion")
 							{
 								{ "RuneName", "" },
 								{ "NoLogoutDelay", false },
@@ -3859,7 +3859,7 @@ namespace Server
 							#endregion
 							#region the New Haven Inn
 
-							new("BaseRegion")
+							new("GenericRegion")
 							{
 								{ "RuneName", "" },
 								{ "NoLogoutDelay", true },
@@ -3877,7 +3877,7 @@ namespace Server
 							#endregion
 							#region the New Haven Docks
 
-							new("BaseRegion")
+							new("GenericRegion")
 							{
 								{ "RuneName", "" },
 								{ "NoLogoutDelay", false },
@@ -3895,7 +3895,7 @@ namespace Server
 							#endregion
 							#region the New Haven Bank
 
-							new("BaseRegion")
+							new("GenericRegion")
 							{
 								{ "RuneName", "" },
 								{ "NoLogoutDelay", false },
@@ -3912,7 +3912,7 @@ namespace Server
 							#endregion
 							#region Springs And Things Workshop
 
-							new("BaseRegion")
+							new("GenericRegion")
 							{
 								{ "RuneName", "" },
 								{ "NoLogoutDelay", false },
@@ -3929,7 +3929,7 @@ namespace Server
 							#endregion
 							#region Haven Dojo
 
-							new("BaseRegion")
+							new("GenericRegion")
 							{
 								{ "RuneName", "" },
 								{ "NoLogoutDelay", false },
@@ -3946,7 +3946,7 @@ namespace Server
 							#endregion
 							#region Gorge's Shop
 
-							new("BaseRegion")
+							new("GenericRegion")
 							{
 								{ "RuneName", "" },
 								{ "NoLogoutDelay", false },
@@ -3963,7 +3963,7 @@ namespace Server
 							#endregion
 							#region Haven Library
 
-							new("BaseRegion")
+							new("GenericRegion")
 							{
 								{ "RuneName", "" },
 								{ "NoLogoutDelay", false },
@@ -4011,7 +4011,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -4056,7 +4056,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -4103,7 +4103,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -4120,7 +4120,7 @@ namespace Server
 					#endregion
 					#region A Field of Sheep in Yew 1
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "A Field of Sheep in Yew" },
 						{ "NoLogoutDelay", false },
@@ -4137,7 +4137,7 @@ namespace Server
 					#endregion
 					#region A Field of Sheep in Yew 2
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "A Field of Sheep in Yew" },
 						{ "NoLogoutDelay", false },
@@ -4154,7 +4154,7 @@ namespace Server
 					#endregion
 					#region A Farm in Yew
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "A Farm in Yew" },
 						{ "NoLogoutDelay", false },
@@ -4171,7 +4171,7 @@ namespace Server
 					#endregion
 					#region A Wheatfield in Yew 1
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "A Wheatfield in Yew" },
 						{ "NoLogoutDelay", false },
@@ -4188,7 +4188,7 @@ namespace Server
 					#endregion
 					#region A Wheatfield in Yew 2
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "A Wheatfield in Yew" },
 						{ "NoLogoutDelay", false },
@@ -4235,7 +4235,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -4278,7 +4278,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -4317,7 +4317,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -4358,7 +4358,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -4430,7 +4430,7 @@ namespace Server
 
 					#region The Scholar's Inn
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -4477,7 +4477,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -4515,7 +4515,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -4777,7 +4777,7 @@ namespace Server
 
 				#region Cave 1
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -4798,7 +4798,7 @@ namespace Server
 
 				#region Cave 2
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -4816,7 +4816,7 @@ namespace Server
 
 				#region Cave 3
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -4834,7 +4834,7 @@ namespace Server
 
 				#region Cave 4
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -4852,7 +4852,7 @@ namespace Server
 
 				#region Britain Mine 1
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -4870,7 +4870,7 @@ namespace Server
 
 				#region Britain Mine 2
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -4888,7 +4888,7 @@ namespace Server
 
 				#region Minoc Cave 1
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -4906,7 +4906,7 @@ namespace Server
 
 				#region Minoc Cave 2
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -4924,7 +4924,7 @@ namespace Server
 
 				#region Minoc Cave 3
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -4942,7 +4942,7 @@ namespace Server
 
 				#region Minoc Mine
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -4961,7 +4961,7 @@ namespace Server
 
 				#region Avatar Isle Cave
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -4979,7 +4979,7 @@ namespace Server
 
 				#region Ice Isle Cave 1
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -4997,7 +4997,7 @@ namespace Server
 
 				#region Ice Isle Cave 2
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5016,7 +5016,7 @@ namespace Server
 
 				#region North Territory Cave
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5034,7 +5034,7 @@ namespace Server
 
 				#region Yew Cave
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5052,7 +5052,7 @@ namespace Server
 
 				#region North Territory Mine 1
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5070,7 +5070,7 @@ namespace Server
 
 				#region North Territory Mine 2
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5088,7 +5088,7 @@ namespace Server
 
 				#region Mt Kendall
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5108,7 +5108,7 @@ namespace Server
 
 				#region Covetous Mine
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5290,7 +5290,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -5328,7 +5328,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -5489,7 +5489,7 @@ namespace Server
 
 				#region A Cotton Field in Moonglow
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "A Cotton Field in Moonglow" },
 					{ "NoLogoutDelay", false },
@@ -5507,7 +5507,7 @@ namespace Server
 
 				#region A Wheatfield in Skara Brae 1
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "A Wheatfield in Skara Brae" },
 					{ "NoLogoutDelay", false },
@@ -5525,7 +5525,7 @@ namespace Server
 
 				#region A Carrot Field in Skara Brae
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5543,7 +5543,7 @@ namespace Server
 
 				#region An Onion Field in Skara Brae
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5561,7 +5561,7 @@ namespace Server
 
 				#region A Cabbage Field in Skara Brae 1
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5579,7 +5579,7 @@ namespace Server
 
 				#region A Cabbage Field in Skara Brae 2
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5597,7 +5597,7 @@ namespace Server
 
 				#region A Wheatfield in Skara Brae 2
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5615,7 +5615,7 @@ namespace Server
 
 				#region A Cotton Field in Skara Brae
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5652,7 +5652,7 @@ namespace Server
 
 				#region Shrine of Compassion
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5670,7 +5670,7 @@ namespace Server
 
 				#region Chaos Shrine
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5688,7 +5688,7 @@ namespace Server
 
 				#region Shrine of Honesty
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5706,7 +5706,7 @@ namespace Server
 
 				#region Shrine of Honor
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5724,7 +5724,7 @@ namespace Server
 
 				#region Shrine of Humility
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5742,7 +5742,7 @@ namespace Server
 
 				#region Shrine of Justice
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5760,7 +5760,7 @@ namespace Server
 
 				#region Shrine of Sacrifice
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5778,7 +5778,7 @@ namespace Server
 
 				#region Shrine of Spirituality
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5797,7 +5797,7 @@ namespace Server
 
 				#region Shrine of Valor
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5815,7 +5815,7 @@ namespace Server
 
 				#region South Britannian Sea
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5893,7 +5893,7 @@ namespace Server
 
 				#region Sea Market
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5980,7 +5980,7 @@ namespace Server
 
 				#region Sheep Farm
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -5998,7 +5998,7 @@ namespace Server
 
 				#region Shrine of Valor
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6016,7 +6016,7 @@ namespace Server
 
 				#region Chaos Shrine
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6034,7 +6034,7 @@ namespace Server
 
 				#region Shrine of Sacrifice
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6052,7 +6052,7 @@ namespace Server
 
 				#region Shrine of Honesty
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6070,7 +6070,7 @@ namespace Server
 
 				#region Shrine of Compassion
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6088,7 +6088,7 @@ namespace Server
 
 				#region Shrine of Spirituality
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6106,7 +6106,7 @@ namespace Server
 
 				#region Shrine of Humility
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6124,7 +6124,7 @@ namespace Server
 
 				#region Shrine of Honor
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6142,7 +6142,7 @@ namespace Server
 
 				#region Terort Skitas
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6183,7 +6183,7 @@ namespace Server
 
 				#region Pormir Harm
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6201,7 +6201,7 @@ namespace Server
 
 				#region Pormir Felwis
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6219,7 +6219,7 @@ namespace Server
 
 				#region Cyclops Temple
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6237,7 +6237,7 @@ namespace Server
 
 				#region Rat Fort
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6255,7 +6255,7 @@ namespace Server
 
 				#region Rat Fort Cellar
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6273,7 +6273,7 @@ namespace Server
 
 				#region Entrance to Central Ilshenar 1
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6291,7 +6291,7 @@ namespace Server
 
 				#region Entrance to Central Ilshenar 2
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6331,7 +6331,7 @@ namespace Server
 
 				#region Termir Flam
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6389,7 +6389,7 @@ namespace Server
 
 				#region Entrance to Rock Dungeon
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6447,7 +6447,7 @@ namespace Server
 
 				#region Entrance to Spider Cave
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6486,7 +6486,7 @@ namespace Server
 
 				#region Twin Oaks
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6501,7 +6501,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -6541,7 +6541,7 @@ namespace Server
 
 				#region Entrance Spectre Dungeon
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6579,7 +6579,7 @@ namespace Server
 
 				#region Entrance Blood Dungeon
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6617,7 +6617,7 @@ namespace Server
 
 				#region Entrance Mushroom Cave
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6635,7 +6635,7 @@ namespace Server
 
 				#region Mushroom Cave
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6672,7 +6672,7 @@ namespace Server
 
 				#region Entrance Rat Cave
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6690,7 +6690,7 @@ namespace Server
 
 				#region Rat Cave Territory
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6708,7 +6708,7 @@ namespace Server
 
 				#region Ratman Cave
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6763,7 +6763,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -6784,7 +6784,7 @@ namespace Server
 
 				#region Entrance Serpentine Passage
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6802,7 +6802,7 @@ namespace Server
 
 				#region Serpentine Passage
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6841,7 +6841,7 @@ namespace Server
 
 				#region Kirin passage
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6859,7 +6859,7 @@ namespace Server
 
 				#region Entrance Lizards Passage
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6905,7 +6905,7 @@ namespace Server
 
 				#region Lizard Passage
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6943,7 +6943,7 @@ namespace Server
 
 				#region Lizard Man's Huts
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -6961,7 +6961,7 @@ namespace Server
 
 				#region Nox Tereg
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -7003,7 +7003,7 @@ namespace Server
 
 				#region Entrance Ancient Lair
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -7041,7 +7041,7 @@ namespace Server
 
 				#region Gypsy Camp
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -7059,7 +7059,7 @@ namespace Server
 
 				#region Gypsy Camp 1
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -7077,7 +7077,7 @@ namespace Server
 
 				#region Gypsy Camp 2
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -7092,7 +7092,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -7113,7 +7113,7 @@ namespace Server
 
 				#region Juka Camp
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -7131,7 +7131,7 @@ namespace Server
 
 				#region Gypsy Camp 3
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -7149,7 +7149,7 @@ namespace Server
 
 				#region Gypsy Camp 4
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -7167,7 +7167,7 @@ namespace Server
 
 				#region Gypsy Camp 5
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -7186,7 +7186,7 @@ namespace Server
 
 				#region Gypsy Camp 6
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -7204,7 +7204,7 @@ namespace Server
 
 				#region Lord Blackthorn's Ilshenar Castle
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -7223,7 +7223,7 @@ namespace Server
 
 				#region Shrine of the Virtues
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -7241,7 +7241,7 @@ namespace Server
 
 				#region Pass of Karnaugh
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -7264,7 +7264,7 @@ namespace Server
 
 				#region Vinculum Inn
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -7279,7 +7279,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -7307,7 +7307,7 @@ namespace Server
 			{
 				#region Gravewater Lake [Underwater]
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -7443,7 +7443,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -7482,7 +7482,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -7563,7 +7563,7 @@ namespace Server
 
 				#region Orc Fortress
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -7643,7 +7643,7 @@ namespace Server
 
 				#region Hanse's Hostel
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", true },
@@ -7703,7 +7703,7 @@ namespace Server
 
 				#region Samurai start location
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -7721,7 +7721,7 @@ namespace Server
 
 				#region Ninja start location
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -7739,7 +7739,7 @@ namespace Server
 
 				#region Ninja cave
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -7820,7 +7820,7 @@ namespace Server
 
 					#region 
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -7879,7 +7879,7 @@ namespace Server
 
 				#region Tokuno Docks
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "Disabled", false },
 					{ "RuneName", "" },
@@ -7931,7 +7931,7 @@ namespace Server
 
 					#region Abyssal Lair
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -7948,7 +7948,7 @@ namespace Server
 					#endregion
 					#region Medusa's Lair
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -7966,7 +7966,7 @@ namespace Server
 					#endregion
 					#region NPC Encampment
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -7983,7 +7983,7 @@ namespace Server
 					#endregion
 					#region Cavern of the Discarded
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -8006,7 +8006,7 @@ namespace Server
 					#endregion
 					#region Chamber of Virtue
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -8023,7 +8023,7 @@ namespace Server
 					#endregion
 					#region Crimson Veins
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -8040,7 +8040,7 @@ namespace Server
 					#endregion
 					#region Enslaved Goblins
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -8062,7 +8062,7 @@ namespace Server
 					#endregion
 					#region Fairy Dragon Lair
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -8079,7 +8079,7 @@ namespace Server
 					#endregion
 					#region Fire Temple Ruins
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -8100,7 +8100,7 @@ namespace Server
 					#endregion
 					#region Fractured City
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -8122,7 +8122,7 @@ namespace Server
 					#endregion
 					#region Lands of the Lich
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -8140,7 +8140,7 @@ namespace Server
 					#endregion
 					#region Lava Caldera
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -8157,7 +8157,7 @@ namespace Server
 					#endregion
 					#region Passage of Tears
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -8174,7 +8174,7 @@ namespace Server
 					#endregion
 					#region Secret Garden
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -8191,7 +8191,7 @@ namespace Server
 					#endregion
 					#region Serpents Lair
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -8210,7 +8210,7 @@ namespace Server
 					#endregion
 					#region Silver Sapling
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -8227,7 +8227,7 @@ namespace Server
 					#endregion
 					#region Skeletal Dragon
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -8244,7 +8244,7 @@ namespace Server
 					#endregion
 					#region Sutek the Mage
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -8385,7 +8385,7 @@ namespace Server
 
 				#region Holy City
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -8522,7 +8522,7 @@ namespace Server
 
 					#region Queen's Palace
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -8539,7 +8539,7 @@ namespace Server
 					#endregion
 					#region Royal City Inn
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", true },
@@ -8764,7 +8764,7 @@ namespace Server
 
 				#region Shrine of Singularity
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -8782,7 +8782,7 @@ namespace Server
 
 				#region Tomb of Kings
 
-				new("BaseRegion")
+				new("GenericRegion")
 				{
 					{ "RuneName", "" },
 					{ "NoLogoutDelay", false },
@@ -8797,7 +8797,7 @@ namespace Server
 
 					#region Bridge
 
-					new("BaseRegion")
+					new("GenericRegion")
 					{
 						{ "RuneName", "" },
 						{ "NoLogoutDelay", false },
@@ -8918,7 +8918,7 @@ namespace Server
 
 				#region Crystal Lotus Puzzle Region
 
-				new("Region")
+				new("GenericRegion")
 				{
 					{ "Name", "Crystal Lotus Puzzle Region" },
 					{ "Priority", 50 },

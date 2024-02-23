@@ -133,33 +133,33 @@ namespace Server.Items
 
 					if (item is BaseClothing)
 					{
-						isExceptional = (((BaseClothing)item).Quality == ClothingQuality.Exceptional);
+						isExceptional = (((BaseClothing)item).Quality == ItemQuality.Exceptional);
 					}
 					else if (item is BaseArmor)
 					{
-						isExceptional = (((BaseArmor)item).Quality == ArmorQuality.Exceptional);
+						isExceptional = (((BaseArmor)item).Quality == ItemQuality.Exceptional);
 					}
 					else if (item is BaseWeapon)
 					{
-						isExceptional = (((BaseWeapon)item).Quality == WeaponQuality.Exceptional);
+						isExceptional = (((BaseWeapon)item).Quality == ItemQuality.Exceptional);
 					}
 
 					if (isExceptional)
 					{
 						if (item is BaseClothing)
 						{
-							((BaseClothing)item).Quality = ClothingQuality.Regular;
+							((BaseClothing)item).Quality = ItemQuality.Regular;
 							((BaseClothing)item).Crafter = from;
 						}
 						else if (item is BaseArmor)
 						{
-							((BaseArmor)item).Quality = ArmorQuality.Regular;
+							((BaseArmor)item).Quality = ItemQuality.Regular;
 							((BaseArmor)item).Crafter = from;
 							((BaseArmor)item).PhysicalBonus = ((BaseArmor)item).FireBonus = ((BaseArmor)item).ColdBonus = ((BaseArmor)item).PoisonBonus = ((BaseArmor)item).EnergyBonus = 0; // Is there a method to remove bonuses?
 						}
 						else if (item is BaseWeapon) // Sanity, weapons cannot recieve gems...
 						{
-							((BaseWeapon)item).Quality = WeaponQuality.Regular;
+							((BaseWeapon)item).Quality = ItemQuality.Regular;
 							((BaseWeapon)item).Crafter = from;
 						}
 

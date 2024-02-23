@@ -238,7 +238,7 @@ namespace Server.Items
 			}
 		}
 
-		public override void OnMapChange()
+		public override void OnMapChange(Map oldMap)
 		{
 			if (Deleted)
 			{
@@ -448,7 +448,7 @@ namespace Server.Items
 			}
 		}
 
-		public override void OnMapChange()
+		public override void OnMapChange(Map oldMap)
 		{
 			if (m_Addon != null)
 			{
@@ -834,9 +834,9 @@ namespace Server.Items
 			}
 		}
 
-		public override void OnMapChange()
+		public override void OnMapChange(Map oldMap)
 		{
-			base.OnMapChange();
+			base.OnMapChange(oldMap);
 
 			if (Deleted)
 			{
@@ -1167,7 +1167,7 @@ namespace Server.Items
 			}
 		}
 
-		public override void OnMapChange()
+		public override void OnMapChange(Map oldMap)
 		{
 			if (m_Addon != null)
 			{
@@ -1356,26 +1356,31 @@ namespace Server.Items
 		}
 
 		#region ICraftable
-		public virtual int OnCraft(int quality, bool makersMark, Mobile from, CraftSystem craftSystem, Type typeRes, BaseTool tool, CraftItem craftItem, int resHue)
+
+		public virtual int OnCraft(int quality, bool makersMark, Mobile from, ICraftSystem craftSystem, Type typeRes, ICraftTool tool, ICraftItem craftItem, int resHue)
 		{
 			var resourceType = typeRes;
 
-			if (resourceType == null)
+			if (resourceType == null && craftItem is CraftItem ci)
 			{
-				resourceType = craftItem.Resources.GetAt(0).ItemType;
+				resourceType = ci.Resources.GetAt(0).ItemType;
 			}
 
 			Resource = CraftResources.GetFromType(resourceType);
 
-			var context = craftSystem.GetContext(from);
-
-			if (context != null && context.DoNotColor)
+			if (craftSystem is CraftSystem cs)
 			{
-				Hue = 0;
+				var context = cs.GetContext(from);
+
+				if (context != null && context.DoNotColor)
+				{
+					Hue = 0;
+				}
 			}
 
 			return quality;
 		}
+
 		#endregion
 
 		private class InternalTarget : Target

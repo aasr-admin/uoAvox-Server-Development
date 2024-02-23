@@ -238,7 +238,7 @@ namespace Server.Spells.Mysticism
 			m_Scroll = scroll;
 			m_Weapon = weapon;
 
-			var font = 0x07FF;
+			short color16 = 0x07FF;
 
 			AddBackground(0, 0, 260, 187, 3600);
 			AddAlphaRegion(5, 15, 242, 170);
@@ -250,22 +250,22 @@ namespace Server.Spells.Mysticism
 			AddItem(185, 3, 6883);
 			AddItem(192, 170, 6881);
 
-			AddHtmlLocalized(20, 22, 150, 16, 1080133, font, false, false); //Select Enchant
+			AddHtmlLocalized(20, 22, 150, 16, 1080133, color16, false, false); //Select Enchant
 
 			AddButton(20, 50, 9702, 9703, 1, GumpButtonType.Reply, 0);
-			AddHtmlLocalized(45, 50, 200, 16, 1079705, font, false, false); //Hit Lighting
+			AddHtmlLocalized(45, 50, 200, 16, 1079705, color16, false, false); //Hit Lighting
 
 			AddButton(20, 75, 9702, 9703, 2, GumpButtonType.Reply, 0);
-			AddHtmlLocalized(45, 75, 200, 16, 1079703, font, false, false); //Hit Fireball
+			AddHtmlLocalized(45, 75, 200, 16, 1079703, color16, false, false); //Hit Fireball
 
 			AddButton(20, 100, 9702, 9703, 3, GumpButtonType.Reply, 0);
-			AddHtmlLocalized(45, 100, 200, 16, 1079704, font, false, false); //Hit Harm
+			AddHtmlLocalized(45, 100, 200, 16, 1079704, color16, false, false); //Hit Harm
 
 			AddButton(20, 125, 9702, 9703, 4, GumpButtonType.Reply, 0);
-			AddHtmlLocalized(45, 125, 200, 16, 1079706, font, false, false); //Hit Magic Arrow
+			AddHtmlLocalized(45, 125, 200, 16, 1079706, color16, false, false); //Hit Magic Arrow
 
 			AddButton(20, 150, 9702, 9703, 5, GumpButtonType.Reply, 0);
-			AddHtmlLocalized(45, 150, 200, 16, 1079702, font, false, false); //Hit Dispel
+			AddHtmlLocalized(45, 150, 200, 16, 1079702, color16, false, false); //Hit Dispel
 		}
 
 		public override void OnResponse(NetState sender, RelayInfo info)

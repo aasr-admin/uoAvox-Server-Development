@@ -3,6 +3,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Server.Items
 {
@@ -1115,7 +1116,7 @@ namespace Server.Items
 		}
 		#endregion
 
-		private static readonly List<Item> m_FindItemsList = new List<Item>();
+		private static readonly Queue<HashSet<Item>> m_FindItemsList = new();
 
 		#region Non-Generic FindItem[s] by Type
 		public Item[] FindItemsByType(Type type)
@@ -1125,17 +1126,29 @@ namespace Server.Items
 
 		public Item[] FindItemsByType(Type type, bool recurse)
 		{
+			HashSet<Item> items;
+
 			if (m_FindItemsList.Count > 0)
 			{
-				m_FindItemsList.Clear();
+				items = m_FindItemsList.Dequeue();
+			}
+			else
+			{
+				items = new();
 			}
 
-			RecurseFindItemsByType(this, type, recurse, m_FindItemsList);
+			RecurseFindItemsByType(this, type, recurse, items);
 
-			return m_FindItemsList.ToArray();
+			var result = items.ToArray();
+
+			items.Clear();
+
+			m_FindItemsList.Enqueue(items);
+
+			return result;
 		}
 
-		private static void RecurseFindItemsByType(Item current, Type type, bool recurse, List<Item> list)
+		private static void RecurseFindItemsByType(Item current, Type type, bool recurse, HashSet<Item> list)
 		{
 			if (current != null && current.Items.Count > 0)
 			{
@@ -1165,17 +1178,29 @@ namespace Server.Items
 
 		public Item[] FindItemsByType(Type[] types, bool recurse)
 		{
+			HashSet<Item> items;
+
 			if (m_FindItemsList.Count > 0)
 			{
-				m_FindItemsList.Clear();
+				items = m_FindItemsList.Dequeue();
+			}
+			else
+			{
+				items = new();
 			}
 
-			RecurseFindItemsByType(this, types, recurse, m_FindItemsList);
+			RecurseFindItemsByType(this, types, recurse, items);
 
-			return m_FindItemsList.ToArray();
+			var result = items.ToArray();
+
+			items.Clear();
+
+			m_FindItemsList.Enqueue(items);
+
+			return result;
 		}
 
-		private static void RecurseFindItemsByType(Item current, Type[] types, bool recurse, List<Item> list)
+		private static void RecurseFindItemsByType(Item current, Type[] types, bool recurse, HashSet<Item> list)
 		{
 			if (current != null && current.Items.Count > 0)
 			{
@@ -1279,36 +1304,46 @@ namespace Server.Items
 		#endregion
 
 		#region Generic FindItem[s] by Type
-		public List<T> FindItemsByType<T>() where T : Item
+		public T[] FindItemsByType<T>() where T : Item
 		{
 			return FindItemsByType<T>(true, null);
 		}
 
-		public List<T> FindItemsByType<T>(bool recurse) where T : Item
+		public T[] FindItemsByType<T>(bool recurse) where T : Item
 		{
 			return FindItemsByType<T>(recurse, null);
 		}
 
-		public List<T> FindItemsByType<T>(Predicate<T> predicate) where T : Item
+		public T[] FindItemsByType<T>(Predicate<T> predicate) where T : Item
 		{
-			return FindItemsByType<T>(true, predicate);
+			return FindItemsByType(true, predicate);
 		}
 
-		public List<T> FindItemsByType<T>(bool recurse, Predicate<T> predicate) where T : Item
+		public T[] FindItemsByType<T>(bool recurse, Predicate<T> predicate) where T : Item
 		{
+			HashSet<Item> items;
+
 			if (m_FindItemsList.Count > 0)
 			{
-				m_FindItemsList.Clear();
+				items = m_FindItemsList.Dequeue();
+			}
+			else
+			{
+				items = new();
 			}
 
-			var list = new List<T>();
+			RecurseFindItemsByType(this, recurse, items, predicate);
 
-			RecurseFindItemsByType<T>(this, recurse, list, predicate);
+			var result = items.Cast<T>().ToArray();
 
-			return list;
+			items.Clear();
+
+			m_FindItemsList.Enqueue(items);
+
+			return result;
 		}
 
-		private static void RecurseFindItemsByType<T>(Item current, bool recurse, List<T> list, Predicate<T> predicate) where T : Item
+		private static void RecurseFindItemsByType<T>(Item current, bool recurse, HashSet<Item> list, Predicate<T> predicate) where T : Item
 		{
 			if (current != null && current.Items.Count > 0)
 			{
@@ -1318,10 +1353,8 @@ namespace Server.Items
 				{
 					var item = items[i];
 
-					if (typeof(T).IsAssignableFrom(item.GetType()))
+					if (item is T typedItem)
 					{
-						var typedItem = (T)item;
-
 						if (predicate == null || predicate(typedItem))
 						{
 							list.Add(typedItem);
@@ -1330,7 +1363,7 @@ namespace Server.Items
 
 					if (recurse && item is Container)
 					{
-						RecurseFindItemsByType<T>(item, recurse, list, predicate);
+						RecurseFindItemsByType(item, recurse, list, predicate);
 					}
 				}
 			}
@@ -1341,10 +1374,9 @@ namespace Server.Items
 			return FindItemByType<T>(true);
 		}
 
-
 		public T FindItemByType<T>(Predicate<T> predicate) where T : Item
 		{
-			return FindItemByType<T>(true, predicate);
+			return FindItemByType(true, predicate);
 		}
 
 		public T FindItemByType<T>(bool recurse) where T : Item
@@ -1354,7 +1386,7 @@ namespace Server.Items
 
 		public T FindItemByType<T>(bool recurse, Predicate<T> predicate) where T : Item
 		{
-			return RecurseFindItemByType<T>(this, recurse, predicate);
+			return RecurseFindItemByType(this, recurse, predicate);
 		}
 
 		private static T RecurseFindItemByType<T>(Item current, bool recurse, Predicate<T> predicate) where T : Item
@@ -1367,10 +1399,8 @@ namespace Server.Items
 				{
 					var item = list[i];
 
-					if (typeof(T).IsAssignableFrom(item.GetType()))
+					if (item is T typedItem)
 					{
-						var typedItem = (T)item;
-
 						if (predicate == null || predicate(typedItem))
 						{
 							return typedItem;
@@ -1378,7 +1408,7 @@ namespace Server.Items
 					}
 					else if (recurse && item is Container)
 					{
-						var check = RecurseFindItemByType<T>(item, recurse, predicate);
+						var check = RecurseFindItemByType(item, recurse, predicate);
 
 						if (check != null)
 						{
@@ -1395,17 +1425,9 @@ namespace Server.Items
 
 		private static bool InTypeList(Item item, Type[] types)
 		{
-			var t = item.GetType();
+			var type = item.GetType();
 
-			for (var i = 0; i < types.Length; ++i)
-			{
-				if (types[i].IsAssignableFrom(t))
-				{
-					return true;
-				}
-			}
-
-			return false;
+			return Array.Exists(types, t => t.IsAssignableFrom(type));
 		}
 
 		private static void SetSaveFlag(ref SaveFlag flags, SaveFlag toSet, bool setIf)
@@ -1418,7 +1440,7 @@ namespace Server.Items
 
 		private static bool GetSaveFlag(SaveFlag flags, SaveFlag toGet)
 		{
-			return ((flags & toGet) != 0);
+			return (flags & toGet) != 0;
 		}
 
 		[Flags]

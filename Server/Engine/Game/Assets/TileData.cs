@@ -5,9 +5,13 @@ using System.Text;
 
 namespace Server
 {
+	[PropertyObject]
 	public struct LandData
 	{
+		[CommandProperty(AccessLevel.Counselor, AccessLevel.Administrator)]
 		public string Name { get; set; }
+
+		[CommandProperty(AccessLevel.Counselor, AccessLevel.Administrator)]
 		public TileFlag Flags { get; set; }
 
 		[CommandProperty(AccessLevel.Counselor)]
@@ -42,7 +46,7 @@ namespace Server
 		[CommandProperty(AccessLevel.Counselor, AccessLevel.Administrator)]
 		public string Name { get; set; }
 
-		[CommandProperty(AccessLevel.Counselor, AccessLevel.Developer)]
+		[CommandProperty(AccessLevel.Counselor, AccessLevel.Administrator)]
 		public TileFlag Flags { get; set; }
 
 		[CommandProperty(AccessLevel.Counselor, AccessLevel.Administrator)]
@@ -359,11 +363,24 @@ namespace Server
 
 				MaxLandValue = landLength - 1;
 				MaxItemValue = itemLength - 1;
+
+				ApplyOverrides();
 			}
 			else
 			{
 				throw new Exception($"TileData: {filePath} not found");
 			}
+		}
+
+		public static void ApplyOverrides()
+		{
+			// Missing NoShoot flags
+			ItemTable[0x2A0].Flags |= TileFlag.NoShoot;
+			ItemTable[0x3E0].Flags |= TileFlag.NoShoot;
+			ItemTable[0x3E1].Flags |= TileFlag.NoShoot;
+
+			// Incorrect height
+			ItemTable[0x34D2].Height = 0;
 		}
 	}
 }

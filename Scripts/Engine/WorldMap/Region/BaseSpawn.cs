@@ -1,5 +1,4 @@
 ﻿using Server.Commands;
-using Server.Engines.Quests.Mobiles;
 using Server.Items;
 using Server.Mobiles;
 
@@ -755,24 +754,14 @@ namespace Server.Regions
 		private static readonly (string, Type[])[] m_DefaultGroups =
 		{
 			#region Groups
-
-			#region Escortables
-
-			("Escortables", new[]
-			{
-				typeof(EscortableMage),
-				typeof(Noble),
-				typeof(SeekerOfAdventure),
-			}),
-
-			#endregion
-			
-			#region TownAnimals
+						
+			#region Town Animals
 
 			("TownAnimals", new[]
 			{
 				typeof(Cat),
 				typeof(Dog),
+				typeof(Rat),
 			}),
 
 			#endregion

@@ -506,11 +506,11 @@ namespace Server.Items
 						{
 							var entry = mcl.List[i];
 
-							int itemID = entry.m_ItemID;
+							int itemID = entry.ItemID;
 
 							if (itemID is >= 0xBA3 and <= 0xC0E)
 							{
-								banLoc = new Point3D(center.X + entry.m_OffsetX, center.Y + entry.m_OffsetY, center.Z);
+								banLoc = new Point3D(center.X + entry.OffsetX, center.Y + entry.OffsetY, center.Z);
 								break;
 							}
 						}

@@ -268,15 +268,15 @@ namespace Server.Engines.BulkOrders
 
 						if (item is BaseWeapon bw)
 						{
-							isExceptional = bw.Quality == WeaponQuality.Exceptional;
+							isExceptional = bw.Quality == ItemQuality.Exceptional;
 						}
 						else if (item is BaseArmor ba)
 						{
-							isExceptional = ba.Quality == ArmorQuality.Exceptional;
+							isExceptional = ba.Quality == ItemQuality.Exceptional;
 						}
 						else if (item is BaseClothing bc)
 						{
-							isExceptional = bc.Quality == ClothingQuality.Exceptional;
+							isExceptional = bc.Quality == ItemQuality.Exceptional;
 						}
 
 						if (m_RequireExceptional && !isExceptional)
@@ -493,7 +493,7 @@ namespace Server.Engines.BulkOrders
 
 			AddHtmlLocalized(40, 96, 120, 20, 1045136, 0x7FFF, false, false); // Item requested:
 			AddItem(385, 96, deed.Graphic);
-			AddHtmlLocalized(40, 120, 210, 20, deed.Number, 0xFFFFFF, false, false);
+			AddHtmlLocalized(40, 120, 210, 20, deed.Number, 0x7FFF, false, false);
 
 			if (deed.RequireExceptional || deed.Material != BulkMaterialType.None)
 			{

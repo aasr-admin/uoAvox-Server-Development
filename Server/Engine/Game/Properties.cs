@@ -156,6 +156,12 @@ namespace Server
 			}
 		}
 
+		public virtual int DefaultAmountMin => Int32.MinValue;
+		public virtual int DefaultAmountMax => Int32.MaxValue;
+
+		public int AmountMin { get; set; }
+		public int AmountMax { get; set; }
+
 		public TypeAmounts()
 		{ }
 
@@ -170,6 +176,14 @@ namespace Server
 		public TypeAmounts(GenericReader reader)
 			: base(reader)
 		{ }
+
+		protected override void OnInit()
+		{
+			base.OnInit();
+
+			AmountMin = DefaultAmountMin;
+			AmountMax = DefaultAmountMax;
+		}
 
 		public override bool Add(TypeAmount t)
 		{
@@ -199,7 +213,7 @@ namespace Server
 
 		public virtual bool Set(Type type, int amount, bool state, bool inherit)
 		{
-			if (type == null || amount < 0)
+			if (type == null)
 			{
 				return false;
 			}
@@ -208,6 +222,8 @@ namespace Server
 			{
 				return false;
 			}
+
+			amount = Math.Clamp(amount, AmountMin, AmountMax);
 
 			var index = IndexOf(type);
 
@@ -250,6 +266,8 @@ namespace Server
 				return false;
 			}
 
+			amount = Math.Clamp(amount, AmountMin, AmountMax);
+
 			var index = IndexOf(type);
 
 			if (index >= 0)
@@ -283,13 +301,19 @@ namespace Server
 			base.Serialize(writer);
 
 			writer.WriteEncodedInt(0);
+
+			writer.WriteEncodedInt(AmountMin);
+			writer.WriteEncodedInt(AmountMax);
 		}
 
 		public override void Deserialize(GenericReader reader)
 		{
 			base.Deserialize(reader);
 
-			reader.ReadEncodedInt();
+			_ = reader.ReadEncodedInt();
+
+			AmountMin = reader.ReadEncodedInt();
+			AmountMax = reader.ReadEncodedInt();
 		}
 	}
 
@@ -542,21 +566,33 @@ namespace Server
 		}
 
 		public TypeList()
-		{ }
+		{
+			OnInit();
+		}
 
 		public TypeList(params T[] entries)
 		{
+			OnInit();
+
 			_Entries.AddRange(entries);
 		}
 
 		public TypeList(IEnumerable<T> entries)
 		{
+			OnInit();
+
 			_Entries.AddRange(entries);
 		}
 
 		public TypeList(GenericReader reader)
 		{
+			OnInit();
+
 			Deserialize(reader);
+		}
+
+		protected virtual void OnInit()
+		{
 		}
 
 		public virtual bool IsValidType(Type type)

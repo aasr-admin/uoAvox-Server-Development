@@ -27,7 +27,7 @@ namespace Server.Mobiles
 			var war = new WarHammer {
 				Movable = true,
 				Crafter = this,
-				Quality = WeaponQuality.Regular
+				Quality = ItemQuality.Regular
 			};
 			AddItem(war);
 
@@ -40,7 +40,7 @@ namespace Server.Mobiles
 				Movable = false,
 				LootType = LootType.Newbied,
 				Crafter = this,
-				Quality = ArmorQuality.Regular
+				Quality = ItemQuality.Regular
 			};
 			AddItem(cht);
 
@@ -48,7 +48,7 @@ namespace Server.Mobiles
 				Movable = false,
 				LootType = LootType.Newbied,
 				Crafter = this,
-				Quality = ArmorQuality.Regular
+				Quality = ItemQuality.Regular
 			};
 			AddItem(chl);
 
@@ -56,7 +56,7 @@ namespace Server.Mobiles
 				Movable = false,
 				LootType = LootType.Newbied,
 				Crafter = this,
-				Quality = ArmorQuality.Regular
+				Quality = ItemQuality.Regular
 			};
 			AddItem(pla);
 

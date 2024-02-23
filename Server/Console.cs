@@ -14,38 +14,22 @@ using System.Threading.Tasks;
 
 namespace Server
 {
-	public delegate void Slice();
-
-	public static class Core
+	public static partial class Core
 	{
 		private static bool m_Crashed;
 		private static Thread m_TimerThread;
 		private static string m_BaseDirectory;
 		private static string m_ExePath;
-
-		private static Assembly m_Assembly;
-		private static Process m_Process;
-		private static Thread m_Thread;
-		private static bool m_Service;
-		private static bool m_Debug;
 		private static bool m_Cache = true;
-		private static bool m_HaltOnWarning;
-		private static bool m_VBdotNET;
-		private static MultiTextWriter m_MultiConOut;
-
 		private static bool m_Profiling;
 		private static DateTime m_ProfileStart;
 		private static TimeSpan m_ProfileTime;
 
-		private static volatile MessagePump m_MessagePump;
+		private static volatile MessagePump m_MessagePump = new();
 
-		public static MessagePump MessagePump
-		{
-			get => m_MessagePump;
-			set => m_MessagePump = value;
-		}
+		public static MessagePump MessagePump => m_MessagePump;
 
-		public static Slice Slice;
+		public static event Action Slice;
 
 		public static bool Profiling
 		{
@@ -64,7 +48,7 @@ namespace Server
 					m_ProfileTime += DateTime.UtcNow - m_ProfileStart;
 				}
 
-				m_ProfileStart = (m_Profiling ? DateTime.UtcNow : DateTime.MinValue);
+				m_ProfileStart = m_Profiling ? DateTime.UtcNow : DateTime.MinValue;
 			}
 		}
 
@@ -81,17 +65,16 @@ namespace Server
 			}
 		}
 
-		public static bool Service => m_Service;
-		public static bool Debug => m_Debug;
+		public static bool Service { get; private set; }
+		public static bool Debug { get; private set; }
 
-		public static bool HaltOnWarning => m_HaltOnWarning;
-		public static bool VBdotNet => m_VBdotNET;
+		public static bool HaltOnWarning { get; private set; }
 
-		public static Assembly Assembly { get => m_Assembly; set => m_Assembly = value; }
-		public static Version Version => m_Assembly.GetName().Version;
-		public static Process Process => m_Process;
-		public static Thread Thread => m_Thread;
-		public static MultiTextWriter MultiConsoleOut => m_MultiConOut;
+		public static Assembly Assembly { get; set; }
+		public static Version Version => Assembly.GetName().Version;
+		public static Process Process { get; private set; }
+		public static Thread Thread { get; private set; }
+		public static MultiTextWriter MultiConsoleOut { get; private set; }
 
 		/* 
 		 * DateTime.Now and DateTime.UtcNow are based on actual system clock time.
@@ -130,15 +113,10 @@ namespace Server
 
 		public static readonly bool Is64Bit = Environment.Is64BitProcess;
 
-		private static bool m_MultiProcessor;
-		private static int m_ProcessorCount;
+		public static bool MultiProcessor { get; private set; }
+		public static int ProcessorCount { get; private set; }
 
-		public static bool MultiProcessor => m_MultiProcessor;
-		public static int ProcessorCount => m_ProcessorCount;
-
-		private static bool m_Unix;
-
-		public static bool Unix => m_Unix;
+		public static bool Unix { get; private set; }
 
 		public static HashSet<string> DataDirectories { get; } = new HashSet<string>();
 
@@ -153,12 +131,12 @@ namespace Server
 				{
 					if (value == null)
 					{
-						DataDirectories.Remove(old);
+						_ = DataDirectories.Remove(old);
 					}
 					else if (!String.IsNullOrWhiteSpace(value) && File.Exists(Path.Combine(value, "client.exe")))
 					{
-						DataDirectories.Remove(old);
-						DataDirectories.Add(value);
+						_ = DataDirectories.Remove(old);
+						_ = DataDirectories.Add(value);
 					}
 				}
 			}
@@ -170,7 +148,7 @@ namespace Server
 
 			if (!String.IsNullOrWhiteSpace(path) && File.Exists(Path.Combine(path, "client.exe")))
 			{
-				DataDirectories.Add(path);
+				_ = DataDirectories.Add(path);
 			}
 
 			while (DataDirectories.Count == 0 && !Service)
@@ -233,32 +211,27 @@ namespace Server
 
 		#region Expansions
 
-		private static Expansion m_Expansion;
-		public static Expansion Expansion
-		{
-			get => m_Expansion;
-			set => m_Expansion = value;
-		}
+		public static Expansion Expansion { get; set; }
 
-		public static bool T2A => m_Expansion >= Expansion.T2A;
+		public static bool T2A => Expansion >= Expansion.T2A;
 
-		public static bool UOR => m_Expansion >= Expansion.UOR;
+		public static bool UOR => Expansion >= Expansion.UOR;
 
-		public static bool UOTD => m_Expansion >= Expansion.UOTD;
+		public static bool UOTD => Expansion >= Expansion.UOTD;
 
-		public static bool LBR => m_Expansion >= Expansion.LBR;
+		public static bool LBR => Expansion >= Expansion.LBR;
 
-		public static bool AOS => m_Expansion >= Expansion.AOS;
+		public static bool AOS => Expansion >= Expansion.AOS;
 
-		public static bool SE => m_Expansion >= Expansion.SE;
+		public static bool SE => Expansion >= Expansion.SE;
 
-		public static bool ML => m_Expansion >= Expansion.ML;
+		public static bool ML => Expansion >= Expansion.ML;
 
-		public static bool SA => m_Expansion >= Expansion.SA;
+		public static bool SA => Expansion >= Expansion.SA;
 
-		public static bool HS => m_Expansion >= Expansion.HS;
+		public static bool HS => Expansion >= Expansion.HS;
 
-		public static bool TOL => m_Expansion >= Expansion.TOL;
+		public static bool TOL => Expansion >= Expansion.TOL;
 
 		#endregion
 
@@ -289,7 +262,7 @@ namespace Server
 			}
 		}
 
-		public static string CurrentSavesDirectory => Path.Combine(BaseDirectory, "Export", "Saves", "Current");
+		public static string CurrentSavesDirectory => Path.Combine(BaseDirectory, "Saves");
 
 		private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
 		{
@@ -314,21 +287,19 @@ namespace Server
 				{
 				}
 
-				if (!close && !m_Service)
+				if (!close && !Service)
 				{
 					try
 					{
-						foreach (var l in m_MessagePump.Listeners)
-						{
-							l.Dispose();
-						}
+						m_MessagePump?.Dispose();
+						m_MessagePump = null;
 					}
 					catch
 					{
 					}
 
 					Console.WriteLine("This exception is fatal, press return to exit");
-					Console.ReadLine();
+					_ = Console.ReadLine();
 				}
 
 				Kill();
@@ -347,15 +318,16 @@ namespace Server
 		internal delegate bool ConsoleEventHandler(ConsoleEventType type);
 		internal static ConsoleEventHandler m_ConsoleEventHandler;
 
-		internal class UnsafeNativeMethods
+		internal partial class UnsafeNativeMethods
 		{
-			[DllImport("Kernel32")]
-			internal static extern bool SetConsoleCtrlHandler(ConsoleEventHandler callback, bool add);
+			[LibraryImport("Kernel32")]
+			[return: MarshalAs(UnmanagedType.Bool)]
+			internal static partial bool SetConsoleCtrlHandler(ConsoleEventHandler callback, [MarshalAs(UnmanagedType.Bool)] bool add);
 		}
 
 		private static bool OnConsoleEvent(ConsoleEventType type)
 		{
-			if (World.Saving || (m_Service && type == ConsoleEventType.CTRL_LOGOFF_EVENT))
+			if (World.Saving || (Service && type == ConsoleEventType.CTRL_LOGOFF_EVENT))
 			{
 				return true;
 			}
@@ -370,8 +342,7 @@ namespace Server
 			HandleClosed();
 		}
 
-		private static bool m_Closing;
-		public static bool Closing => m_Closing;
+		public static bool Closing { get; private set; }
 
 		private static int m_CycleIndex = 1;
 		private static readonly float[] m_CyclesPerSecond = new float[100];
@@ -391,20 +362,20 @@ namespace Server
 
 			if (restart)
 			{
-				Process.Start(ExePath, Arguments);
+				_ = Process.Start(ExePath, Arguments);
 			}
 
-			m_Process.Kill();
+			Process.Kill();
 		}
 
 		private static void HandleClosed()
 		{
-			if (m_Closing)
+			if (Closing)
 			{
 				return;
 			}
 
-			m_Closing = true;
+			Closing = true;
 
 			Console.WriteLine("Exiting...");
 
@@ -420,9 +391,9 @@ namespace Server
 			Console.WriteLine("done");
 		}
 
-		private static readonly AutoResetEvent m_Signal = new AutoResetEvent(true);
+		private static readonly AutoResetEvent m_Signal = new(true);
 
-		public static void Set() { m_Signal.Set(); }
+		public static void Set() { _ = m_Signal.Set(); }
 
 		public static void Start(string[] args)
 		{
@@ -433,11 +404,11 @@ namespace Server
 			{
 				if (Insensitive.Equals(a, "-debug"))
 				{
-					m_Debug = true;
+					Debug = true;
 				}
 				else if (Insensitive.Equals(a, "-service"))
 				{
-					m_Service = true;
+					Service = true;
 				}
 				else if (Insensitive.Equals(a, "-profile"))
 				{
@@ -449,11 +420,7 @@ namespace Server
 				}
 				else if (Insensitive.Equals(a, "-haltonwarning"))
 				{
-					m_HaltOnWarning = true;
-				}
-				else if (Insensitive.Equals(a, "-vb"))
-				{
-					m_VBdotNET = true;
+					HaltOnWarning = true;
 				}
 				else if (Insensitive.Equals(a, "-usehrt"))
 				{
@@ -463,35 +430,35 @@ namespace Server
 
 			try
 			{
-				if (m_Service)
+				if (Service)
 				{
 					var path = Path.Combine("Export", "Logs");
 
 					if (!Directory.Exists(path))
 					{
-						Directory.CreateDirectory(path);
+						_ = Directory.CreateDirectory(path);
 					}
 
 					path = Path.Combine(path, "Console.log");
 
-					Console.SetOut(m_MultiConOut = new MultiTextWriter(new FileLogger(path)));
+					Console.SetOut(MultiConsoleOut = new MultiTextWriter(new FileLogger(path)));
 				}
 				else
 				{
-					Console.SetOut(m_MultiConOut = new MultiTextWriter(Console.Out));
+					Console.SetOut(MultiConsoleOut = new MultiTextWriter(Console.Out));
 				}
 			}
 			catch
 			{
 			}
 
-			m_Thread = Thread.CurrentThread;
-			m_Process = Process.GetCurrentProcess();
-			m_Assembly = Assembly.GetEntryAssembly();
+			Thread = Thread.CurrentThread;
+			Process = Process.GetCurrentProcess();
+			Assembly = Assembly.GetEntryAssembly();
 
-			if (m_Thread != null)
+			if (Thread != null)
 			{
-				m_Thread.Name = "Core Thread";
+				Thread.Name = "Core Thread";
 			}
 
 			if (BaseDirectory.Length > 0)
@@ -504,7 +471,7 @@ namespace Server
 				Name = "Timer Thread"
 			};
 
-			var ver = m_Assembly.GetName().Version;
+			var ver = Assembly.GetName().Version;
 
 			#region uoAvos Console Application Window
 
@@ -521,28 +488,30 @@ namespace Server
 				Console.WriteLine($"Core: Running with arguments: {s}");
 			}
 
-			m_ProcessorCount = Environment.ProcessorCount;
+			ProcessorCount = Environment.ProcessorCount;
 
-			if (m_ProcessorCount > 1)
+			if (ProcessorCount > 1)
 			{
-				m_MultiProcessor = true;
+				MultiProcessor = true;
 			}
 
-			if (m_MultiProcessor || Is64Bit)
+			if (MultiProcessor || Is64Bit)
 			{
-				Console.WriteLine("Core: Optimizing for {0} {2}processor{1}", m_ProcessorCount, m_ProcessorCount == 1 ? "" : "s", Is64Bit ? "64-bit " : "");
+				Console.WriteLine("Core: Optimizing for {0} {2}processor{1}", ProcessorCount, ProcessorCount == 1 ? "" : "s", Is64Bit ? "64-bit " : "");
 			}
 
 			var platform = (int)Environment.OSVersion.Platform;
-			if (platform == 4 || platform == 128)
-			{ // MS 4, MONO 128
-				m_Unix = true;
+
+			// MS 4, MONO 128
+			if (platform is 4 or 128)
+			{
+				Unix = true;
 				Console.WriteLine("Core: Unix environment detected");
 			}
 			else
 			{
 				m_ConsoleEventHandler = OnConsoleEvent;
-				UnsafeNativeMethods.SetConsoleCtrlHandler(m_ConsoleEventHandler, true);
+				_ = UnsafeNativeMethods.SetConsoleCtrlHandler(m_ConsoleEventHandler, true);
 			}
 
 			if (GCSettings.IsServerGC)
@@ -557,11 +526,11 @@ namespace Server
 
 			Console.WriteLine("RandomImpl: {0} ({1})", RandomImpl.Type.Name, RandomImpl.IsHardwareRNG ? "Hardware" : "Software");
 
-			while (!ScriptCompiler.Compile(m_Debug, m_Cache))
+			while (!ScriptCompiler.Compile(Debug, m_Cache))
 			{
 				Console.WriteLine("Scripts: One or more scripts failed to compile or no script files were found.");
 
-				if (m_Service)
+				if (Service)
 				{
 					return;
 				}
@@ -586,14 +555,9 @@ namespace Server
 
 			DisplayDataDirectories();
 
-			var messagePump = m_MessagePump = new MessagePump();
+			m_MessagePump.Listen();
 
 			m_TimerThread.Start();
-
-			foreach (var m in Map.AllMaps)
-			{
-				m.Tiles.Force();
-			}
 
 			NetState.Initialize();
 
@@ -608,23 +572,21 @@ namespace Server
 
 				long sample = 0;
 
-				while (!m_Closing)
+				while (!Closing)
 				{
-					m_Signal.WaitOne();
+					_ = m_Signal.WaitOne();
 
 					Mobile.ProcessDeltaQueue();
 					Item.ProcessDeltaQueue();
 
 					Timer.Slice();
-					messagePump.Slice();
+
+					m_MessagePump?.Slice();
 
 					NetState.FlushAll();
 					NetState.ProcessDisposedQueue();
 
-					if (Slice != null)
-					{
-						Slice();
-					}
+					Slice?.Invoke();
 
 					if (sample++ % sampleInterval != 0)
 					{
@@ -648,12 +610,12 @@ namespace Server
 			{
 				var sb = new StringBuilder();
 
-				if (m_Debug)
+				if (Debug)
 				{
 					Utility.Separate(sb, "-debug", " ");
 				}
 
-				if (m_Service)
+				if (Service)
 				{
 					Utility.Separate(sb, "-service", " ");
 				}
@@ -668,14 +630,9 @@ namespace Server
 					Utility.Separate(sb, "-nocache", " ");
 				}
 
-				if (m_HaltOnWarning)
+				if (HaltOnWarning)
 				{
 					Utility.Separate(sb, "-haltonwarning", " ");
-				}
-
-				if (m_VBdotNET)
-				{
-					Utility.Separate(sb, "-vb", " ");
 				}
 
 				if (_UseHRT)
@@ -687,23 +644,11 @@ namespace Server
 			}
 		}
 
-		private static int m_GlobalUpdateRange = 18;
+		public static int GlobalUpdateRange { get; set; } = 18;
 
-		public static int GlobalUpdateRange
-		{
-			get => m_GlobalUpdateRange;
-			set => m_GlobalUpdateRange = value;
-		}
+		public static int GlobalMaxUpdateRange { get; set; } = 24;
 
-		private static int m_GlobalMaxUpdateRange = 24;
-
-		public static int GlobalMaxUpdateRange
-		{
-			get => m_GlobalMaxUpdateRange;
-			set => m_GlobalMaxUpdateRange = value;
-		}
-
-		private static int m_ItemCount, m_MobileCount;
+		private static volatile int m_ItemCount, m_MobileCount;
 
 		public static int ScriptItems => m_ItemCount;
 		public static int ScriptMobiles => m_MobileCount;
@@ -736,13 +681,11 @@ namespace Server
 
 			if (isItem)
 			{
-				//++_ItemCount;
-				Interlocked.Increment(ref m_ItemCount);
+				_ = Interlocked.Increment(ref m_ItemCount);
 			}
 			else
 			{
-				//++_MobileCount;
-				Interlocked.Increment(ref m_MobileCount);
+				_ = Interlocked.Increment(ref m_MobileCount);
 			}
 
 			StringBuilder warningSb = null;
@@ -751,45 +694,33 @@ namespace Server
 			{
 				if (t.GetConstructor(m_SerialTypeArray) == null)
 				{
-					warningSb = new StringBuilder();
+					warningSb ??= new StringBuilder();
 
-					warningSb.AppendLine("       - No serialization constructor");
+					_ = warningSb.AppendLine("       - No serialization constructor");
 				}
 
-				if (
-					t.GetMethod(
-						"Serialize",
-						BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly) == null)
+				if (t.GetMethod("Serialize", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly) == null)
 				{
-					if (warningSb == null)
-					{
-						warningSb = new StringBuilder();
-					}
+					warningSb ??= new StringBuilder();
 
-					warningSb.AppendLine("       - No Serialize() method");
+					_ = warningSb.AppendLine("       - No Serialize() method");
 				}
 
-				if (
-					t.GetMethod(
-						"Deserialize",
-						BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly) == null)
+				if (t.GetMethod("Deserialize", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly) == null)
 				{
-					if (warningSb == null)
-					{
-						warningSb = new StringBuilder();
-					}
+					warningSb ??= new StringBuilder();
 
-					warningSb.AppendLine("       - No Deserialize() method");
+					_ = warningSb.AppendLine("       - No Deserialize() method");
 				}
 
 				if (warningSb != null && warningSb.Length > 0)
 				{
-					Console.WriteLine("Warning: {0}\n{1}", t, warningSb);
+					Console.WriteLine($"Warning: {t}\n{warningSb}");
 				}
 			}
 			catch
 			{
-				Console.WriteLine("Warning: Exception in serialization verification of type {0}", t);
+				Console.WriteLine($"Warning: Exception in serialization verification of type {t}");
 			}
 		}
 
@@ -797,7 +728,7 @@ namespace Server
 		{
 			if (a != null)
 			{
-				Parallel.ForEach(a.GetTypes(), VerifyType);
+				_ = Parallel.ForEach(a.GetTypes(), VerifyType);
 			}
 		}
 	}
@@ -832,44 +763,38 @@ namespace Server
 
 		public override void Write(char ch)
 		{
-			using (var writer = new StreamWriter(new FileStream(FileName, FileMode.Append, FileAccess.Write, FileShare.Read)))
+			using var writer = new StreamWriter(new FileStream(FileName, FileMode.Append, FileAccess.Write, FileShare.Read));
+			if (_NewLine)
 			{
-				if (_NewLine)
-				{
-					writer.Write(DateTime.UtcNow.ToString(DateFormat));
-					_NewLine = false;
-				}
-
-				writer.Write(ch);
+				writer.Write(DateTime.UtcNow.ToString(DateFormat));
+				_NewLine = false;
 			}
+
+			writer.Write(ch);
 		}
 
 		public override void Write(string str)
 		{
-			using (var writer = new StreamWriter(new FileStream(FileName, FileMode.Append, FileAccess.Write, FileShare.Read)))
+			using var writer = new StreamWriter(new FileStream(FileName, FileMode.Append, FileAccess.Write, FileShare.Read));
+			if (_NewLine)
 			{
-				if (_NewLine)
-				{
-					writer.Write(DateTime.UtcNow.ToString(DateFormat));
-					_NewLine = false;
-				}
-
-				writer.Write(str);
+				writer.Write(DateTime.UtcNow.ToString(DateFormat));
+				_NewLine = false;
 			}
+
+			writer.Write(str);
 		}
 
 		public override void WriteLine(string line)
 		{
-			using (var writer = new StreamWriter(new FileStream(FileName, FileMode.Append, FileAccess.Write, FileShare.Read)))
+			using var writer = new StreamWriter(new FileStream(FileName, FileMode.Append, FileAccess.Write, FileShare.Read));
+			if (_NewLine)
 			{
-				if (_NewLine)
-				{
-					writer.Write(DateTime.UtcNow.ToString(DateFormat));
-				}
-
-				writer.WriteLine(line);
-				_NewLine = true;
+				writer.Write(DateTime.UtcNow.ToString(DateFormat));
 			}
+
+			writer.WriteLine(line);
+			_NewLine = true;
 		}
 
 		public override Encoding Encoding => Encoding.Default;
@@ -896,7 +821,7 @@ namespace Server
 
 		public void Remove(TextWriter tw)
 		{
-			_Streams.Remove(tw);
+			_ = _Streams.Remove(tw);
 		}
 
 		public override void Write(char ch)

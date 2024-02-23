@@ -1,0 +1,353 @@
+﻿using Server;
+using Server.Engines.Harvest;
+using Server.Items;
+using Server.Misc;
+using Server.Multis;
+
+using System;
+using System.Collections.Generic;
+
+namespace Server
+{
+
+}
+
+namespace Server
+{
+    public class MINER_Path
+    {
+        public List<Tuple<Point3D, Direction>> list {get; set;}
+        public Point3D point3d {get; set;}
+    }
+
+    public class ActionAI_MinerPaths
+    {
+        public static List<Tuple<Point3D, Direction>> path_miner = new List<Tuple<Point3D, Direction>>
+        {
+            (new Tuple<Point3D, Direction> (new Point3D(3510, 2755, 7), Direction.West)),
+            (new Tuple<Point3D, Direction> (new Point3D(3512, 2761, 4), Direction.West)),
+            (new Tuple<Point3D, Direction> (new Point3D(3516, 2770, 9), Direction.West)),
+            (new Tuple<Point3D, Direction> (new Point3D(3517, 2765, 14), Direction.East)),
+            (new Tuple<Point3D, Direction> (new Point3D(3513, 2757, 9), Direction.East)),
+            (new Tuple<Point3D, Direction> (new Point3D(3511, 2753, 7), Direction.North)),
+        };
+
+
+        public static List<MINER_Path> MINER_ListOfPaths = new List<MINER_Path>
+        {
+            ( new MINER_Path(path_miner, new Point3D(path_miner[0].Item1) )
+        };
+
+    }
+
+    
+}
+
+namespace Server.Mobiles
+{
+    public class ActionAI_Miner : BaseCreature
+    {
+        private MinerCamp m_Camp;
+        public PathFollower m_Path;
+        private int m_Index;
+        private WayPoint m_waypointFirst;
+        private List<Tuple<Point3D, Direction>> m_MobilePath;
+
+        public override HarvestDefinition harvestDefinition { get { return Mining.System.OreAndStone; } }
+        public override HarvestSystem harvestSystem { get { return Mining.System; } }
+
+        [CommandProperty(AccessLevel.GameMaster)]
+        public int Index
+        {
+            get { return m_Index; }
+            set { m_Index = value; }
+        }
+
+        [CommandProperty(AccessLevel.GameMaster)]
+        public WayPoint waypointFirst
+        {
+            get { return m_waypointFirst; }
+            set { m_waypointFirst = value; }
+        }
+
+        [CommandProperty(AccessLevel.GameMaster)]
+        public List<Tuple<Point3D, Direction>> MobilePath
+        {
+            get { return m_MobilePath; }
+            set { m_MobilePath = value; }
+        }
+
+        //private static readonly double[] m_StandardPassiveSpeeds = new[] { 0.350, 0.2, 0.4, 0.5, 0.6, 0.8, 1.0, 1.2, 1.6, 2.0 };
+
+        //BaseCreature( AIType ai, FightMode mode, int iRangePerception, int iRangeFight, double dActiveSpeed, double dPassiveSpeed)
+        [Constructable]
+        public ActionAI_Miner()
+            : base(AIType.AI_ActionAI, FightMode.None, 10, 1, 0.2, 1.6)
+        {
+            InitStats(31, 41, 51);
+
+            SetSkill(SkillName.Healing, 36, 68);
+            SetSkill(SkillName.Mining, 200, 300);
+
+            RangeHome = 0;
+
+            SpeechHue = Utility.RandomDyedHue();
+            Title = "the MiningAiTestMobile";
+            Hue = Utility.RandomSkinHue();
+
+
+            if (this.Female = Utility.RandomBool())
+            {
+                this.Body = 0x191;
+                this.Name = NameList.RandomName("female");
+            }
+            else
+            {
+                this.Body = 0x190;
+                this.Name = NameList.RandomName("male");
+            }
+            AddItem(new Doublet(Utility.RandomDyedHue()));
+            AddItem(new Sandals(Utility.RandomNeutralHue()));
+            AddItem(new ShortPants(Utility.RandomNeutralHue()));
+            AddItem(new HalfApron(Utility.RandomDyedHue()));
+
+            AddItem(new Pickaxe());
+
+            Utility.AssignRandomHair(this);
+
+            Container pack = new Backpack();
+
+            //pack.DropItem( new Gold( 250, 300 ) );
+
+            pack.Movable = false;
+
+            AddItem(pack);
+
+            RangeHome = 10;
+
+
+            Timer.DelayCall(CreateCamp);
+        }
+
+        private void SetPath()
+        {
+           /*  switch (this.Map)
+            {
+                case Map.Felucca:
+                    SetPathFelucca();
+                    break;
+            } */
+        
+            /* if( (Home.X <= MinerPaths.path_3461_2745_50[0].Item1.X || Home.X >= MinerPaths.path_3461_2745_50[0].Item1.X) & (Home.Y <= MinerPaths.path_3461_2745_50[0].Item1.Y || Home.Y >= MinerPaths.path_3461_2745_50[0].Item1.Y) )
+				m_MobilePath = MinerPaths.path_3461_2745_50; */
+
+            //m_MobilePath = ActionAI_MinerPaths.path_miner;
+
+            Timer.DelayCall(TimeSpan.FromSeconds(10.0), MoveWayPoint);
+        }
+
+        private void SetPathFelucca()
+        {
+            
+        }
+
+        public void CreateCamp()
+        {
+            if (!Alive && Deleted)
+            {
+                return;
+            }
+
+            Home = this.Location;
+
+            /* if( (Home.X <= MinerPaths.path_3461_2745_50[0].Item1.X || Home.X >= MinerPaths.path_3461_2745_50[0].Item1.X) & (Home.Y <= MinerPaths.path_3461_2745_50[0].Item1.Y || Home.Y >= MinerPaths.path_3461_2745_50[0].Item1.Y) )
+				m_MobilePath = MinerPaths.path_3461_2745_50; */
+
+            m_MobilePath = ActionAI_MinerPaths.path_miner;
+
+            //Timer.DelayCall(TimeSpan.FromSeconds( 0.5 ), SetPath);
+
+            MinerCamp camp = new MinerCamp();
+
+            camp.MoveToWorld(this.Location, this.Map);
+
+            m_Camp = camp;
+
+            if (Backpack == null)
+                AddItem(new Backpack());
+
+            if (m_MobilePath == null)
+            {
+                //Timer.DelayCall(TimeSpan.FromSeconds( 0.5 ), SetPath);
+                return;
+            }
+
+
+            // Create the first Waypoint
+            m_waypointFirst = new WayPoint();
+            m_waypointFirst.MoveToWorld(m_MobilePath[0].Item1, Map);
+
+            CurrentWayPoint = m_waypointFirst;
+            Timer.DelayCall(TimeSpan.FromSeconds(10.0), MoveWayPoint);
+        }
+
+
+        public override void OnThink()
+        {
+            if (!Alive && Deleted)
+            {
+                return;
+            }
+
+            //WayPoint point = CurrentWayPoint;
+
+            if (Alive && !Deleted)
+            {
+                if (m_waypointFirst.Location == Home)
+                {
+                    //CantWalk = true;
+                    CurrentSpeed = 2.0;
+                    //CurrentWayPoint = m_waypointFirst;
+
+                    Timer.DelayCall(TimeSpan.FromMinutes(5.0), MoveWayPoint);
+                }
+
+                if (Location != Home && m_waypointFirst != null && (m_waypointFirst.X == Location.X & m_waypointFirst.Y == Location.Y))
+                {
+                    CantWalk = true;
+                    CurrentSpeed = 2.0;
+
+                    Direction = m_MobilePath[m_Index].Item2;
+                    Animate(11, 5, 1, true, false, 0);
+
+                    //Animate( Utility.RandomList( harvestDefinition.EffectActions ), 5, 1, true, false, 0 );
+                    PlaySound(Utility.RandomList(harvestDefinition.EffectSounds));
+                }
+                else
+                {
+                    CurrentSpeed = 0.2;
+                    CantWalk = false;
+                }
+            }
+        }
+
+        public void MoveWayPoint()
+        {
+            if (!Alive && Deleted)
+            {
+                return;
+            }
+
+            //CurrentWayPoint = waypointFirst;
+            if (Alive && !Deleted)
+            {
+                if (waypointFirst != null && (waypointFirst.X == Location.X & waypointFirst.Y == Location.Y))
+                {
+                    CantWalk = false;
+
+                    if ((m_Index + 1) < m_MobilePath.Count)
+                    {
+                        m_Index++;
+                        //Emote("moving to next point");
+                        waypointFirst.Location = m_MobilePath[m_Index].Item1;
+                        CurrentWayPoint = waypointFirst;
+                        Timer.DelayCall(TimeSpan.FromSeconds(10.0), MoveWayPoint);
+                    }
+                    else
+                    {
+                        //Emote("returning to camp");
+                        m_Index = 0;
+                        waypointFirst.Location = Home;
+                        CurrentWayPoint = waypointFirst;
+                    }
+                }
+            }
+        }
+
+        // separate method in case mobile isn't on a way point at startup, this will force them to start moving again
+        public void MoveWayPointOnDeserialize()
+        {
+            if (!Alive && Deleted)
+            {
+                return;
+            }
+
+            if (Alive && !Deleted)
+            {
+                if (m_MobilePath == null)
+                {
+                    return;
+                }
+
+                CurrentWayPoint = waypointFirst;
+
+                if (waypointFirst != null)
+                {
+                    CantWalk = false;
+
+                    if ((m_Index + 1) < m_MobilePath.Count)
+                    {
+                        m_Index++;
+                        //Emote("moving to next point");
+                        waypointFirst.Location = m_MobilePath[m_Index].Item1;
+                        CurrentWayPoint = waypointFirst;
+                        Timer.DelayCall(TimeSpan.FromSeconds(10.0), MoveWayPoint);
+                    }
+                    else
+                    {
+                        //Emote("returning to camp");
+                        m_Index = 0;
+                        waypointFirst.Location = Home;
+                        CurrentWayPoint = waypointFirst;
+                    }
+                }
+            }
+        }
+
+        public override void OnDelete()
+        {
+            if (m_Camp != null && !m_Camp.Deleted)
+                m_Camp.Delete();
+
+            base.OnDelete();
+        }
+
+        public ActionAI_Miner(Serial serial)
+            : base(serial)
+        {
+        }
+
+        public override void Serialize(GenericWriter writer)
+        {
+            base.Serialize(writer);
+
+            writer.Write((int)1); // version 
+
+            //version 1
+            //writer.Write( m_MobilePath );
+
+            //version 0
+            writer.Write(m_Camp);
+            writer.Write(m_waypointFirst);
+        }
+
+        public override void Deserialize(GenericReader reader)
+        {
+            base.Deserialize(reader);
+
+            int version = reader.ReadInt();
+
+            //m_MobilePath = reader.Read;
+
+            m_Camp = reader.ReadItem() as MinerCamp;
+            m_waypointFirst = reader.ReadItem() as WayPoint;
+
+            /* if( (Home.X <= MinerPaths.path_3461_2745_50[0].Item1.X || Home.X >= MinerPaths.path_3461_2745_50[0].Item1.X) & (Home.Y <= MinerPaths.path_3461_2745_50[0].Item1.Y || Home.Y >= MinerPaths.path_3461_2745_50[0].Item1.Y) )
+				m_MobilePath = MinerPaths.path_3461_2745_50; */
+
+            m_MobilePath = ActionAI_MinerPaths.path_miner;
+
+            Timer.DelayCall(TimeSpan.FromSeconds(10.0), MoveWayPointOnDeserialize);
+        }
+    }
+}

@@ -11,7 +11,7 @@ namespace Server.ContextMenus
 	public class ContextMenu
 	{
 		private readonly Mobile m_From;
-		private readonly object m_Target;
+		private readonly IEntity m_Target;
 		private readonly ContextMenuEntry[] m_Entries;
 
 		/// <summary>
@@ -22,7 +22,7 @@ namespace Server.ContextMenus
 		/// <summary>
 		/// Gets an object of the <see cref="Mobile" /> or <see cref="Item" /> for which this ContextMenu is on.
 		/// </summary>
-		public object Target => m_Target;
+		public IEntity Target => m_Target;
 
 		/// <summary>
 		/// Gets the list of <see cref="ContextMenuEntry">entries</see> contained in this ContextMenu.
@@ -40,7 +40,7 @@ namespace Server.ContextMenus
 		/// The <see cref="Mobile" /> or <see cref="Item" /> for which this ContextMenu is on.
 		/// <seealso cref="Target" />
 		/// </param>
-		public ContextMenu(Mobile from, object target)
+		public ContextMenu(Mobile from, IEntity target)
 		{
 			m_From = from;
 			m_Target = target;
@@ -56,7 +56,7 @@ namespace Server.ContextMenus
 				((Item)target).GetContextMenuEntries(from, list);
 			}
 
-			//m_Entries = (ContextMenuEntry[])list.ToArray( typeof( ContextMenuEntry ) );
+			EventSink.InvokeContextMenuRequest(new ContextMenuRequestEventArgs(from, target, list));
 
 			m_Entries = list.ToArray();
 

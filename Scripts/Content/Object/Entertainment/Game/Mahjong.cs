@@ -1116,7 +1116,7 @@ namespace Server.Engines.Mahjong
 
 		public static void OnPacket(NetState state, PacketReader pvSrc)
 		{
-			var game = World.FindItem(pvSrc.ReadInt32()) as MahjongGame;
+			var game = pvSrc.ReadItem() as MahjongGame;
 
 			if (game != null)
 			{

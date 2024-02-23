@@ -1,0 +1,18 @@
+﻿
+    ____              __  ______       ____________    _________________________________________________
+   / __ \__  ______  / / / / __ \     / ____/ ____/    Server Acknowledgement: © The RunUO Software Team
+  / /_/ / / / / __ \/ / / / / / /    / /   / __/         RunUO Initialized On: 05/01/2002 (mm/dd/yyyy)
+ / _, _/ /_/ / / / / /_/ / /_/ /    / /___/ /___       *************************************************
+/_/ |_|\__,_/_/ /_/\____/\____/_____\____/_____/        This file is maintained by: www.uoavocation.net
+                                                 
+________________________________________________________________________________________________________
+FILE MODIFICATIONS                                                                           | CHANGELOG
+========================================================================================================
+--------------------------------------------------------------------------------------------------------
+[x] [DATE: 11/14/2020 (mm/dd/yyyy)] [CODE DEVELOPED BY: zerodowned]
+
+[i] This command is what sets the path waypoints for ActionAI mobiles so that they can walk from 
+    resource location to resource location. After using the "[plot" or "[mark" commands go to the
+    server console and copy and paste the code that will appear into the individual mobile scripts.
+
+>>> [✔] Added ActionAI.cs

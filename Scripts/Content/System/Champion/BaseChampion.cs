@@ -994,7 +994,7 @@ namespace Server.Engines.CannedEvil
 			UpdateRegionArea();
 		}
 
-		public override void OnMapChange()
+		public override void OnMapChange(Map oldMap)
 		{
 			if (Deleted)
 			{

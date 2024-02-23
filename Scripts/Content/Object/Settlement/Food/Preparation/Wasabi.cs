@@ -11,6 +11,7 @@
 		public override void OnDoubleClick(Mobile from)
 		{
 			from.AddToBackpack(new WasabiClumps(2));
+
 			Delete();
 
 			base.OnDoubleClick(from);
@@ -38,11 +39,16 @@
 	public class WasabiClumps : Food
 	{
 		[Constructable]
-		public WasabiClumps() : base(0x24EB)
+		public WasabiClumps() : this(2)
+		{
+		}
+
+		[Constructable]
+		public WasabiClumps(int fillFactor) : base(0x24EB)
 		{
 			Stackable = false;
 			Weight = 1.0;
-			FillFactor = 2;
+			FillFactor = fillFactor;
 		}
 
 		public WasabiClumps(Serial serial) : base(serial)

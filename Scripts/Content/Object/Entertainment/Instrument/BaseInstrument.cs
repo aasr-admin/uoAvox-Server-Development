@@ -1,5 +1,4 @@
-﻿using Server.Engines.Craft;
-using Server.Mobiles;
+﻿using Server.Mobiles;
 using Server.Network;
 using Server.Targeting;
 
@@ -10,18 +9,11 @@ namespace Server.Items
 {
 	public delegate void InstrumentPickedCallback(Mobile from, BaseInstrument instrument);
 
-	public enum InstrumentQuality
-	{
-		Low,
-		Regular,
-		Exceptional
-	}
-
-	public abstract class BaseInstrument : Item, ICraftable, ISlayer
+	public abstract class BaseInstrument : Item, ICraftable, ISlayer, IQuality
 	{
 		private int m_WellSound, m_BadlySound;
 		private SlayerName m_Slayer, m_Slayer2;
-		private InstrumentQuality m_Quality;
+		private ItemQuality m_Quality;
 		private Mobile m_Crafter;
 		private int m_UsesRemaining;
 
@@ -54,7 +46,7 @@ namespace Server.Items
 		}
 
 		[CommandProperty(AccessLevel.GameMaster)]
-		public InstrumentQuality Quality
+		public ItemQuality Quality
 		{
 			get => m_Quality;
 			set { UnscaleUses(); m_Quality = value; InvalidateProperties(); ScaleUses(); }
@@ -143,7 +135,7 @@ namespace Server.Items
 
 		public int GetUsesScalar()
 		{
-			if (m_Quality == InstrumentQuality.Exceptional)
+			if (m_Quality == ItemQuality.Exceptional)
 			{
 				return 200;
 			}
@@ -330,7 +322,7 @@ namespace Server.Items
 		{
 			var val = GetBaseDifficulty(targ);
 
-			if (m_Quality == InstrumentQuality.Exceptional)
+			if (m_Quality == ItemQuality.Exceptional)
 			{
 				val -= 5.0; // 10%
 			}
@@ -396,7 +388,7 @@ namespace Server.Items
 				list.Add(1050043, m_Crafter.Name); // crafted by ~1_NAME~
 			}
 
-			if (m_Quality == InstrumentQuality.Exceptional)
+			if (m_Quality == ItemQuality.Exceptional)
 			{
 				list.Add(1060636); // exceptional
 			}
@@ -448,7 +440,7 @@ namespace Server.Items
 				}
 			}
 
-			if (m_Quality == InstrumentQuality.Exceptional)
+			if (m_Quality == ItemQuality.Exceptional)
 			{
 				attrs.Add(new EquipInfoAttribute(1018305 - (int)m_Quality));
 			}
@@ -550,7 +542,7 @@ namespace Server.Items
 					{
 						m_Crafter = reader.ReadMobile();
 
-						m_Quality = (InstrumentQuality)reader.ReadEncodedInt();
+						m_Quality = (ItemQuality)reader.ReadEncodedInt();
 						m_Slayer = (SlayerName)reader.ReadEncodedInt();
 						m_Slayer2 = (SlayerName)reader.ReadEncodedInt();
 
@@ -565,7 +557,7 @@ namespace Server.Items
 					{
 						m_Crafter = reader.ReadMobile();
 
-						m_Quality = (InstrumentQuality)reader.ReadEncodedInt();
+						m_Quality = (ItemQuality)reader.ReadEncodedInt();
 						m_Slayer = (SlayerName)reader.ReadEncodedInt();
 
 						UsesRemaining = reader.ReadEncodedInt();
@@ -648,11 +640,12 @@ namespace Server.Items
 				m_From.EndAction(typeof(BaseInstrument));
 			}
 		}
-		#region ICraftable Members
 
-		public int OnCraft(int quality, bool makersMark, Mobile from, CraftSystem craftSystem, Type typeRes, BaseTool tool, CraftItem craftItem, int resHue)
+		#region ICraftable
+
+		public virtual int OnCraft(int quality, bool makersMark, Mobile from, ICraftSystem craftSystem, Type typeRes, ICraftTool tool, ICraftItem craftItem, int resHue)
 		{
-			Quality = (InstrumentQuality)quality;
+			Quality = (ItemQuality)quality;
 
 			if (makersMark)
 			{

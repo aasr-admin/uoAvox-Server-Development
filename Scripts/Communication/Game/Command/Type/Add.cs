@@ -1377,12 +1377,6 @@ namespace Server.Commands
 					typeof(BaseShieldGuard),
 				},
 				#endregion
-				#region Escortables
-				new CategoryNode("Escortables")
-				{
-					typeof(BaseEscortable),
-				},
-				#endregion
 				#region Vendors
 				new CategoryNode("Vendors")
 				{
@@ -2296,7 +2290,7 @@ namespace Server.Gumps
 				AddImage(10, 249, 4014);
 			}
 
-			AddHtmlLocalized(44, 250, 170, 20, 1061028, m_Page > 0 ? 0x7FFF : 0x5EF7, false, false); // Previous page
+			AddHtmlLocalized(44, 250, 170, 20, 1061028, (short)(m_Page > 0 ? 0x7FFF : 0x5EF7), false, false); // Previous page
 
 			if (((m_Page + 1) * 10) < searchResults.Length)
 			{
@@ -2307,7 +2301,7 @@ namespace Server.Gumps
 				AddImage(210, 249, 4005);
 			}
 
-			AddHtmlLocalized(244, 250, 170, 20, 1061027, ((m_Page + 1) * 10) < searchResults.Length ? 0x7FFF : 0x5EF7, false, false); // Next page
+			AddHtmlLocalized(244, 250, 170, 20, 1061027, (short)((m_Page + 1) * 10 < searchResults.Length ? 0x7FFF : 0x5EF7), false, false); // Next page
 		}
 
 		private static readonly Type typeofItem = typeof(Item), typeofMobile = typeof(Mobile);

@@ -6,7 +6,7 @@ using System.Collections.Generic;
 namespace Server.Mobiles
 {
 	[CorpseName("a llama corpse")]
-	public class PackLlama : BaseCreature
+	public class PackLlama : BaseCreature, IPackAnimal
 	{
 		[Constructable]
 		public PackLlama() : base(AIType.AI_Animal, FightMode.Aggressor, 10, 1, 0.2, 0.4)

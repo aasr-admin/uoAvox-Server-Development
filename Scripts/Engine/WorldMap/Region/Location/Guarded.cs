@@ -136,7 +136,7 @@ namespace Server.Regions
 		public bool Disabled { get; set; }
 
 		[CommandProperty(AccessLevel.Counselor, AccessLevel.GameMaster)]
-		public bool AllowReds { get; set; }
+		public bool MurderersAllowed { get; set; }
 
 		public GuardedRegion(string name, Map map, int priority, params Rectangle2D[] area) : base(name, map, priority, area)
 		{
@@ -183,24 +183,20 @@ namespace Server.Regions
 			base.DefaultInit();
 
 			GuardType = null;
-			Disabled = false;
-			AllowReds = Core.AOS;
-			HousingAllowed = false;
-		}
 
-		public virtual bool IsDisabled()
-		{
-			return Disabled;
+			Disabled = false;
+			MurderersAllowed = true;
+			HousingAllowed = false;
 		}
 
 		public virtual bool CheckVendorAccess(BaseVendor vendor, Mobile from)
 		{
-			if (from.AccessLevel >= AccessLevel.GameMaster || IsDisabled())
+			if (from.AccessLevel >= AccessLevel.GameMaster || Disabled)
 			{
 				return true;
 			}
 
-			if (!from.Murderer || AllowReds)
+			if (!from.Murderer || MurderersAllowed)
 			{
 				return true;
 			}
@@ -244,15 +240,12 @@ namespace Server.Regions
 					}
 					catch
 					{
-						if (m_GuardType != null)
-						{
-							m_GuardType = null;
-						}
+						m_GuardType = null;
 					}
 				}
-				else if (m_GuardType != null)
+				else 
 				{
-					m_GuardType = null;
+					GuardType = null;
 				}
 			}
 
@@ -261,9 +254,9 @@ namespace Server.Regions
 
 		public override void OnEnter(Mobile m)
 		{
-			if (!IsDisabled())
+			if (!Disabled)
 			{
-				if (!AllowReds && m.Murderer)
+				if (!MurderersAllowed && m.Murderer)
 				{
 					CheckGuardCandidate(m);
 				}
@@ -272,20 +265,11 @@ namespace Server.Regions
 			base.OnEnter(m);
 		}
 
-		public override void OnExit(Mobile m)
-		{
-			if (!IsDisabled())
-			{
-			}
-
-			base.OnExit(m);
-		}
-
 		public override void OnSpeech(SpeechEventArgs args)
 		{
 			base.OnSpeech(args);
 
-			if (!IsDisabled())
+			if (!Disabled)
 			{
 				if (args.Mobile.Alive && args.HasKeyword(0x0007)) // *guards*
 				{
@@ -298,7 +282,7 @@ namespace Server.Regions
 		{
 			base.OnAggressed(aggressor, aggressed, criminal);
 
-			if (!IsDisabled())
+			if (!Disabled)
 			{
 				if (aggressor != aggressed && criminal)
 				{
@@ -311,7 +295,7 @@ namespace Server.Regions
 		{
 			base.OnGotBeneficialAction(helper, helped);
 
-			if (!IsDisabled())
+			if (!Disabled)
 			{
 				var noto = Notoriety.Compute(helper, helped);
 
@@ -326,7 +310,7 @@ namespace Server.Regions
 		{
 			base.OnCriminalAction(m, message);
 
-			if (!IsDisabled())
+			if (!Disabled)
 			{
 				CheckGuardCandidate(m);
 			}
@@ -402,7 +386,7 @@ namespace Server.Regions
 
 		public void CallGuards(Point3D p)
 		{
-			if (!IsDisabled())
+			if (!Disabled)
 			{
 				var eable = Map.GetMobilesInRange(p, 14);
 
@@ -410,7 +394,7 @@ namespace Server.Regions
 				{
 					if (IsGuardCandidate(m))
 					{
-						if (m_GuardCandidates.TryGetValue(m, out var timer) || (!AllowReds && m.Murderer && m.Region.IsPartOf(this)))
+						if (m_GuardCandidates.TryGetValue(m, out var timer) || (!MurderersAllowed && m.Murderer && m.Region.IsPartOf(this)))
 						{
 							if (timer != null)
 							{
@@ -439,7 +423,7 @@ namespace Server.Regions
 
 		public bool IsGuardCandidate(Mobile m)
 		{
-			if (!IsDisabled())
+			if (!Disabled)
 			{
 				if (m is not BaseGuard && (m is not BaseCreature c || !c.IsInvulnerable))
 				{
@@ -450,7 +434,7 @@ namespace Server.Regions
 							return true;
 						}
 
-						if (!AllowReds && m.Murderer)
+						if (!MurderersAllowed && m.Murderer)
 						{
 							return true;
 						}
@@ -468,8 +452,8 @@ namespace Server.Regions
 			writer.Write(0);
 
 			writer.Write(Disabled);
-			writer.Write(AllowReds);
-			writer.WriteObjectType(m_GuardType);
+			writer.Write(MurderersAllowed);
+			writer.WriteObjectType(GuardType);
 		}
 
 		public override void Deserialize(GenericReader reader)
@@ -479,8 +463,8 @@ namespace Server.Regions
 			reader.ReadInt();
 
 			Disabled = reader.ReadBool();
-			AllowReds = reader.ReadBool();
-			m_GuardType = reader.ReadObjectType();
+			MurderersAllowed = reader.ReadBool();
+			GuardType = reader.ReadObjectType();
 		}
 
 		private class GuardTimer : Timer

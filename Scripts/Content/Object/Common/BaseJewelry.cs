@@ -445,29 +445,35 @@ namespace Server.Items
 				m_GemType = GemType.None;
 			}
 		}
-		#region ICraftable Members
 
-		public int OnCraft(int quality, bool makersMark, Mobile from, CraftSystem craftSystem, Type typeRes, BaseTool tool, CraftItem craftItem, int resHue)
+		#region ICraftable
+
+		public virtual int OnCraft(int quality, bool makersMark, Mobile from, ICraftSystem craftSystem, Type typeRes, ICraftTool tool, ICraftItem craftItem, int resHue)
 		{
 			var resourceType = typeRes;
 
-			if (resourceType == null)
+			var ci = craftItem as CraftItem;
+
+			if (resourceType == null && ci != null)
 			{
-				resourceType = craftItem.Resources.GetAt(0).ItemType;
+				resourceType = ci.Resources.GetAt(0).ItemType;
 			}
 
 			Resource = CraftResources.GetFromType(resourceType);
 
-			var context = craftSystem.GetContext(from);
-
-			if (context != null && context.DoNotColor)
+			if (craftSystem is CraftSystem cs)
 			{
-				Hue = 0;
+				var context = cs.GetContext(from);
+
+				if (context != null && context.DoNotColor)
+				{
+					Hue = 0;
+				}
 			}
 
-			if (1 < craftItem.Resources.Count)
+			if (ci != null && ci.Resources.Count > 1)
 			{
-				resourceType = craftItem.Resources.GetAt(1).ItemType;
+				resourceType = ci.Resources.GetAt(1).ItemType;
 
 				if (resourceType == typeof(StarSapphire))
 				{

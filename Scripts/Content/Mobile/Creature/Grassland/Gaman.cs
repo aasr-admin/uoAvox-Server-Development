@@ -69,12 +69,6 @@ namespace Server.Mobiles
 		public override int Hides => 15;
 		public override FoodType FavoriteFood => FoodType.GrainsAndHay;
 
-		public override void OnDeath(Container c)
-		{
-			base.OnDeath(c);
-			c.DropItem(new GamanHorns(Utility.RandomBool() ? 1 : 2));
-		}
-
 		public Gaman(Serial serial) : base(serial)
 		{
 		}

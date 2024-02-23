@@ -237,7 +237,7 @@ namespace Server
 									continue;
 								}
 
-								var newTile = new StaticTile((ushort)item.ItemID, (byte)xOffset, (byte)yOffset, (sbyte)item.Z, (short)item.Hue);
+								var newTile = new StaticTile((ushort)item.ItemID, (byte)xOffset, (byte)yOffset, (sbyte)item.Z, (ushort)item.Hue);
 
 								newTiles[newTileCount++] = newTile;
 
@@ -576,7 +576,7 @@ namespace Server
 					{
 						staTiles[i].Set((ushort)(m_Buffer[index++] | (m_Buffer[index++] << 8)),
 								m_Buffer[index++], m_Buffer[index++], (sbyte)m_Buffer[index++],
-								(short)(m_Buffer[index++] | (m_Buffer[index++] << 8)));
+								(ushort)(m_Buffer[index++] | (m_Buffer[index++] << 8)));
 					}
 				}
 			}

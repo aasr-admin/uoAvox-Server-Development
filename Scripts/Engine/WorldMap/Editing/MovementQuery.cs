@@ -1,14 +1,9 @@
-﻿using Server;
-using Server.Mobiles;
-using Server.Network;
-
-using System;
+﻿using Server.Mobiles;
 
 namespace Server.Engine.Facet
 {
 	public class MovementQuery : FacetEditingQuery
 	{
-
 		public static void Initialize()
 		{
 			PlayerMobile.BlockQuery = new MovementQuery();
@@ -20,11 +15,11 @@ namespace Server.Engine.Facet
 
 		public int QueryMobile(Mobile m, int previousMapBlock)
 		{
-			int blocknum = (((m.Location.X >> 3) * m.Map.Tiles.BlockHeight) + (m.Location.Y >> 3));
+			var blocknum = ((m.Location.X >> 3) * m.Map.Tiles.BlockHeight) + (m.Location.Y >> 3);
 
 			if (blocknum != previousMapBlock)
 			{
-				m.Send(new Server.Engine.Facet.QueryClientHash(m));
+				_ = m.Send(new QueryClientHash(m));
 			}
 
 			return blocknum;

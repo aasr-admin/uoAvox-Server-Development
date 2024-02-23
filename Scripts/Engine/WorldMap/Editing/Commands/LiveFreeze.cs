@@ -130,7 +130,7 @@ namespace Server.Engine.Facet
 						continue;
 					}
 
-					StaticTile newTile = new StaticTile((ushort)item.ItemID, (byte)xOffset, (byte)yOffset, (sbyte)item.Z, (short)item.Hue);
+					StaticTile newTile = new StaticTile((ushort)item.ItemID, (byte)xOffset, (byte)yOffset, (sbyte)item.Z, (ushort)item.Hue);
 					Point2D refPoint = new Point2D(xOffset, yOffset);
 
 					if (!(newBlockStatics.ContainsKey(refPoint)))

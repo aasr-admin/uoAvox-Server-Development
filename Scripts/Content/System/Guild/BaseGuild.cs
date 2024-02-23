@@ -135,7 +135,7 @@ namespace Server.Guilds
 		#endregion
 
 		#region EventSinks
-		public static void EventSink_GuildGumpRequest(GuildGumpRequestArgs args)
+		public static void EventSink_GuildGumpRequest(GuildGumpRequestEventArgs args)
 		{
 			var pm = args.Mobile as PlayerMobile;
 			if (!NewGuildSystem || pm == null)
@@ -2712,7 +2712,7 @@ namespace Server.Guilds
 			AddBackground(450, 370, 100, 26, 0x2486);
 
 			AddButton(455, 375, 0x845, 0x846, 7, GumpButtonType.Reply, 0);
-			AddHtmlLocalized(480, 373, 60, 26, 3006115, (m_IsResigning) ? 0x5000 : 0, false, false); // Resign
+			AddHtmlLocalized(480, 373, 60, 26, 3006115, (short)(m_IsResigning ? 0x5000 : 0), false, false); // Resign
 		}
 
 		public override void OnResponse(NetState sender, RelayInfo info)
@@ -2867,7 +2867,7 @@ namespace Server.Guilds
 
 			AddBackground(20, 180, 150, 26, 0x2486);
 			AddButton(25, 185, 0x845, 0x846, 1, GumpButtonType.Reply, 0);
-			AddHtmlLocalized(50, 183, 110, 26, 1062993, (m_ToLeader) ? 0x990000 : 0, false, false); // Promote
+			AddHtmlLocalized(50, 183, 110, 26, 1062993, (short)(m_ToLeader ? 0x990000 : 0), false, false); // Promote
 
 			AddBackground(180, 180, 150, 26, 0x2486);
 			AddButton(185, 185, 0x845, 0x846, 3, GumpButtonType.Reply, 0);
@@ -2879,7 +2879,7 @@ namespace Server.Guilds
 
 			AddBackground(180, 210, 150, 26, 0x2486);
 			AddButton(185, 215, 0x845, 0x846, 5, GumpButtonType.Reply, 0);
-			AddHtmlLocalized(210, 213, 110, 26, 1062997, (m_toKick) ? 0x5000 : 0, false, false); // Kick
+			AddHtmlLocalized(210, 213, 110, 26, 1062997, (short)(m_toKick ? 0x5000 : 0), false, false); // Kick
 		}
 
 		public override void OnResponse(NetState sender, RelayInfo info)

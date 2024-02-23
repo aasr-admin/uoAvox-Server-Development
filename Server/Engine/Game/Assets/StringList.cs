@@ -9,10 +9,10 @@ namespace Server
 {
 	public class StringList
 	{
-		private static readonly char[] m_Tab = new[] { '\t' };
+		private static readonly char[] m_Tab = { '\t' };
 
 		//C# argument support
-		public static readonly Regex FormatExpression = new Regex(@"~(\d)+_.*?~", RegexOptions.IgnoreCase);
+		public static readonly Regex FormatExpression = new(@"~(\d)+_.*?~", RegexOptions.IgnoreCase);
 
 		public static StringList Localization { get; }
 
@@ -23,12 +23,12 @@ namespace Server
 
 		public static string MatchComparison(Match m)
 		{
-			return $"{{{(Utility.ToInt32(m.Groups[1].Value) - 1)}}}";
+			return $"{{{Utility.ToInt32(m.Groups[1].Value) - 1}}}";
 		}
 
 		public static string FormatArguments(string entry)
 		{
-			return FormatExpression.Replace(entry, new MatchEvaluator(MatchComparison));
+			return FormatExpression.Replace(entry, MatchComparison);
 		}
 
 		public static string CombineArguments(string str, string args)
@@ -139,9 +139,10 @@ namespace Server
 
 	public class StringEntry
 	{
-		private static readonly Regex m_RegEx = new Regex(@"~(\d+)[_\w]+~", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant);
+		private static readonly Regex m_RegEx = new(@"~(\d+)[_\w]+~", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant);
 
-		private static readonly object[] m_Args = new object[] { "", "", "", "", "", "", "", "", "", "", "" };
+		private string m_Format;
+		private int m_ArgCount;
 
 		public int Number { get; private set; }
 		public string Text { get; private set; }
@@ -152,21 +153,44 @@ namespace Server
 			Text = text;
 		}
 
-		private string m_FmtTxt;
-
-		public string Format(params object[] args)
+		public override string ToString()
 		{
-			if (m_FmtTxt == null)
+			return Text;
+		}
+
+		public string ToString(string tsv)
+		{
+			if (tsv == null)
 			{
-				m_FmtTxt = m_RegEx.Replace(Text, @"{$1}");
+				return ToString();
 			}
 
-			for (var i = 0; i < args.Length && i < 10; i++)
+			return ToString(tsv.Split('\t'));
+		}
+
+		public string ToString(params object[] args)
+		{
+			if (m_Format == null)
 			{
-				m_Args[i + 1] = args[i];
+				m_ArgCount = m_RegEx.Count(Text);
+				m_Format = m_ArgCount > 0 ? m_RegEx.Replace(Text, @"{$1}") : String.Empty;
 			}
 
-			return String.Format(m_FmtTxt, m_Args);
+			if (m_ArgCount <= 0 || args == null || args.Length == 0)
+			{
+				return m_Format;
+			}
+
+			if (args.Length < m_ArgCount)
+			{
+				Array.Resize(ref args, m_ArgCount);
+			}
+			else if (args.Length > m_ArgCount)
+			{
+				args[m_ArgCount - 1] = String.Join(' ', args[(m_ArgCount - 1)..]);
+			}
+
+			return String.Format(m_Format, args);
 		}
 	}
 }

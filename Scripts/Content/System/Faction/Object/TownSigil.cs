@@ -589,9 +589,9 @@ namespace Server.Factions
 			UpdateSigil();
 		}
 
-		public override void OnMapChange()
+		public override void OnMapChange(Map oldMap)
 		{
-			base.OnMapChange();
+			base.OnMapChange(oldMap);
 			UpdateSigil();
 		}
 

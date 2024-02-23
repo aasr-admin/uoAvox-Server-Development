@@ -602,19 +602,16 @@ namespace Server.Factions
 
 			var killPoints = pl.KillPoints;
 
-			if (mob.Backpack != null)
+			var pack = mob.Backpack;
+
+			if (pack != null)
 			{
 				//Ordinarily, through normal faction removal, this will never find any sigils.
 				//Only with a leave delay less than the ReturnPeriod or a Faction Kick/Ban, will this ever do anything
-				var sigils = mob.Backpack.FindItemsByType<Sigil>();
-
-				for (var i = 0; i < sigils.Count; ++i)
+				foreach (var sigil in pack.FindItemsByType<Sigil>())
 				{
-					sigils[i].ReturnHome();
+					sigil.ReturnHome();
 				}
-
-				sigils.Clear();
-				sigils.TrimExcess();
 			}
 
 			if (pl.RankIndex != -1)
@@ -1353,12 +1350,9 @@ namespace Server.Factions
 			if (pack != null)
 			{
 				var killerPack = killer?.Backpack;
-				var sigils = pack.FindItemsByType<Sigil>();
 
-				for (var i = 0; i < sigils.Count; ++i)
+				foreach (var sigil in pack.FindItemsByType<Sigil>())
 				{
-					var sigil = sigils[i];
-
 					if (killerState != null && killerPack != null)
 					{
 						if (killer.GetDistanceToSqrt(victim) > 64)
@@ -1382,9 +1376,6 @@ namespace Server.Factions
 						sigil.ReturnHome();
 					}
 				}
-
-				sigils.Clear();
-				sigils.TrimExcess();
 			}
 
 			if (killerState == null)
@@ -1556,15 +1547,10 @@ namespace Server.Factions
 				return;
 			}
 
-			var sigils = pack.FindItemsByType<Sigil>();
-
-			for (var i = 0; i < sigils.Count; ++i)
+			foreach (var sigil in pack.FindItemsByType<Sigil>())
 			{
-				sigils[i].ReturnHome();
+				sigil.ReturnHome();
 			}
-
-			sigils.Clear();
-			sigils.TrimExcess();
 		}
 
 		private static void EventSink_Login(LoginEventArgs e)

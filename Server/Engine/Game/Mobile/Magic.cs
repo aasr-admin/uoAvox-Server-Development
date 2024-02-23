@@ -887,6 +887,44 @@ namespace Server
 		}
 	}
 
+	public sealed class SpellReagents : TypeAmounts
+	{
+		public override int DefaultAmountMin => 0;
+
+		public SpellReagents()
+		{
+		}
+
+		public SpellReagents(params TypeAmount[] entries) 
+			: base(entries)
+		{
+		}
+
+		public SpellReagents(IEnumerable<TypeAmount> entries) 
+			: base(entries)
+		{
+		}
+
+		public SpellReagents(GenericReader reader) 
+			: base(reader)
+		{
+		}
+
+		public override void Serialize(GenericWriter writer)
+		{
+			base.Serialize(writer);
+
+			writer.WriteEncodedInt(0);
+		}
+
+		public override void Deserialize(GenericReader reader)
+		{
+			base.Deserialize(reader);
+
+			reader.ReadEncodedInt();
+		}
+	}
+
 	public sealed class SpellInfo
 	{
 		public static SpellInfo CreateInvalid()
@@ -925,7 +963,7 @@ namespace Server
 		public int Tithe { get; set; } = 0;
 		public double Skill { get; set; } = 0.0;
 
-		public TypeAmounts Reagents { get; } = new();
+		public SpellReagents Reagents { get; } = new();
 
 		public int ReagentsCount => Reagents.Count;
 

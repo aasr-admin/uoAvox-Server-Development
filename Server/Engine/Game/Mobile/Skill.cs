@@ -75,7 +75,7 @@ namespace Server
 		Spellweaving = 54,
 		Mysticism = 55,
 		Imbuing = 56,
-		Throwing = 57
+		Throwing = 57,
 	}
 
 	[PropertyObject]
@@ -124,7 +124,12 @@ namespace Server
 
 					Owner.OnSkillChange(this);
 
-					Owner.Owner?.OnSkillChange(SkillName, (double)oldBase / 10);
+					if (Owner.Owner != null)
+					{
+						Owner.Owner.OnSkillChange(SkillName, oldBase / 10.0);
+
+						EventSink.InvokeSkillChanged(new SkillChangedEventArgs(Owner.Owner, SkillName, (m_Base - oldBase) / 10.0));
+					}
 				}
 			}
 		}

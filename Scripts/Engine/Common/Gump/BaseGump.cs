@@ -14,6 +14,78 @@ namespace Server.Gumps
 		public const int CenterLoc = 1114513;     // <center>~1_val~</center>
 		public const int AlignRightLoc = 1114514; // <DIV ALIGN=RIGHT>~1_TOKEN~</DIV>
 
+		public static T SendGump<T>(T gump) where T : BaseGump
+		{
+			if (gump == null)
+			{
+				return null;
+			}
+
+			var g = gump.User.FindGump<T>();
+
+			if (g == gump)
+			{
+				gump.Refresh();
+			}
+			else
+			{
+				gump.SendGump();
+			}
+
+			return gump;
+		}
+
+		public static T GetGump<T>(PlayerMobile pm, Func<T, bool> predicate) where T : Gump
+		{
+			return EnumerateGumps<T>(pm).FirstOrDefault(x => predicate == null || predicate(x));
+		}
+
+		public static IEnumerable<T> EnumerateGumps<T>(PlayerMobile pm, Func<T, bool> predicate = null) where T : Gump
+		{
+			return pm?.NetState?.Gumps?.OfType<T>().Where(g => predicate == null || predicate(g)) ?? Enumerable.Empty<T>();
+		}
+
+		public static List<Gump> GetGumps(PlayerMobile pm)
+		{
+			return new(EnumerateGumps<Gump>(pm));
+		}
+
+		public static List<T> GetGumps<T>(PlayerMobile pm) where T : Gump
+		{
+			return new(EnumerateGumps<T>(pm));
+		}
+
+		public static List<BaseGump> GetGumps(PlayerMobile pm, bool checkOpen)
+		{
+			return new(EnumerateGumps<BaseGump>(pm, g => !checkOpen || g.Open));
+		}
+
+		public static List<T> GetGumps<T>(PlayerMobile pm, bool checkOpen) where T : BaseGump
+		{
+			return new(EnumerateGumps<T>(pm, g => !checkOpen || g.Open));
+		}
+
+		public static void CheckCloseGumps(PlayerMobile pm, bool checkOpen = false)
+		{
+			var ns = pm.NetState;
+
+			if (ns != null)
+			{
+				var gumps = GetGumps(pm, checkOpen);
+
+				foreach (var gump in gumps)
+				{
+					if (gump.CloseOnMapChange)
+					{
+						_ = pm.CloseGump(gump.GetType());
+					}
+				}
+
+				gumps.Clear();
+				gumps.TrimExcess();
+			}
+		}
+
 		private Gump _Parent;
 
 		private int _ButtonID;
@@ -64,32 +136,11 @@ namespace Server.Gumps
 			Dispose();
 		}
 
-		public static BaseGump SendGump(BaseGump gump)
-		{
-			if (gump == null)
-			{
-				return null;
-			}
-
-			var g = gump.User.FindGump(gump.GetType()) as BaseGump;
-
-			if (g == gump)
-			{
-				gump.Refresh();
-			}
-			else
-			{
-				gump.SendGump();
-			}
-
-			return gump;
-		}
-
 		public virtual void SendGump()
 		{
 			AddGumpLayout();
-			Open = true;
-			_ = User.SendGump(this);
+
+			Open = User.SendGump(this);
 		}
 
 		public void Dispose()
@@ -102,18 +153,48 @@ namespace Server.Gumps
 			User = null;
 			Parent = null;
 
-			foreach (var kvp in _TextTooltips)
+			if (_TextTooltips != null)
 			{
-				kvp.Value.Free();
+				foreach (var kvp in _TextTooltips)
+				{
+					kvp.Value.Free();
+				}
+
+				_TextTooltips.Clear();
+				_TextTooltips.TrimExcess();
 			}
 
-			foreach (var kvp in _ClilocTooltips)
+			if (_ClilocTooltips != null)
 			{
-				kvp.Value.Free();
+				foreach (var kvp in _ClilocTooltips)
+				{
+					kvp.Value.Free();
+				}
+
+				_ClilocTooltips.Clear();
+				_ClilocTooltips.TrimExcess();
 			}
 
-			_ClilocTooltips.Clear();
-			_TextTooltips.Clear();
+			if (_VScrollIndex != null)
+			{
+				_VScrollIndex.Clear();
+				_VScrollIndex.TrimExcess();
+				_VScrollIndex = null;
+			}
+
+			if (_Controls != null)
+			{
+				_Controls.Clear();
+				_Controls.TrimExcess();
+				_Controls = null;
+			}
+
+			if (_Buttons != null)
+			{
+				_Buttons.Clear();
+				_Buttons.TrimExcess();
+				_Buttons = null;
+			}
 
 			OnDispose();
 		}
@@ -149,7 +230,8 @@ namespace Server.Gumps
 				AddGumpLayout();
 			}
 
-			_ = User.SendGump(this);
+			Open = User.SendGump(this);
+
 			OnAfterRefresh();
 		}
 
@@ -238,6 +320,7 @@ namespace Server.Gumps
 			OnServerClose(User.NetState);
 
 			_ = User.Send(new CloseGump(TypeID, 0));
+
 			User.NetState.RemoveGump(this);
 
 			OnClosed();
@@ -245,54 +328,140 @@ namespace Server.Gumps
 			_Buttons?.Clear();
 		}
 
-		public static T GetGump<T>(PlayerMobile pm, Func<T, bool> predicate) where T : Gump
-		{
-			return EnumerateGumps<T>(pm).FirstOrDefault(x => predicate == null || predicate(x));
-		}
+		private Dictionary<int, int> _VScrollIndex;
 
-		public static IEnumerable<T> EnumerateGumps<T>(PlayerMobile pm, Func<T, bool> predicate = null) where T : Gump
+		public void SetVerticalScroll(int id, int index)
 		{
-			return pm?.NetState?.Gumps?.OfType<T>().Where(g => predicate == null || predicate(g)) ?? Enumerable.Empty<T>();
-		}
-
-		public static List<Gump> GetGumps(PlayerMobile pm)
-		{
-			return new(EnumerateGumps<Gump>(pm));
-		}
-
-		public static List<T> GetGumps<T>(PlayerMobile pm) where T : Gump
-		{
-			return new(EnumerateGumps<T>(pm));
-		}
-
-		public static List<BaseGump> GetGumps(PlayerMobile pm, bool checkOpen)
-		{
-			return new(EnumerateGumps<BaseGump>(pm, g => !checkOpen || g.Open));
-		}
-
-		public static List<T> GetGumps<T>(PlayerMobile pm, bool checkOpen) where T : BaseGump
-		{
-			return new(EnumerateGumps<T>(pm, g => !checkOpen || g.Open));
-		}
-
-		public static void CheckCloseGumps(PlayerMobile pm, bool checkOpen = false)
-		{
-			var ns = pm.NetState;
-
-			if (ns != null)
+			if (index > 0)
 			{
-				var gumps = GetGumps(pm, checkOpen);
+				_VScrollIndex ??= new();
 
-				foreach (var gump in gumps)
+				_VScrollIndex[id] = index;
+			}
+			else if (_VScrollIndex != null)
+			{
+				_VScrollIndex.Remove(id);
+			}
+		}
+
+		public int GetVerticalScroll(int id)
+		{
+			if (_VScrollIndex == null)
+			{
+				return 0;
+			}
+
+			_VScrollIndex.TryGetValue(id, out var index);
+
+			return index;
+		}
+
+		/// <summary>
+		/// The total width of this element is 18 (4 + 10 + 4)<br />
+		/// The minimum height of this element is 48 (4 + 11 + 4 + 10~ + 4 + 11 + 4)
+		/// </summary>
+		public void AddVerticalScroll(int x, int y, int height, int id, int count)
+		{
+			var padding = 4;
+			var padding2 = padding * 2;
+			var width = 10 + padding2;
+
+			height = Math.Max(height, padding + 11 + padding + 10 + padding + 11 + padding);
+
+			x += padding;
+			y += padding;
+			width -= padding2;
+			height -= padding2;
+
+			var index = GetVerticalScroll(id);
+
+			if (count > 0 && index > 0)
+			{
+				var page = Math.Clamp(index - 1, 0, count - 1);
+
+				AddButton(x, y, 2435, 2436, () =>
 				{
-					if (gump.CloseOnMapChange)
+					_VScrollIndex ??= new();
+
+					_VScrollIndex[id] = page;
+
+					Refresh();
+				});
+			}
+			else
+			{
+				AddImage(x, y, 2435, 900);
+			}
+
+			if (count > 0 && index + 1 < count)
+			{
+				var page = Math.Clamp(index + 1, 0, count - 1);
+
+				AddButton(x, y + (height - 11), 2437, 2438, () =>
+				{
+					_VScrollIndex ??= new();
+
+					_VScrollIndex[id] = page;
+
+					Refresh();
+				});
+			}
+			else
+			{
+				AddImage(x, y + (height - 11), 2437, 900);
+			}
+
+			y += 11 + padding;
+
+			var bx = x - 1;
+			var by = y;
+			var bw = width;
+			var bh = height;
+
+			var si = 0;
+			var sc = Math.Floor(height / 10.0);
+
+			while (by < bh)
+			{
+				if (by + 10 > bh)
+				{
+					by = bh - 10;
+				}
+
+				if (count > 0)
+				{
+					var page = Math.Clamp((int)(count * (si / sc)), 0, count - 1);
+
+					if (page != si)
 					{
-						_ = pm.CloseGump(gump.GetType());
+						AddButton(bx, by, 30550, 30550, () =>
+						{
+							_VScrollIndex ??= new();
+
+							_VScrollIndex[id] = page;
+
+							Refresh();
+						});
 					}
 				}
 
-				gumps.Clear();
-				gumps.TrimExcess();
+				++si;
+
+				by += 10;
+			}
+
+			var fx = x - 1;
+			var fy = y;
+			var fw = width;
+			var fh = (int)(height / sc);
+
+			if (fh > 0)
+			{
+				var fo = height - (fy + fh);
+
+				fy += Math.Clamp((int)(fo * (index / sc)), 0, fo);
+
+				AddImageTiled(fx, fy, fw, fh, 30556);
 			}
 		}
 
@@ -333,12 +502,250 @@ namespace Server.Gumps
 			AddItemProperty(mob.Serial.Value);
 		}
 
-		public void AddProperties(Spoof spoof)
-		{
-			_ = User.Send(spoof.PropertyList);
+		#region Controls
 
-			AddItemProperty(spoof.Serial.Value);
+		private Dictionary<int, object> _Controls;
+
+		public bool HasTabs<T>(Action<int, int, int, int, T> renderer)
+		{
+			return _Controls?.ContainsKey(renderer.GetHashCode()) == true;
 		}
+
+		public T GetTabs<T>(Action<int, int, int, int, T> renderer)
+		{
+			object o = null;
+
+			_Controls?.TryGetValue(renderer.GetHashCode(), out o);
+
+			if (o is T t)
+			{
+				return t;
+			}
+
+			return default;
+		}
+
+		/// <summary>
+		///     onRender: (x, y, w, h, obj)
+		/// </summary>
+		public (T Selected, int TotalHeight) AddTabs<T>(Rectangle o, Action<int, int, int, int, T> onRender)
+		{
+			return AddTabs(o.X, o.Y, o.Width, o.Height, onRender);
+		}
+
+		/// <summary>
+		///     onRender: (x, y, w, h, obj)
+		/// </summary>
+		public (T Selected, int TotalHeight) AddTabs<T>(int x, int y, int w, int h, Action<int, int, int, int, T> onRender)
+		{
+			return AddTabs(x, y, w, h, null, onRender);
+		}
+
+		/// <summary>
+		///     onRender: (x, y, w, h, obj)
+		/// </summary>
+		public (T Selected, int TotalHeight) AddTabs<T>(Rectangle o, T initValue, Action<int, int, int, int, T> onRender)
+		{
+			return AddTabs(o.X, o.Y, o.Width, o.Height, initValue, onRender);
+		}
+
+		/// <summary>
+		///     onRender: (x, y, w, h, obj)
+		/// </summary>
+		public (T Selected, int TotalHeight) AddTabs<T>(int x, int y, int w, int h, T initValue, Action<int, int, int, int, T> onRender)
+		{
+			return AddTabs(x, y, w, h, initValue, null, onRender);
+		}
+
+		/// <summary>
+		///     onRender: (x, y, w, h, obj)
+		/// </summary>
+		public (T Selected, int TotalHeight) AddTabs<T>(Rectangle o, int pad, int bgID, int btnNormal, int btnSelected, Color txtNormal, Color txtSelected, T initValue, Action<int, int, int, int, T> onRender)
+		{
+			return AddTabs(o.X, o.Y, o.Width, o.Height, pad, bgID, btnNormal, btnSelected, txtNormal, txtSelected, initValue, onRender);
+		}
+
+		/// <summary>
+		///     onRender: (x, y, w, h, obj)
+		/// </summary>
+		public (T Selected, int TotalHeight) AddTabs<T>(int x, int y, int w, int h, int pad, int bgID, int btnNormal, int btnSelected, Color txtNormal, Color txtSelected, T initValue, Action<int, int, int, int, T> onRender)
+		{
+			return AddTabs(x, y, w, h, pad, bgID, btnNormal, btnSelected, txtNormal, txtSelected, initValue, null, onRender);
+		}
+
+		/// <summary>
+		///     onRender: (x, y, w, h, obj)
+		/// </summary>
+		public (T Selected, int TotalHeight) AddTabs<T>(Rectangle o, ICollection<T> values, Action<int, int, int, int, T> onRender)
+		{
+			return AddTabs(o.X, o.Y, o.Width, o.Height, values, onRender);
+		}
+
+		/// <summary>
+		///     onRender: (x, y, w, h, obj)
+		/// </summary>
+		public (T Selected, int TotalHeight) AddTabs<T>(int x, int y, int w, int h, ICollection<T> values, Action<int, int, int, int, T> onRender)
+		{
+			return AddTabs(x, y, w, h, default(T), values, onRender);
+		}
+
+		/// <summary>
+		///     onRender: (x, y, w, h, obj)
+		/// </summary>
+		public (T Selected, int TotalHeight) AddTabs<T>(Rectangle o, T initValue, ICollection<T> values, Action<int, int, int, int, T> onRender)
+		{
+			return AddTabs(o.X, o.Y, o.Width, o.Height, initValue, values, onRender);
+		}
+
+		/// <summary>
+		///     onRender: (x, y, w, h, obj)
+		/// </summary>
+		public (T Selected, int TotalHeight) AddTabs<T>(int x, int y, int w, int h, T initValue, ICollection<T> values, Action<int, int, int, int, T> onRender)
+		{
+			var sup = false;
+			var pad = sup ? 15 : 10;
+			var bgID = sup ? 40000 : 9270;
+			var btnNormal = sup ? 40016 : 9909;
+			var btnSelected = sup ? 40027 : 9904;
+
+			return AddTabs(x, y, w, h, pad, bgID, btnNormal, btnSelected, Color.White, Color.Gold, initValue, values, onRender);
+		}
+
+		/// <summary>
+		///     onRender: (x, y, w, h, obj)
+		/// </summary>
+		public (T Selected, int TotalHeight) AddTabs<T>(Rectangle o, int pad, int bgID, int btnNormal, int btnSelected, Color txtNormal, Color txtSelected, T initValue, ICollection<T> values, Action<int, int, int, int, T> onRender)
+		{
+			return AddTabs(o.X, o.Y, o.Width, o.Height, pad, bgID, btnNormal, btnSelected, txtNormal, txtSelected, initValue, values, onRender);
+		}
+
+		/// <summary>
+		///     onRender: (x, y, w, h, obj)
+		/// </summary>
+		public (T Selected, int TotalHeight) AddTabs<T>(int x, int y, int w, int h, int pad, int bgID, int btnNormal, int btnSelected, Color txtNormal, Color txtSelected, T initValue, ICollection<T> values, Action<int, int, int, int, T> onRender)
+		{
+			if (w * h <= 0 || pad * 2 >= w || pad * 2 >= h || onRender == null)
+			{
+				return (default, -1);
+			}
+
+			if (values == null && typeof(T).IsEnum)
+			{
+				values = (T[])Enum.GetValues(typeof(T));
+			}
+
+			if (values == null || values.Count == 0)
+			{
+				return (default, -1);
+			}
+
+			var hash = onRender.GetHashCode();
+
+			object value = null;
+
+			_ = _Controls?.TryGetValue(hash, out value);
+
+			if (value is not T vt || !values.Contains(vt))
+			{
+				value = initValue;
+			}
+
+			if (btnNormal < 0)
+			{
+				btnNormal = 9909;
+			}
+
+			if (btnSelected < 0)
+			{
+				btnSelected = 9904;
+			}
+
+			var btnSize = GetImageSize(btnNormal);
+
+			var titleX = pad + btnSize.Width + 5;
+			var titleH = btnSize.Height + 5;
+
+			var titleC = values.Count(v => v != null);
+
+			var font = FontData.GetUnicode(0);
+
+			var maxW = values.Select(v => Utility.SpaceWords($"{v}")).Aggregate(pad, (c, o) => Math.Max(c, font.GetWidth(o)));
+
+			var tabW = titleX + maxW;
+			var tabH = titleH;
+
+			var tabC = w / tabW;
+			var tabR = (int)Math.Ceiling(titleC / (double)tabC);
+
+			if (tabW * tabC < w - (pad * 2))
+			{
+				tabW += (int)((w - (pad * 2) - (tabW * tabC)) / (double)tabC);
+			}
+
+			var tabsH = (pad * 2) + (tabR * tabH);
+			var panelH = h - tabsH;
+
+			var txtWidth = tabW - titleX;
+
+			var px = x;
+			var py = y + tabsH;
+			var hh = 0;
+			var i = 0;
+
+			if (bgID > 0)
+			{
+				AddBackground(x, y, w, tabsH, bgID);
+			}
+
+			foreach (var val in values.Where(v => v != null))
+			{
+				var v = val;
+				var s = Equals(value, v);
+				var l = SetColor(s ? txtSelected : txtNormal, $"<BIG>{ResolveLabel(v)}</BIG>");
+
+				AddECHandleInput();
+
+				AddButton(x + pad, y + pad, s ? btnSelected : btnNormal, s ? btnNormal : btnSelected, b =>
+				{
+					_Controls ??= new();
+
+					_Controls[hash] = s ? initValue : v;
+
+					Refresh(true);
+				});
+
+				AddHtml(x + titleX, ComputeCenter(y + pad, tabH) - 10, txtWidth, 40, l, false, false);
+
+				AddECHandleInput();
+
+				if (s)
+				{
+					if (bgID > 0)
+					{
+						AddBackground(px, py, w, panelH, bgID);
+					}
+
+					onRender(px + pad, py + pad, w - (pad * 2), panelH - (pad * 2), v);
+
+					hh += panelH;
+				}
+
+				if (++i % tabC == 0)
+				{
+					x = px;
+					y += tabH;
+					hh += tabH;
+				}
+				else
+				{
+					x += tabW;
+				}
+			}
+
+			return ((T)value, hh);
+		}
+
+		#endregion
 
 		#region Images
 
@@ -353,47 +760,27 @@ namespace Server.Gumps
 
 		#region Formatting
 
-		public static int C16232(int c16)
-		{
-			c16 &= 0x7FFF;
-
-			var r = ((c16 >> 10) & 0x1F) << 3;
-			var g = ((c16 >> 05) & 0x1F) << 3;
-			var b = ((c16 >> 00) & 0x1F) << 3;
-
-			return (r << 16) | (g << 8) | (b << 0);
-		}
-
-		public static int C16216(int c16)
-		{
-			return c16 & 0x7FFF;
-		}
-
-		public static int C32216(int c32)
-		{
-			c32 &= 0xFFFFFF;
-
-			var r = ((c32 >> 16) & 0xFF) >> 3;
-			var g = ((c32 >> 08) & 0xFF) >> 3;
-			var b = ((c32 >> 00) & 0xFF) >> 3;
-
-			return (r << 10) | (g << 5) | (b << 0);
-		}
-
 		public static string SetColor(Color color, string str)
 		{
 			return SetColor(color.ToArgb(), str);
 		}
 
-		public static string SetColor(int color, string str)
+		public static string SetColor(short color16, string str)
 		{
-			var r = Math.Max(0x08, (color >> 16) & 0xFF);
-			var g = Math.Max(0x08, (color >> 08) & 0xFF);
-			var b = Math.Max(0x08, (color >> 00) & 0xFF);
+			Utility.ConvertColor(color16, out var color32); 
 
-			color = (r << 16) | (g << 08) | (b << 00);
+			return SetColor(color32, str);
+		}
 
-			return $"<BASEFONT COLOR=#{color:X6}>{str}";
+		public static string SetColor(int color32, string str)
+		{
+			var r = Math.Max(0x08, (color32 >> 16) & 0xFF);
+			var g = Math.Max(0x08, (color32 >> 08) & 0xFF);
+			var b = Math.Max(0x08, (color32 >> 00) & 0xFF);
+
+			color32 = (r << 16) | (g << 08) | (b << 00);
+
+			return $"<BASEFONT COLOR=#{color32:X6}>{str}";
 		}
 
 		public static string ColorAndCenter(Color color, string str)
@@ -401,11 +788,14 @@ namespace Server.Gumps
 			return ColorAndCenter(color.ToArgb(), str);
 		}
 
-		public static string ColorAndCenter(int color, string str)
+		public static string ColorAndCenter(short color16, string str)
 		{
-			color &= 0x00FFFFFF;
+			return SetColor(color16, Center(str));
+		}
 
-			return $"<BASEFONT COLOR=#{color:X6}><CENTER>{str}</CENTER>";
+		public static string ColorAndCenter(int color32, string str)
+		{
+			return SetColor(color32, Center(str));
 		}
 
 		public static string Center(string str)
@@ -418,11 +808,14 @@ namespace Server.Gumps
 			return ColorAndAlignRight(color.ToArgb(), str);
 		}
 
-		public static string ColorAndAlignRight(int color, string str)
+		public static string ColorAndAlignRight(short color16, string str)
 		{
-			color &= 0x00FFFFFF;
+			return SetColor(color16, AlignRight(str));
+		}
 
-			return $"<DIV ALIGN=RIGHT><BASEFONT COLOR=#{color:X6}>{str}</DIV>";
+		public static string ColorAndAlignRight(int color32, string str)
+		{
+			return SetColor(color32, AlignRight(str));
 		}
 
 		public static string AlignRight(string str)
@@ -430,58 +823,13 @@ namespace Server.Gumps
 			return $"<DIV ALIGN=RIGHT>{str}</DIV>";
 		}
 
-		public void AddHtmlTextDefinition(int x, int y, int length, int height, TextDefinition text, bool background, bool scrollbar)
-		{
-			if (text.Number > 0)
-			{
-				AddHtmlLocalized(x, y, length, height, text.Number, false, false);
-			}
-			else if (!String.IsNullOrEmpty(text.String))
-			{
-				AddHtml(x, y, length, height, text.String, background, scrollbar);
-			}
-		}
-
-		public void AddHtmlTextDefinition(int x, int y, int length, int height, TextDefinition text, int color, bool background, bool scrollbar)
-		{
-			if (text.Number > 0)
-			{
-				AddHtmlLocalized(x, y, length, height, text.Number, color, false, false);
-			}
-			else if (!String.IsNullOrEmpty(text.String))
-			{
-				AddHtml(x, y, length, height, SetColor(color, text.String), background, scrollbar);
-			}
-		}
-
-		public void AddHtmlLocalizedCentered(int x, int y, int length, int height, int localization, bool background, bool scrollbar)
-		{
-			AddHtmlLocalized(x, y, length, height, 1113302, $"#{localization}", 0, background, scrollbar);
-		}
-
-		public void AddHtmlLocalizedCentered(int x, int y, int length, int height, int localization, int hue, bool background, bool scrollbar)
-		{
-			AddHtmlLocalized(x, y, length, height, 1113302, $"#{localization}", hue, background, scrollbar);
-		}
-
-		public void AddHtmlLocalizedAlignRight(int x, int y, int length, int height, int localization, bool background, bool scrollbar)
-		{
-			AddHtmlLocalized(x, y, length, height, 1114514, $"#{localization}", 0, background, scrollbar);
-		}
-
-		public void AddHtmlLocalizedAlignRight(int x, int y, int length, int height, int localization, int hue, bool background, bool scrollbar)
-		{
-			AddHtmlLocalized(x, y, length, height, 1114514, $"#{localization}", hue, background, scrollbar);
-		}
-
 		#endregion
 
 		#region Tooltips
 
-		private readonly Dictionary<string, Spoof> _TextTooltips = new();
-		private readonly Dictionary<Dictionary<int, string>, Spoof> _ClilocTooltips = new();
+		private Dictionary<int, Spoof> _TextTooltips, _ClilocTooltips;
 
-		public void AddTooltipTextDefinition(TextDefinition text)
+		public void AddTooltip(TextDefinition text)
 		{
 			if (text.Number > 0)
 			{
@@ -532,46 +880,63 @@ namespace Server.Gumps
 
 		public void AddTooltip(int[] clilocs, string[] args)
 		{
-			var dictionary = new Dictionary<int, string>();
-			var emptyIndex = 0;
+			var h = new HashCode();
 
 			for (var i = 0; i < clilocs.Length; i++)
 			{
-				var str = String.Empty;
+				h.Add(clilocs[i]);
 
-				if (i < args.Length)
+				if (args != null && i < args.Length && args[i] != null)
 				{
-					str = args[i] ?? String.Empty;
-				}
-
-				var cliloc = clilocs[i];
-
-				if (cliloc <= 0)
-				{
-					if (emptyIndex <= Spoof.EmptyClilocs.Length)
-					{
-						cliloc = Spoof.EmptyClilocs[emptyIndex];
-						emptyIndex++;
-					}
-				}
-
-				if (cliloc > 0)
-				{
-					dictionary[cliloc] = str;
+					h.Add(args[i]);
 				}
 			}
+
+			var hash = h.ToHashCode();
 
 			Spoof spoof;
 
-			if (!_ClilocTooltips.TryGetValue(dictionary, out spoof) || spoof == null || spoof.Deleted)
+			if (_ClilocTooltips?.TryGetValue(hash, out spoof) != true || spoof?.Deleted != false)
 			{
-				spoof = Spoof.Acquire();
+				_ClilocTooltips ??= new();
+
+				_ClilocTooltips[hash] = spoof = Spoof.Acquire();
+
+				var dictionary = spoof.ClilocTable ??= new();
+
+				dictionary.Clear();
+
+				var emptyIndex = 0;
+
+				for (var i = 0; i < clilocs.Length; i++)
+				{
+					var str = String.Empty;
+
+					if (i < args.Length)
+					{
+						str = args[i] ?? String.Empty;
+					}
+
+					var cliloc = clilocs[i];
+
+					if (cliloc <= 0)
+					{
+						if (emptyIndex <= Spoof.EmptyClilocs.Length)
+						{
+							cliloc = Spoof.EmptyClilocs[emptyIndex];
+
+							emptyIndex++;
+						}
+					}
+
+					if (cliloc > 0)
+					{
+						dictionary[cliloc] = str;
+					}
+				}
 			}
 
-			spoof.ClilocTable = dictionary;
-
-			_ClilocTooltips[dictionary] = spoof;
-			AddProperties(spoof);
+			AddItemProperty(spoof);
 		}
 
 		public void AddTooltip(string title, string text, Color titleColor, Color textColor)
@@ -589,47 +954,85 @@ namespace Server.Gumps
 				textColor = Color.White;
 			}
 
+			var hash = HashCode.Combine(title, text, titleColor, textColor);
+
 			Spoof spoof;
 
-			if (!_TextTooltips.TryGetValue(text, out spoof) || spoof == null || spoof.Deleted)
+			if (_TextTooltips?.TryGetValue(hash, out spoof) != true || spoof?.Deleted != false)
 			{
-				spoof = Spoof.Acquire();
-			}
+				_TextTooltips ??= new();
 
-			if (!String.IsNullOrWhiteSpace(title))
-			{
-				spoof.Text = String.Concat(String.Format("<basefont color=#{0:X}>{1}", titleColor.ToArgb(), title),
-							'\n',
-							String.Format("<basefont color=#{0:X}>{1}", textColor.ToArgb(), text));
-			}
-			else
-			{
-				spoof.Text = String.Format("<basefont color=#{0:X}>{1}", textColor.ToArgb(), text); //  text.WrapUOHtmlColor(textColor, false);
-			}
+				_TextTooltips[hash] = spoof = Spoof.Acquire();
 
-			_TextTooltips[text] = spoof;
-			AddProperties(spoof);
-		}
-
-		public sealed class Spoof : Entity
-		{
-			private static readonly char[] _Split = { '\n' };
-			private static int _UID = -1;
-
-			private static int NewUID
-			{
-				get
+				if (!String.IsNullOrWhiteSpace(title))
 				{
-					if (_UID == Int32.MinValue)
-					{
-						_UID = -1;
-					}
-
-					return --_UID;
+					spoof.Text = $"{SetColor(titleColor, title)}\n{SetColor(textColor, text)}";
+				}
+				else
+				{
+					spoof.Text = SetColor(textColor, text);
 				}
 			}
 
-			public static int[] EmptyClilocs =
+			AddItemProperty(spoof);
+		}
+
+		public static string StripHtmlBreaks(string str, bool preserve)
+		{
+			return Regex.Replace(str, @"<br[^>]?>", preserve ? "\n" : " ", RegexOptions.IgnoreCase);
+		}
+
+		public static string ResolveLabel(object o)
+		{
+			if (o is Enum en)
+			{
+				return Utility.FriendlyName(en);
+			}
+
+			if (o is IEntity e)
+			{
+				return Utility.FriendlyName(e);
+			}
+
+			return o.ToString();
+		}
+
+		public static Point ComputeCenter(Point p, Size s)
+		{
+			return new Point(ComputeCenter(p.X, s.Width), ComputeCenter(p.Y, s.Height));
+		}
+
+		public static void ComputeCenter(ref Point p, Size s)
+		{
+			p = new Point(ComputeCenter(p.X, s.Width), ComputeCenter(p.Y, s.Height));
+		}
+
+		public static Point ComputeCenter(int x, int y, int w, int h)
+		{
+			ComputeCenter(ref x, ref y, w, h);
+
+			return new Point(x, y);
+		}
+
+		public static void ComputeCenter(ref int x, ref int y, int w, int h)
+		{
+			x = ComputeCenter(x, w);
+			y = ComputeCenter(y, h);
+		}
+
+		public static void ComputeCenter(ref int o, int s)
+		{
+			o = ComputeCenter(o, s);
+		}
+
+		public static int ComputeCenter(int o, int s)
+		{
+			return o + (s / 2);
+		}
+
+		private sealed class Spoof : Item
+		{
+			public static readonly int[] EmptyClilocs =
 			{
 				1042971, 1070722, // ~1_NOTHING~
 			    1114057, 1114778, 1114779, // ~1_val~
@@ -637,88 +1040,25 @@ namespace Server.Gumps
 			    1153153, // ~1_year~
             };
 
-			private static readonly List<Spoof> _SpoofPool = new();
+			private static readonly char[] _Split = { '\n' };
+
+			private static readonly Queue<Spoof> _SpoofPool = new();
 
 			public static Spoof Acquire()
 			{
-				if (_SpoofPool.Count == 0)
+				Spoof spoof = null;
+
+				while (spoof?.Deleted != false)
 				{
-					return new Spoof();
-				}
-
-				var spoof = _SpoofPool[0];
-
-				_ = _SpoofPool.Remove(spoof);
-
-				return spoof;
-			}
-
-			public void Free()
-			{
-				Packet.Release(ref _PropertyList);
-
-				_Text = String.Empty;
-				_ClilocTable = null;
-
-				_SpoofPool.Add(this);
-			}
-
-			private ObjectPropertyList _PropertyList;
-
-			public ObjectPropertyList PropertyList
-			{
-				get
-				{
-					if (_PropertyList == null)
+					if (_SpoofPool.Count == 0)
 					{
-						_PropertyList = new ObjectPropertyList(this);
-
-						if (!String.IsNullOrEmpty(Text))
-						{
-							var text = StripHtmlBreaks(Text, true);
-
-							if (text.IndexOf('\n') >= 0)
-							{
-								var lines = text.Split(_Split);
-
-								foreach (var str in lines)
-								{
-									_PropertyList.Add(str);
-								}
-							}
-							else
-							{
-								_PropertyList.Add(text);
-							}
-						}
-						else if (_ClilocTable != null)
-						{
-							foreach (var kvp in _ClilocTable)
-							{
-								var cliloc = kvp.Key;
-								var args = kvp.Value;
-
-								if (cliloc <= 0 && !String.IsNullOrEmpty(args))
-								{
-									_PropertyList.Add(args);
-								}
-								else if (String.IsNullOrEmpty(args))
-								{
-									_PropertyList.Add(cliloc);
-								}
-								else
-								{
-									_PropertyList.Add(cliloc, args);
-								}
-							}
-						}
-
-						_PropertyList.Terminate();
-						_PropertyList.SetStatic();
+						return new Spoof();
 					}
 
-					return _PropertyList;
+					spoof = _SpoofPool.Dequeue();
 				}
+
+				return spoof;
 			}
 
 			private string _Text = String.Empty;
@@ -732,7 +1072,7 @@ namespace Server.Gumps
 					{
 						_Text = value;
 
-						Packet.Release(ref _PropertyList);
+						ClearProperties();
 					}
 				}
 			}
@@ -748,19 +1088,113 @@ namespace Server.Gumps
 					{
 						_ClilocTable = value;
 
-						Packet.Release(ref _PropertyList);
+						ClearProperties();
 					}
 				}
 			}
 
-			public Spoof()
-				: base(NewUID, Point3D.Zero, Map.Internal)
-			{ }
-		}
+			public override bool Decays => false;
 
-		public static string StripHtmlBreaks(string str, bool preserve)
-		{
-			return Regex.Replace(str, @"<br[^>]?>", preserve ? "\n" : " ", RegexOptions.IgnoreCase);
+			public override string DefaultName => " ";
+
+			public Spoof()
+				: base(1)
+			{
+				Visible = false;
+				Movable = false;
+
+				Internalize();
+			}
+
+			public Spoof(Serial serial)
+				: base(serial)
+			{
+			}
+
+			public void Free()
+			{
+				ClearProperties();
+
+				_Text = String.Empty;
+
+				_ClilocTable = null;
+
+				if (!Deleted && _SpoofPool.Count < 128)
+				{
+					_SpoofPool.Enqueue(this);
+				}
+				else
+				{
+					Delete();
+				}
+			}
+
+			public override void AddNameProperty(ObjectPropertyList list)
+			{
+			}
+
+			public override void AddNameProperties(ObjectPropertyList list)
+			{
+			}
+
+			public override void GetProperties(ObjectPropertyList list)
+			{
+				if (!String.IsNullOrEmpty(Text))
+				{
+					var text = StripHtmlBreaks(Text, true);
+
+					if (text.Contains('\n'))
+					{
+						var lines = text.Split(_Split);
+
+						foreach (var str in lines)
+						{
+							list.Add(str);
+						}
+					}
+					else
+					{
+						list.Add(text);
+					}
+				}
+				else if (_ClilocTable?.Count > 0)
+				{
+					foreach (var kvp in _ClilocTable)
+					{
+						var cliloc = kvp.Key;
+						var args = kvp.Value;
+
+						if (cliloc <= 0 && !String.IsNullOrEmpty(args))
+						{
+							list.Add(args);
+						}
+						else if (String.IsNullOrEmpty(args))
+						{
+							list.Add(cliloc);
+						}
+						else
+						{
+							list.Add(cliloc, args);
+						}
+					}
+				}
+			}
+
+			public override void Serialize(GenericWriter writer)
+			{
+				base.Serialize(writer);
+
+				writer.WriteEncodedInt(0);
+			}
+
+			public override void Deserialize(GenericReader reader)
+			{
+				base.Deserialize(reader);
+
+				_ = reader.ReadEncodedInt();
+
+				Timer.DelayCall(Free);
+			}
 		}
 
 		#endregion

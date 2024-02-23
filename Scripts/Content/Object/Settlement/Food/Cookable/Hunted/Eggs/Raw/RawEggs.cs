@@ -26,7 +26,7 @@
 				case 0:
 					{
 						from.AddToBackpack(new Eggs(1));
-						from.AddToBackpack(new Eggshells(1));
+						from.AddToBackpack(new Eggshells());
 						Delete();
 						break;
 					}

@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Text;
 
 namespace Server.Gumps
@@ -189,7 +190,7 @@ namespace Server.Gumps
 		{
 			Add(new GumpTooltip(1042971, text));
 		}
-        
+
 		public void AddHtml(int x, int y, int width, int height, string text, bool background, bool scrollbar)
 		{
 			Add(new GumpHtml(x, y, width, height, text, background, scrollbar));
@@ -200,12 +201,12 @@ namespace Server.Gumps
 			Add(new GumpHtmlLocalized(x, y, width, height, number, background, scrollbar));
 		}
 
-		public void AddHtmlLocalized(int x, int y, int width, int height, int number, int color, bool background, bool scrollbar)
+		public void AddHtmlLocalized(int x, int y, int width, int height, int number, short color, bool background, bool scrollbar)
 		{
 			Add(new GumpHtmlLocalized(x, y, width, height, number, color, background, scrollbar));
 		}
 
-		public void AddHtmlLocalized(int x, int y, int width, int height, int number, string args, int color, bool background, bool scrollbar)
+		public void AddHtmlLocalized(int x, int y, int width, int height, int number, string args, short color, bool background, bool scrollbar)
 		{
 			Add(new GumpHtmlLocalized(x, y, width, height, number, args, color, background, scrollbar));
 		}
@@ -273,6 +274,89 @@ namespace Server.Gumps
 		public void AddTextEntry(int x, int y, int width, int height, int hue, int entryID, string initialText, int size)
 		{
 			Add(new GumpTextEntryLimited(x, y, width, height, hue, entryID, initialText, size));
+		}
+
+		public void AddPoly(int x, int y, Poly3D poly, Color color, Func<Point2D, Point2D> mutator = null)
+		{
+			AddPoly(x, y, poly.m_Poly, color, mutator);
+		}
+
+		public void AddPoly(int x, int y, Poly2D poly, Color color, Func<Point2D, Point2D> mutator = null) 
+		{
+			AddPoly(x, y, poly, color, color, mutator);
+		}
+
+		public void AddPoly(int x, int y, Poly2D poly, Color colorStart, Color colorEnd, Func<Point2D, Point2D> mutator = null)
+		{
+			if (poly.Count > 0)
+			{
+				for (int i = 0, n = 1; i < poly.Count; i = n++)
+				{
+					var rgb = Utility.Interpolate(n, poly.Count, colorStart, colorEnd, out _);
+
+					var cur = poly.m_Points[i % poly.Count];
+					var next = poly.m_Points[n % poly.Count];
+
+					if (mutator != null)
+					{
+						cur = mutator(cur);
+						next = mutator(next);
+					}
+
+					if (cur == next)
+					{
+						AddHtml(x + cur.X, y + cur.Y, 1, 1, $"<BODYBGCOLOR=#{rgb:X6}> ", false, false);
+
+						break;
+					}
+
+					if (cur.m_X == next.m_X)
+					{
+						var x1 = Math.Min(cur.m_X, next.m_X);
+						var y1 = Math.Min(cur.m_Y, next.m_Y);
+
+						var w = Math.Abs(next.m_X - cur.m_X);
+
+						AddHtml(x + x1, y + y1, w, 1, $"<BODYBGCOLOR=#{rgb:X6}> ", false, false);
+					}
+					else if (cur.m_Y == next.m_Y)
+					{
+						var x1 = Math.Min(cur.m_X, next.m_X);
+						var y1 = Math.Min(cur.m_Y, next.m_Y);
+
+						var h = Math.Abs(next.m_Y - cur.m_Y);
+
+						AddHtml(x + x1, y + y1, 1, h, $"<BODYBGCOLOR=#{rgb:X6}> ", false, false);
+					}
+					else
+					{
+						foreach (var p in Geometry.TraceLine2D(cur, next))
+						{
+							AddHtml(x + p.X, y + p.Y, 1, 1, $"<BODYBGCOLOR=#{rgb:X6}> ", false, false);
+						}
+					}
+				}
+			}
+		}
+
+		/// <summary>
+		/// onRender(imageX, imageY, imageWidth, imageHeight)
+		/// </summary>
+		public void AddMap(int x, int y, int mapID, int frameHue = -1, Action<int, int, int, int> onRender = null)
+		{
+			var framed = frameHue >= 0;
+
+			var ox = framed ? x + 5 : x;
+			var oy = framed ? y + 5 : y;
+
+			AddImage(ox, oy, 8013 + mapID);
+
+			onRender?.Invoke(ox, oy, 383, 383);
+
+			if (framed)
+			{
+				AddImage(x, y, 5599, frameHue);
+			}
 		}
 
 		public void AddItemProperty(int serial)
@@ -2075,10 +2159,10 @@ namespace Server.Gumps
 		{
 			if (String.IsNullOrEmpty(m_Args))
 			{
-				return $"{{ tooltip { m_Number } }}";
+				return $"{{ tooltip {m_Number} }}";
 			}
 
-			return $"{{ tooltip { m_Number } @{ m_Args }@ }}";
+			return $"{{ tooltip {m_Number} @{m_Args}@ }}";
 		}
 
 		private static readonly byte[] m_LayoutName = Gump.StringToBuffer("tooltip");

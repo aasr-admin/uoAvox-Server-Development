@@ -5,8 +5,12 @@ using System;
 
 namespace Server.Items
 {
-	public class ProspectorsTool : BaseBashing, IUsesRemaining
+	public class ProspectorsTool : BaseBashing, IUsesRemaining, IHarvestTool
 	{
+		public virtual HarvestSystem HarvestSystem => Mining.System;
+
+		IHarvestSystem IHarvestTool.HarvestSystem => HarvestSystem;
+
 		private int m_UsesRemaining;
 
 		[CommandProperty(AccessLevel.GameMaster)]
@@ -64,13 +68,14 @@ namespace Server.Items
 				return;
 			}
 
-			HarvestSystem system = Mining.System;
+			var system = HarvestSystem;
 
-			int tileID;
-			Map map;
-			Point3D loc;
+			if (system == null)
+			{
+				return;
+			}
 
-			if (!system.GetHarvestDetails(from, this, toProspect, out tileID, out map, out loc))
+			if (!system.GetHarvestDetails(from, this, toProspect, out var tileID, out var map, out var loc))
 			{
 				from.SendLocalizedMessage(1049048); // You cannot use your prospector tool on that.
 				return;
@@ -99,7 +104,8 @@ namespace Server.Items
 				from.SendLocalizedMessage(1049048); // You cannot use your prospector tool on that.
 				return;
 			}
-			else if (vein != defaultVein)
+
+			if (vein != defaultVein)
 			{
 				from.SendLocalizedMessage(1049049); // That ore looks to be prospected already.
 				return;
@@ -110,23 +116,24 @@ namespace Server.Items
 			if (veinIndex < 0)
 			{
 				from.SendLocalizedMessage(1049048); // You cannot use your prospector tool on that.
+				return;
 			}
-			else if (veinIndex >= (def.Veins.Length - 1))
+
+			if (veinIndex >= (def.Veins.Length - 1))
 			{
 				from.SendLocalizedMessage(1049061); // You cannot improve valorite ore through prospecting.
+				return;
 			}
-			else
+
+			bank.Vein = def.Veins[veinIndex + 1];
+
+			from.SendLocalizedMessage(1049050 + veinIndex);
+
+			if (--UsesRemaining <= 0)
 			{
-				bank.Vein = def.Veins[veinIndex + 1];
-				from.SendLocalizedMessage(1049050 + veinIndex);
+				from.SendLocalizedMessage(1049062); // You have used up your prospector's tool.
 
-				--UsesRemaining;
-
-				if (UsesRemaining <= 0)
-				{
-					from.SendLocalizedMessage(1049062); // You have used up your prospector's tool.
-					Delete();
-				}
+				Delete();
 			}
 		}
 

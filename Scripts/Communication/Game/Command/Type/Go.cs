@@ -52,7 +52,7 @@ namespace Server.Commands
 			{
 				try
 				{
-					var ser = e.GetInt32(0);
+					var ser = e.GetSerial(0);
 
 					var ent = World.FindEntity(ser);
 
@@ -118,10 +118,8 @@ namespace Server.Commands
 					{
 						var name = e.GetString(0);
 
-						for (var i = 0; i < Map.AllMaps.Count; ++i)
+						foreach (var map in Map.AllMaps)
 						{
-							var map = Map.AllMaps[i];
-
 							if (map.MapIndex == 0x7F || map.MapIndex == 0xFF)
 							{
 								continue;
@@ -143,10 +141,8 @@ namespace Server.Commands
 							}
 						}
 
-						for (var i = 0; i < Map.AllMaps.Count; ++i)
+						foreach (var map in Map.AllMaps)
 						{
-							var map = Map.AllMaps[i];
-
 							if (map.MapIndex == 0x7F || map.MapIndex == 0xFF || from.Map == map)
 							{
 								continue;

@@ -30,6 +30,47 @@
 		}
 	}
 
+	/// BoneMachete
+	public class BoneMachete : ElvenMachete
+	{
+		public override WeaponAbility PrimaryAbility => null;
+		public override WeaponAbility SecondaryAbility => null;
+
+		public override int PhysicalResistance => 1;
+		public override int FireResistance => 1;
+		public override int ColdResistance => 1;
+		public override int PoisonResistance => 1;
+		public override int EnergyResistance => 1;
+
+		public override int InitMinHits => 5;
+		public override int InitMaxHits => 5;
+
+		[Constructable]
+		public BoneMachete()
+		{
+			ItemID = 0x20E;
+		}
+
+		public BoneMachete(Serial serial)
+			: base(serial)
+		{
+		}
+
+		public override void Serialize(GenericWriter writer)
+		{
+			base.Serialize(writer);
+
+			writer.WriteEncodedInt(0); // version
+		}
+
+		public override void Deserialize(GenericReader reader)
+		{
+			base.Deserialize(reader);
+
+			var version = reader.ReadEncodedInt();
+		}
+	}
+
 	/// Bokuto
 	[FlipableAttribute(0x27A8, 0x27F3)]
 	public class Bokuto : BaseSword

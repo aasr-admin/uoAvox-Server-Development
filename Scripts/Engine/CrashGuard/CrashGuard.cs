@@ -95,36 +95,6 @@ namespace Server.Misc
 			}
 		}
 
-		private static void CreateDirectory(string path)
-		{
-			if (!Directory.Exists(path))
-			{
-				Directory.CreateDirectory(path);
-			}
-		}
-
-		private static void CreateDirectory(string path1, string path2)
-		{
-			CreateDirectory(Path.Combine(path1, path2));
-		}
-
-		private static void CopyFile(string rootOrigin, string rootBackup, string path)
-		{
-			var originPath = Path.Combine(rootOrigin, path);
-			var backupPath = Path.Combine(rootBackup, path);
-
-			try
-			{
-				if (File.Exists(originPath))
-				{
-					File.Copy(originPath, backupPath);
-				}
-			}
-			catch
-			{
-			}
-		}
-
 		private static void Backup()
 		{
 			Console.Write("Crash: Backing up...");
@@ -141,32 +111,16 @@ namespace Server.Misc
 				var root = GetRoot();
 
 				var rootBackup = Path.Combine(root, "Export", "Saves", "Crashed", timeStamp);
-				var rootOrigin = Path.Combine(root, "Export", "Saves");
+				var rootOrigin = Core.CurrentSavesDirectory;
 
-				// Create new directories
-				CreateDirectory(rootBackup);
-				CreateDirectory(rootBackup, "Accounts");
-				CreateDirectory(rootBackup, "Items");
-				CreateDirectory(rootBackup, "Mobiles");
-				CreateDirectory(rootBackup, "Guilds");
-				CreateDirectory(rootBackup, "Regions");
+				foreach (var file in Directory.EnumerateFiles(rootOrigin, "*", SearchOption.AllDirectories))
+				{
+					var path = file.Replace(rootOrigin, rootBackup);
 
-				// Copy files
-				CopyFile(rootOrigin, rootBackup, Path.Combine("Accounts", "Accounts.xml"));
+					Directory.CreateDirectory(Path.GetDirectoryName(path));
 
-				CopyFile(rootOrigin, rootBackup, Path.Combine("Items", "Items.bin"));
-				CopyFile(rootOrigin, rootBackup, Path.Combine("Items", "Items.idx"));
-				CopyFile(rootOrigin, rootBackup, Path.Combine("Items", "Items.tdb"));
-
-				CopyFile(rootOrigin, rootBackup, Path.Combine("Mobiles", "Mobiles.bin"));
-				CopyFile(rootOrigin, rootBackup, Path.Combine("Mobiles", "Mobiles.idx"));
-				CopyFile(rootOrigin, rootBackup, Path.Combine("Mobiles", "Mobiles.tdb"));
-
-				CopyFile(rootOrigin, rootBackup, Path.Combine("Guilds", "Guilds.bin"));
-				CopyFile(rootOrigin, rootBackup, Path.Combine("Guilds", "Guilds.idx"));
-
-				CopyFile(rootOrigin, rootBackup, Path.Combine("Regions", "Regions.bin"));
-				CopyFile(rootOrigin, rootBackup, Path.Combine("Regions", "Regions.idx"));
+					File.Copy(file, path, true);
+				}
 
 				Console.WriteLine("done");
 			}
@@ -193,7 +147,7 @@ namespace Server.Misc
 					op.WriteLine("Server Crash Report");
 					op.WriteLine("===================");
 					op.WriteLine();
-					op.WriteLine($"RunUO Version {ver.Major}.{ver.Minor}, Build {ver.Build}.{ver.Revision}");
+					op.WriteLine($"uoAvos Version {ver.Major}.{ver.Minor}, Build {ver.Build}.{ver.Revision}");
 					op.WriteLine($"Operating System: {Environment.OSVersion}");
 					op.WriteLine($".NET: {Environment.Version}");
 					op.WriteLine($"Date: {timeStamp}");

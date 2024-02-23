@@ -1,9 +1,6 @@
-﻿using Server.Spells.Chivalry;
-using Server.Spells.Magery;
-
-namespace Server.Regions
+﻿namespace Server.Regions
 {
-	public class GreenAcres : BaseRegion
+	public sealed class GreenAcres : BaseRegion
 	{
 		public override bool WeatherSupported => true;
 
@@ -47,28 +44,17 @@ namespace Server.Regions
 		{
 		}
 
-		public override bool AllowHousing(Mobile m, Point3D p)
+		protected override void DefaultInit()
 		{
-			if (m.AccessLevel < AccessLevel.Counselor)
-			{
-				return false;
-			}
+			base.DefaultInit();
 
-			return base.AllowHousing(m, p);
-		}
+			Rules.AllowHouses = false;
+			Rules.AllowVehicles = false;
 
-		public override bool OnBeginSpellCast(Mobile m, ISpell s)
-		{
-			if (m.AccessLevel < AccessLevel.Counselor)
-			{
-				if (s is GateTravelSpell || s is RecallSpell || s is MarkSpell || s is SacredJourneySpell)
-				{
-					m.SendMessage("You cannot cast that spell here.");
-					return false;
-				}
-			}
-
-			return base.OnBeginSpellCast(m, s);
+			SpellPermissions[SpellName.Mark] = false;
+			SpellPermissions[SpellName.Recall] = false;
+			SpellPermissions[SpellName.GateTravel] = false;
+			SpellPermissions[SpellName.SacredJourney] = false;
 		}
 
 		public override void Serialize(GenericWriter writer)

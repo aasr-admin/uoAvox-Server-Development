@@ -1,4 +1,5 @@
 ﻿using Server.Commands;
+using Server.Engines.Harvest;
 using Server.Engines.Weather;
 using Server.Gumps;
 using Server.Items;
@@ -417,7 +418,7 @@ namespace Server.Regions
 		#endregion
 	}
 
-	public class BaseRegion : Region
+	public abstract class BaseRegion : Region
 	{
 		private static readonly List<Poly3D> m_RectBuffer1 = new();
 		private static readonly List<Poly3D> m_RectBuffer2 = new();
@@ -427,7 +428,7 @@ namespace Server.Regions
 
 		public static void Configure()
 		{
-			DefaultRegionType = typeof(BaseRegion);
+			DefaultRegionType = typeof(GenericRegion);
 		}
 
 		public static string GetRuneNameFor(Region region)
@@ -481,11 +482,52 @@ namespace Server.Regions
 			return false;
 		}
 
+		public static IEnumerable<TypeAmount> EnumerateHarvestNodes(Region region, Type harvest, bool active, bool inherited)
+		{
+			return internalEnumerate(region, harvest, active, inherited).DistinctBy(e => HashCode.Combine(e.Type, e.Amount)).OrderBy(e => e.Amount);
+
+			static IEnumerable<TypeAmount> internalEnumerate(Region r, Type t, bool a, bool i)
+			{
+				if (r?.Deleted != false || t == null)
+				{
+					yield break;
+				}
+
+				while (r != null)
+				{
+					if (r is BaseRegion br)
+					{
+						var node = br.HarvestNodes[t];
+
+						if (node?.Count > 0)
+						{
+							var entries = a ? node.ActiveEntries : node.ValidEntries;
+
+							foreach (var entry in entries)
+							{
+								yield return entry;
+							}
+						}
+					}
+
+					if (!i)
+					{
+						break;
+					}
+
+					r = r.Parent;
+				}
+			}
+		}
+
 		[CommandProperty(AccessLevel.Counselor, AccessLevel.GameMaster)]
 		public string RuneName { get; set; }
 
 		[CommandProperty(AccessLevel.Counselor, AccessLevel.GameMaster)]
 		public Currencies Currencies { get; protected set; } = new();
+
+		[CommandProperty(AccessLevel.Counselor, AccessLevel.GameMaster)]
+		public HarvestNodes HarvestNodes { get; protected set; } = new();
 
 		[CommandProperty(AccessLevel.Counselor, AccessLevel.GameMaster)]
 		public SkillPermissions SkillPermissions { get; protected set; } = new();
@@ -1038,36 +1080,36 @@ namespace Server.Regions
 			return base.AcceptsSpawnsFrom(spawn, region);
 		}
 
-		public override bool AllowHousing(Mobile from, Point3D p)
+		public override bool AllowHousing(Mobile owner, Point3D p)
 		{
-			if (from.AccessLevel < RulesOverride)
+			if (owner == null || owner.AccessLevel < RulesOverride)
 			{
 				if (!Rules.AllowHouses)
 				{
-					if (!OnRuleEnforced(RegionFlags.AllowHouses, from, p, false))
+					if (!OnRuleEnforced(RegionFlags.AllowHouses, owner, p, false))
 					{
 						return false;
 					}
 				}
 			}
 
-			return base.AllowHousing(from, p);
+			return base.AllowHousing(owner, p);
 		}
 
-		public override bool AllowVehicles(Mobile from, Point3D p)
+		public override bool AllowVehicles(Mobile owner, Point3D p)
 		{
-			if (from.AccessLevel < RulesOverride)
+			if (owner == null || owner.AccessLevel < RulesOverride)
 			{
 				if (!Rules.AllowVehicles)
 				{
-					if (!OnRuleEnforced(RegionFlags.AllowVehicles, from, p, false))
+					if (!OnRuleEnforced(RegionFlags.AllowVehicles, owner, p, false))
 					{
 						return false;
 					}
 				}
 			}
 
-			return base.AllowVehicles(from, p);
+			return base.AllowVehicles(owner, p);
 		}
 
 		public override bool CanEnter(Mobile m)
@@ -1727,11 +1769,39 @@ namespace Server.Regions
 			return Point3D.Zero;
 		}
 
+		public override Type GetResource(Mobile from, IHarvestTool tool, Map map, Point3D loc, IHarvestSystem harvest, Type resource)
+		{
+			if (harvest != null)
+			{
+				var roll = Utility.RandomDouble();
+
+				// group all entries that have the same chances, then pick one entry at random
+				foreach (var g in EnumerateHarvestNodes(this, harvest.GetType(), true, false).GroupBy(e => e.Amount))
+				{
+					if (roll > g.Key / 100.0)
+					{
+						continue;
+					}
+
+					var entries = g.Select(e => e.Type).OrderBy(e => Utility.RandomDouble());
+
+					var entry = entries.FirstOrDefault();
+
+					if (entry != null)
+					{
+						return entry;
+					}
+				}
+			}
+
+			return base.GetResource(from, tool, map, loc, harvest, resource);
+		}
+
 		public override void Serialize(GenericWriter writer)
 		{
 			base.Serialize(writer);
 
-			writer.Write(5);
+			writer.Write(0);
 
 			writer.Write(RuneName);
 
@@ -1768,6 +1838,17 @@ namespace Server.Regions
 				writer.Write(true);
 
 				Currencies.Serialize(writer);
+			}
+			else
+			{
+				writer.Write(false);
+			}
+
+			if (HarvestNodes != null)
+			{
+				writer.Write(true);
+
+				HarvestNodes.Serialize(writer);
 			}
 			else
 			{
@@ -1812,36 +1893,17 @@ namespace Server.Regions
 		{
 			base.Deserialize(reader);
 
-			var v = reader.ReadInt();
+			_ = reader.ReadInt();
 
 			RuneName = reader.ReadString();
 
-			if (v >= 5)
+			if (reader.ReadBool())
 			{
-				if (reader.ReadBool())
-				{
-					Rules.Defaults();
-				}
-				else
-				{
-					Rules.Flags = reader.ReadEnum<RegionFlags>();
-				}
-			}
-			else if (v >= 2)
-			{
-				Rules.Flags = reader.ReadEnum<RegionFlags>();
+				Rules.Defaults();
 			}
 			else
 			{
-				Rules.AllowHouses = reader.ReadBool();
-				Rules.AllowYoungAggro = !reader.ReadBool();
-				Rules.CanEnterYoung = reader.ReadBool();
-				Rules.AllowMount = reader.ReadBool();
-				Rules.CanEnterDead = reader.ReadBool();
-				Rules.AllowPlayerRes = reader.ReadBool();
-				Rules.AllowLogout = reader.ReadBool();
-				Rules.AllowDelayLogout = !reader.ReadBool();
-				Rules.AllowParentSpawns = !reader.ReadBool();
+				Rules.Flags = reader.ReadEnum<RegionFlags>();
 			}
 
 			SpawnZLevel = reader.ReadEnum<SpawnZLevel>();
@@ -1868,29 +1930,31 @@ namespace Server.Regions
 
 					spawns.Clear();
 				}
-				
+
 				spawns.TrimExcess();
 			}
 
-			if (v >= 4 && reader.ReadBool())
+			if (reader.ReadBool())
 			{
 				Currencies.Deserialize(reader);
 			}
 
-			if (v >= 3)
+			if (reader.ReadBool())
 			{
-				if (reader.ReadBool())
-				{
-					SkillPermissions.Deserialize(reader);
-				}
-
-				if (reader.ReadBool())
-				{
-					SpellPermissions.Deserialize(reader);
-				}
+				HarvestNodes.Deserialize(reader);
 			}
 
-			if (v >= 1 && reader.ReadBool())
+			if (reader.ReadBool())
+			{
+				SkillPermissions.Deserialize(reader);
+			}
+
+			if (reader.ReadBool())
+			{
+				SpellPermissions.Deserialize(reader);
+			}
+
+			if (reader.ReadBool())
 			{
 				if (Weather != null)
 				{

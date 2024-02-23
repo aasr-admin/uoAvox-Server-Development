@@ -40,7 +40,7 @@ namespace Server.Mobiles
 				Crafter = this,
 				Poison = Poison.Deadly,
 				PoisonCharges = 12,
-				Quality = WeaponQuality.Regular
+				Quality = ItemQuality.Regular
 			};
 			AddToBackpack(kat);
 
@@ -48,7 +48,7 @@ namespace Server.Mobiles
 				Movable = false,
 				LootType = LootType.Newbied,
 				Crafter = this,
-				Quality = ArmorQuality.Regular
+				Quality = ItemQuality.Regular
 			};
 			AddItem(lea);
 
@@ -56,7 +56,7 @@ namespace Server.Mobiles
 				Movable = false,
 				LootType = LootType.Newbied,
 				Crafter = this,
-				Quality = ArmorQuality.Regular
+				Quality = ItemQuality.Regular
 			};
 			AddItem(lec);
 
@@ -64,7 +64,7 @@ namespace Server.Mobiles
 				Movable = false,
 				LootType = LootType.Newbied,
 				Crafter = this,
-				Quality = ArmorQuality.Regular
+				Quality = ItemQuality.Regular
 			};
 			AddItem(leg);
 
@@ -72,7 +72,7 @@ namespace Server.Mobiles
 				Movable = false,
 				LootType = LootType.Newbied,
 				Crafter = this,
-				Quality = ArmorQuality.Regular
+				Quality = ItemQuality.Regular
 			};
 			AddItem(lel);
 
@@ -244,7 +244,7 @@ namespace Server.Mobiles
 				Movable = false,
 				LootType = LootType.Newbied,
 				Crafter = this,
-				Quality = ArmorQuality.Regular
+				Quality = ItemQuality.Regular
 			};
 			AddItem(lea);
 
@@ -252,7 +252,7 @@ namespace Server.Mobiles
 				Movable = false,
 				LootType = LootType.Newbied,
 				Crafter = this,
-				Quality = ArmorQuality.Regular
+				Quality = ItemQuality.Regular
 			};
 			AddItem(lec);
 
@@ -260,7 +260,7 @@ namespace Server.Mobiles
 				Movable = false,
 				LootType = LootType.Newbied,
 				Crafter = this,
-				Quality = ArmorQuality.Regular
+				Quality = ItemQuality.Regular
 			};
 			AddItem(leg);
 
@@ -268,7 +268,7 @@ namespace Server.Mobiles
 				Movable = false,
 				LootType = LootType.Newbied,
 				Crafter = this,
-				Quality = ArmorQuality.Regular
+				Quality = ItemQuality.Regular
 			};
 			AddItem(lel);
 

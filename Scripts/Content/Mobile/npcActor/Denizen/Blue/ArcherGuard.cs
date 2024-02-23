@@ -31,7 +31,7 @@ namespace Server.Mobiles
 			{
 				AddItem(new Bow
 				{
-					Quality = WeaponQuality.Exceptional
+					Quality = ItemQuality.Exceptional
 				});
 
 				pack.DropItem(new Arrow(250)
@@ -43,7 +43,7 @@ namespace Server.Mobiles
 			{
 				AddItem(new Crossbow
 				{
-					Quality = WeaponQuality.Exceptional
+					Quality = ItemQuality.Exceptional
 				});
 
 				pack.DropItem(new Bolt(250)

@@ -11,14 +11,8 @@ namespace Server.Items
 	{
 		public override int LabelNumber => 1041079;  // a special fishing net
 
-		private bool m_InUse;
-
 		[CommandProperty(AccessLevel.GameMaster)]
-		public bool InUse
-		{
-			get => m_InUse;
-			set => m_InUse = value;
-		}
+		public bool InUse { get; set; }
 
 		[Constructable]
 		public SpecialFishingNet() : base(0x0DCA)
@@ -76,7 +70,7 @@ namespace Server.Items
 
 			writer.Write(1); // version
 
-			writer.Write(m_InUse);
+			writer.Write(InUse);
 		}
 
 		public override void Deserialize(GenericReader reader)
@@ -89,9 +83,9 @@ namespace Server.Items
 			{
 				case 1:
 					{
-						m_InUse = reader.ReadBool();
+						InUse = reader.ReadBool();
 
-						if (m_InUse)
+						if (InUse)
 						{
 							Delete();
 						}
@@ -105,14 +99,14 @@ namespace Server.Items
 
 		public override void OnDoubleClick(Mobile from)
 		{
-			if (m_InUse)
+			if (InUse)
 			{
 				from.SendLocalizedMessage(1010483); // Someone is already using that net!
 			}
 			else if (IsChildOf(from.Backpack))
 			{
 				from.SendLocalizedMessage(1010484); // Where do you wish to use the net?
-				from.BeginTarget(-1, true, TargetFlags.None, new TargetCallback(OnTarget));
+				_ = from.BeginTarget(-1, true, TargetFlags.None, new TargetCallback(OnTarget));
 			}
 			else
 			{
@@ -124,14 +118,7 @@ namespace Server.Items
 
 		public void OnTarget(Mobile from, object obj)
 		{
-			if (Deleted || m_InUse)
-			{
-				return;
-			}
-
-			var p3D = obj as IPoint3D;
-
-			if (p3D == null)
+			if (Deleted || InUse)
 			{
 				return;
 			}
@@ -143,8 +130,18 @@ namespace Server.Items
 				return;
 			}
 
-			int x = p3D.X, y = p3D.Y, z = map.GetAverageZ(x, y); // OSI just takes the targeted Z
+			if (obj is not IPoint3D i3d)
+			{
+				return;
+			}
 
+			var p3D = new Point3D(i3d);
+
+			if (BaseHouse.FindHouseAt(p3D, map, 0) != null)
+			{
+				return;
+			}
+			
 			if (!from.InRange(p3D, 6))
 			{
 				from.SendLocalizedMessage(500976); // You need to be closer to the water to fish!
@@ -153,59 +150,73 @@ namespace Server.Items
 			{
 				from.SendLocalizedMessage(500979); // You cannot see that location.
 			}
-			else if (RequireDeepWater ? FullValidation(map, x, y) : (ValidateDeepWater(map, x, y) || ValidateUndeepWater(map, obj, ref z)))
-			{
-				var p = new Point3D(x, y, z);
-
-				if (GetType() == typeof(SpecialFishingNet))
-				{
-					for (var i = 1; i < Amount; ++i) // these were stackable before, doh
-					{
-						from.AddToBackpack(new SpecialFishingNet());
-					}
-				}
-
-				m_InUse = true;
-				Movable = false;
-				MoveToWorld(p, map);
-
-				SpellHelper.Turn(from, p);
-				from.Animate(12, 5, 1, true, false, 0);
-
-				Effects.SendLocationEffect(p, map, 0x352D, 16, 4);
-				Effects.PlaySound(p, map, 0x364);
-
-				Timer.DelayCall(TimeSpan.FromSeconds(1.0), TimeSpan.FromSeconds(1.25), 14, DoEffect, new object[] { p, 0, from });
-
-				from.SendLocalizedMessage(RequireDeepWater ? 1010487 : 1074492); // You plunge the net into the sea... / You plunge the net into the water...
-			}
 			else
 			{
-				from.SendLocalizedMessage(RequireDeepWater ? 1010485 : 1074491); // You can only use this net in deep water! / You can only use this net in water!
+				var valid = false;
+				var fresh = false;
+				var z = p3D.Z;
+
+				if (RequireDeepWater)
+				{
+					valid = WaterUtility.FullDeepValidation(map, p3D, ref z, out fresh);
+				}
+				else
+				{
+					valid = WaterUtility.ValidateWater(map, obj, ref z, out fresh);
+				}
+
+				if (valid)
+				{
+					p3D.Z = z;
+
+					if (GetType() == typeof(SpecialFishingNet))
+					{
+						for (var i = 1; i < Amount; ++i) // these were stackable before, doh
+						{
+							_ = from.AddToBackpack(new SpecialFishingNet());
+						}
+					}
+
+					InUse = true;
+					Movable = false;
+
+					MoveToWorld(p3D, map);
+
+					SpellHelper.Turn(from, p3D);
+
+					from.Animate(12, 5, 1, true, false, 0);
+
+					Effects.SendLocationEffect(p3D, map, 0x352D, 16, 4);
+					Effects.PlaySound(p3D, map, 0x364);
+
+					_EffectIndex = 0;
+
+					_ = Timer.DelayCall(TimeSpan.FromSeconds(1.00), TimeSpan.FromSeconds(1.25), 14, DoEffect, p3D, from);
+
+					from.SendLocalizedMessage(RequireDeepWater ? 1010487 : 1074492); // You plunge the net into the sea... / You plunge the net into the water...
+				}
+				else
+				{
+					from.SendLocalizedMessage(RequireDeepWater ? 1010485 : 1074491); // You can only use this net in deep water! / You can only use this net in water!
+				}
 			}
 		}
 
-		private void DoEffect(object state)
+		private int _EffectIndex;
+
+		private void DoEffect(Point3D p, Mobile from)
 		{
 			if (Deleted)
 			{
 				return;
 			}
 
-			var states = (object[])state;
-
-			var p = (Point3D)states[0];
-			var index = (int)states[1];
-			var from = (Mobile)states[2];
-
-			states[1] = ++index;
-
-			if (index == 1)
+			if (++_EffectIndex == 1)
 			{
 				Effects.SendLocationEffect(p, Map, 0x352D, 16, 4);
 				Effects.PlaySound(p, Map, 0x364);
 			}
-			else if (index <= 7 || index == 14)
+			else if (_EffectIndex is <= 7 or 14)
 			{
 				if (RequireDeepWater)
 				{
@@ -239,13 +250,13 @@ namespace Server.Items
 					Effects.PlaySound(p, Map, 0x364);
 				}
 
-				if (index == 14)
+				if (_EffectIndex >= 14)
 				{
 					FinishEffect(p, Map, from);
 				}
 				else
 				{
-					Z -= 1;
+					--Z;
 				}
 			}
 		}
@@ -262,7 +273,7 @@ namespace Server.Items
 			return count;
 		}
 
-		protected void Spawn(Point3D p, Map map, BaseCreature spawn)
+		protected static void Spawn(Point3D p, Map map, BaseCreature spawn)
 		{
 			if (map == null)
 			{
@@ -279,7 +290,7 @@ namespace Server.Items
 
 				var t = map.Tiles.GetLandTile(tx, ty);
 
-				if (t.Z == p.Z && ((t.ID >= 0xA8 && t.ID <= 0xAB) || (t.ID >= 0x136 && t.ID <= 0x137)) && !Spells.SpellHelper.CheckMulti(new Point3D(tx, ty, p.Z), map))
+				if (t.Z == p.Z && ((t.ID >= 0xA8 && t.ID <= 0xAB) || (t.ID >= 0x136 && t.ID <= 0x137)) && !SpellHelper.CheckMulti(new Point3D(tx, ty, p.Z), map))
 				{
 					x = tx;
 					y = ty;
@@ -303,102 +314,19 @@ namespace Server.Items
 
 			for (var i = 0; map != null && i < count; ++i)
 			{
-				BaseCreature spawn;
-
-				switch (Utility.Random(4))
+				BaseCreature spawn = Utility.Random(4) switch
 				{
-					default:
-					case 0: spawn = new SeaSerpent(); break;
-					case 1: spawn = new DeepSeaSerpent(); break;
-					case 2: spawn = new WaterElemental(); break;
-					case 3: spawn = new Kraken(); break;
-				}
-
+					1 => new DeepSeaSerpent(),
+					2 => new WaterElemental(),
+					3 => new Kraken(),
+					_ => new SeaSerpent(),
+				};
 				Spawn(p, map, spawn);
 
 				spawn.Combatant = from;
 			}
 
 			Delete();
-		}
-
-		public static bool FullValidation(Map map, int x, int y)
-		{
-			var valid = ValidateDeepWater(map, x, y);
-
-			for (int j = 1, offset = 5; valid && j <= 5; ++j, offset += 5)
-			{
-				if (!ValidateDeepWater(map, x + offset, y + offset))
-				{
-					valid = false;
-				}
-				else if (!ValidateDeepWater(map, x + offset, y - offset))
-				{
-					valid = false;
-				}
-				else if (!ValidateDeepWater(map, x - offset, y + offset))
-				{
-					valid = false;
-				}
-				else if (!ValidateDeepWater(map, x - offset, y - offset))
-				{
-					valid = false;
-				}
-			}
-
-			return valid;
-		}
-
-		private static readonly int[] m_WaterTiles = new int[]
-			{
-				0x00A8, 0x00AB,
-				0x0136, 0x0137
-			};
-
-		private static bool ValidateDeepWater(Map map, int x, int y)
-		{
-			var tileID = map.Tiles.GetLandTile(x, y).ID;
-			var water = false;
-
-			for (var i = 0; !water && i < m_WaterTiles.Length; i += 2)
-			{
-				water = (tileID >= m_WaterTiles[i] && tileID <= m_WaterTiles[i + 1]);
-			}
-
-			return water;
-		}
-
-		private static readonly int[] m_UndeepWaterTiles = new int[]
-			{
-				0x1797, 0x179C
-			};
-
-		private static bool ValidateUndeepWater(Map map, object obj, ref int z)
-		{
-			if (!(obj is StaticTarget))
-			{
-				return false;
-			}
-
-			var target = (StaticTarget)obj;
-
-			if (BaseHouse.FindHouseAt(target.Location, map, 0) != null)
-			{
-				return false;
-			}
-
-			var itemID = target.ItemID;
-
-			for (var i = 0; i < m_UndeepWaterTiles.Length; i += 2)
-			{
-				if (itemID >= m_UndeepWaterTiles[i] && itemID <= m_UndeepWaterTiles[i + 1])
-				{
-					z = target.Z;
-					return true;
-				}
-			}
-
-			return false;
 		}
 	}
 
@@ -446,8 +374,7 @@ namespace Server.Items
 		public override void Deserialize(GenericReader reader)
 		{
 			base.Deserialize(reader);
-
-			var version = reader.ReadInt();
+			_ = reader.ReadInt();
 		}
 	}
 
@@ -543,8 +470,7 @@ namespace Server.Items
 		public override void Deserialize(GenericReader reader)
 		{
 			base.Deserialize(reader);
-
-			var version = reader.ReadInt();
+			_ = reader.ReadInt();
 		}
 	}
 
@@ -563,14 +489,9 @@ namespace Server.Items
 
 		private Item CreateReplacement()
 		{
-			Item result = new AquariumFishNet {
-				Hue = Hue,
-				LootType = LootType,
-				Movable = Movable,
-				Name = Name,
-				QuestItem = QuestItem,
-				Visible = Visible
-			};
+			var result = new AquariumFishNet();
+
+			Commands.Dupe.CopyProperties(result, this);
 
 			return result;
 		}
@@ -607,8 +528,7 @@ namespace Server.Items
 		public override void Deserialize(GenericReader reader)
 		{
 			base.Deserialize(reader);
-
-			var version = reader.ReadInt();
+			_ = reader.ReadInt();
 		}
 	}
 

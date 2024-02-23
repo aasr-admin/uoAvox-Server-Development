@@ -147,7 +147,7 @@ namespace Server.Engines.Events
 			}
 			else if (i.QuestItem)
 			{
-				from.SendLocalizedMessage(1151836); // You may not dye toggled quest items.
+				from.SendLocalizedMessage(1042417); // You cannot dye that.
 			}
 			else if (i is MetalPigmentsOfTokuno)
 			{

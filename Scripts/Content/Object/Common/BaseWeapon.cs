@@ -31,13 +31,6 @@ namespace Server.Items
 		Wrestle = 31
 	}
 
-	public enum WeaponQuality
-	{
-		Low,
-		Regular,
-		Exceptional
-	}
-
 	public enum WeaponAccuracyLevel
 	{
 		Regular,
@@ -68,7 +61,7 @@ namespace Server.Items
 		Indestructible
 	}
 
-	public abstract class BaseWeapon : Item, IWeapon, IFactionItem, ICraftable, ISlayer, IDurability
+	public abstract class BaseWeapon : Item, IWeapon, IFactionItem, ICraftable, ISlayer, IDurability, IQuality
 	{
 		private string m_EngravedText;
 
@@ -121,7 +114,7 @@ namespace Server.Items
 		private WeaponDamageLevel m_DamageLevel;
 		private WeaponAccuracyLevel m_AccuracyLevel;
 		private WeaponDurabilityLevel m_DurabilityLevel;
-		private WeaponQuality m_Quality;
+		private ItemQuality m_Quality;
 		private Mobile m_Crafter;
 		private Poison m_Poison;
 		private int m_PoisonCharges;
@@ -299,7 +292,7 @@ namespace Server.Items
 		}
 
 		[CommandProperty(AccessLevel.GameMaster)]
-		public WeaponQuality Quality
+		public ItemQuality Quality
 		{
 			get => m_Quality;
 			set { UnscaleDurability(); m_Quality = value; ScaleDurability(); InvalidateProperties(); }
@@ -531,7 +524,7 @@ namespace Server.Items
 		{
 			var bonus = 0;
 
-			if (m_Quality == WeaponQuality.Exceptional)
+			if (m_Quality == ItemQuality.Exceptional)
 			{
 				bonus += 20;
 			}
@@ -2607,8 +2600,8 @@ namespace Server.Items
 
 			switch (m_Quality)
 			{
-				case WeaponQuality.Low: bonus -= 20; break;
-				case WeaponQuality.Exceptional: bonus += 20; break;
+				case ItemQuality.Low: bonus -= 20; break;
+				case ItemQuality.Exceptional: bonus += 20; break;
 			}
 
 			switch (m_DamageLevel)
@@ -2778,7 +2771,7 @@ namespace Server.Items
 			}
 
 			// New quality bonus:
-			if (m_Quality != WeaponQuality.Regular)
+			if (m_Quality != ItemQuality.Regular)
 			{
 				modifiers += (((int)m_Quality - 1) * 0.2);
 			}
@@ -2948,7 +2941,7 @@ namespace Server.Items
 			SetSaveFlag(ref flags, SaveFlag.DamageLevel, m_DamageLevel != WeaponDamageLevel.Regular);
 			SetSaveFlag(ref flags, SaveFlag.AccuracyLevel, m_AccuracyLevel != WeaponAccuracyLevel.Regular);
 			SetSaveFlag(ref flags, SaveFlag.DurabilityLevel, m_DurabilityLevel != WeaponDurabilityLevel.Regular);
-			SetSaveFlag(ref flags, SaveFlag.Quality, m_Quality != WeaponQuality.Regular);
+			SetSaveFlag(ref flags, SaveFlag.Quality, m_Quality != ItemQuality.Regular);
 			SetSaveFlag(ref flags, SaveFlag.Hits, m_Hits != 0);
 			SetSaveFlag(ref flags, SaveFlag.MaxHits, m_MaxHits != 0);
 			SetSaveFlag(ref flags, SaveFlag.Slayer, m_Slayer != SlayerName.None);
@@ -3210,11 +3203,11 @@ namespace Server.Items
 
 						if (GetSaveFlag(flags, SaveFlag.Quality))
 						{
-							m_Quality = (WeaponQuality)reader.ReadInt();
+							m_Quality = (ItemQuality)reader.ReadInt();
 						}
 						else
 						{
-							m_Quality = WeaponQuality.Regular;
+							m_Quality = ItemQuality.Regular;
 						}
 
 						if (GetSaveFlag(flags, SaveFlag.Hits))
@@ -3502,7 +3495,7 @@ namespace Server.Items
 						m_DamageLevel = (WeaponDamageLevel)reader.ReadInt();
 						m_AccuracyLevel = (WeaponAccuracyLevel)reader.ReadInt();
 						m_DurabilityLevel = (WeaponDurabilityLevel)reader.ReadInt();
-						m_Quality = (WeaponQuality)reader.ReadInt();
+						m_Quality = (ItemQuality)reader.ReadInt();
 
 						m_Crafter = reader.ReadMobile();
 
@@ -3631,7 +3624,7 @@ namespace Server.Items
 		{
 			Layer = (Layer)ItemData.Quality;
 
-			m_Quality = WeaponQuality.Regular;
+			m_Quality = ItemQuality.Regular;
 			m_StrReq = -1;
 			m_DexReq = -1;
 			m_IntReq = -1;
@@ -3826,7 +3819,7 @@ namespace Server.Items
 				m_AosSkillBonuses.GetProperties(list);
 			}
 
-			if (m_Quality == WeaponQuality.Exceptional)
+			if (m_Quality == ItemQuality.Exceptional)
 			{
 				list.Add(1060636); // exceptional
 			}
@@ -4215,7 +4208,7 @@ namespace Server.Items
 			}
 			#endregion
 
-			if (m_Quality == WeaponQuality.Exceptional)
+			if (m_Quality == ItemQuality.Exceptional)
 			{
 				attrs.Add(new EquipInfoAttribute(1018305 - (int)m_Quality));
 			}
@@ -4295,11 +4288,11 @@ namespace Server.Items
 			set => m_Fists = value;
 		}
 
-		#region ICraftable Members
+		#region ICraftable
 
-		public int OnCraft(int quality, bool makersMark, Mobile from, CraftSystem craftSystem, Type typeRes, BaseTool tool, CraftItem craftItem, int resHue)
+		public virtual int OnCraft(int quality, bool makersMark, Mobile from, ICraftSystem craftSystem, Type typeRes, ICraftTool tool, ICraftItem craftItem, int resHue)
 		{
-			Quality = (WeaponQuality)quality;
+			Quality = (ItemQuality)quality;
 
 			if (makersMark)
 			{
@@ -4310,20 +4303,23 @@ namespace Server.Items
 
 			var resourceType = typeRes;
 
-			if (resourceType == null)
+			if (resourceType == null && craftItem is CraftItem ci)
 			{
-				resourceType = craftItem.Resources.GetAt(0).ItemType;
+				resourceType = ci.Resources.GetAt(0).ItemType;
 			}
 
 			if (Core.AOS)
 			{
 				Resource = CraftResources.GetFromType(resourceType);
 
-				var context = craftSystem.GetContext(from);
-
-				if (context != null && context.DoNotColor)
+				if (craftSystem is CraftSystem cs)
 				{
-					Hue = 0;
+					var context = cs.GetContext(from);
+
+					if (context != null && context.DoNotColor)
+					{
+						Hue = 0;
+					}
 				}
 
 				if (tool is BaseRunicTool)
@@ -4331,7 +4327,7 @@ namespace Server.Items
 					((BaseRunicTool)tool).ApplyAttributesTo(this);
 				}
 
-				if (Quality == WeaponQuality.Exceptional)
+				if (Quality == ItemQuality.Exceptional)
 				{
 					if (Attributes.WeaponDamage > 35)
 					{
@@ -4363,11 +4359,14 @@ namespace Server.Items
 				{
 					Resource = thisResource;
 
-					var context = craftSystem.GetContext(from);
-
-					if (context != null && context.DoNotColor)
+					if (craftSystem is CraftSystem cs)
 					{
-						Hue = 0;
+						var context = cs.GetContext(from);
+
+						if (context != null && context.DoNotColor)
+						{
+							Hue = 0;
+						}
 					}
 
 					switch (thisResource)

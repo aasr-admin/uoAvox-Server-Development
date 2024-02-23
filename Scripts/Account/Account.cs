@@ -48,8 +48,6 @@ namespace Server.Accounting
 			try
 			{
 				BankBox box;
-				List<Gold> gold;
-				List<BankCheck> checks;
 				long share = 0, shared;
 				int diff;
 
@@ -59,7 +57,7 @@ namespace Server.Accounting
 					{
 						if (!AccountGold.Enabled)
 						{
-							share = (int)Math.Truncate((a.TotalCurrency / a.Count) * CurrencyThreshold);
+							share = (int)Math.Truncate(a.TotalCurrency / a.Count * CurrencyThreshold);
 							found += a.TotalCurrency * CurrencyThreshold;
 						}
 
@@ -74,7 +72,7 @@ namespace Server.Accounting
 
 							if (AccountGold.Enabled)
 							{
-								foreach (var o in checks = box.FindItemsByType<BankCheck>())
+								foreach (var o in box.FindItemsByType<BankCheck>())
 								{
 									found += o.Worth;
 
@@ -87,10 +85,7 @@ namespace Server.Accounting
 									o.Delete();
 								}
 
-								checks.Clear();
-								checks.TrimExcess();
-
-								foreach (var o in gold = box.FindItemsByType<Gold>())
+								foreach (var o in box.FindItemsByType<Gold>())
 								{
 									found += o.Amount;
 
@@ -102,9 +97,6 @@ namespace Server.Accounting
 									converted += o.Amount;
 									o.Delete();
 								}
-
-								gold.Clear();
-								gold.TrimExcess();
 							}
 							else
 							{
@@ -1072,7 +1064,7 @@ namespace Server.Accounting
 					try
 					{
 						var index = Utility.GetXMLInt32(Utility.GetAttribute(ele, "index", "0"), 0);
-						var serial = Utility.GetXMLInt32(Utility.GetText(ele, "0"), 0);
+						var serial = Utility.GetXMLSerial(Utility.GetText(ele, "0"), 0);
 
 						if (index >= 0 && index < list.Length)
 						{
@@ -2077,17 +2069,17 @@ namespace Server.Gumps
 			AddHtmlLocalized(190, 24, 120, 20, 1046287, 0x7D00, false, false); // You have died.
 
 			// As a ghost you cannot interact with the world. You cannot touch items nor can you use them.
-			AddHtmlLocalized(50, 50, 380, 40, 1046288, 0xFFFFFF, false, false);
+			AddHtmlLocalized(50, 50, 380, 40, 1046288, 0x7FFF, false, false);
 			// You can pass through doors as though they do not exist.  However, you cannot pass through walls.
-			AddHtmlLocalized(50, 100, 380, 45, 1046289, 0xFFFFFF, false, false);
+			AddHtmlLocalized(50, 100, 380, 45, 1046289, 0x7FFF, false, false);
 			// Since you are a new player, any items you had on your person at the time of your death will be in your backpack upon resurrection.
-			AddHtmlLocalized(50, 140, 380, 60, 1046291, 0xFFFFFF, false, false);
+			AddHtmlLocalized(50, 140, 380, 60, 1046291, 0x7FFF, false, false);
 			// To be resurrected you must find a healer in town or wandering in the wilderness.  Some powerful players may also be able to resurrect you.
-			AddHtmlLocalized(50, 204, 380, 65, 1046292, 0xFFFFFF, false, false);
+			AddHtmlLocalized(50, 204, 380, 65, 1046292, 0x7FFF, false, false);
 			// While you are still in young status, you will be transported to the nearest healer (along with your items) at the time of your death.
-			AddHtmlLocalized(50, 269, 380, 65, 1046293, 0xFFFFFF, false, false);
+			AddHtmlLocalized(50, 269, 380, 65, 1046293, 0x7FFF, false, false);
 			// To rejoin the world of the living simply walk near one of the NPC healers, and they will resurrect you as long as you are not marked as a criminal.
-			AddHtmlLocalized(50, 334, 380, 70, 1046294, 0xFFFFFF, false, false);
+			AddHtmlLocalized(50, 334, 380, 70, 1046294, 0x7FFF, false, false);
 
 			AddButton(195, 410, 0xF8, 0xF9, 0, GumpButtonType.Reply, 0);
 		}
@@ -2515,7 +2507,7 @@ namespace Server.Misc
 				return;
 			}
 
-			var un = e.Username;
+			var un = e.Username.Trim();
 			var pw = e.Password;
 
 			e.Accepted = false;
@@ -2523,13 +2515,14 @@ namespace Server.Misc
 
 			if (acct == null)
 			{
-				if (AutoAccountCreation && un.Trim().Length > 0) // To prevent someone from making an account of just '' or a bunch of meaningless spaces
+				if (AutoAccountCreation && un.Length > 0) // To prevent someone from making an account of just '' or a bunch of meaningless spaces
 				{
 					e.State.Account = acct = CreateAccount(e.State, un, pw);
-					e.Accepted = acct == null ? false : acct.CheckAccess(e.State);
+					e.Accepted = acct?.CheckAccess(e.State) == true;
 
 					if (!e.Accepted)
 					{
+						Console.WriteLine("Login: {0}: Access denied for '{1}'", e.State, un);
 						e.RejectReason = ALRReason.BadComm;
 					}
 				}

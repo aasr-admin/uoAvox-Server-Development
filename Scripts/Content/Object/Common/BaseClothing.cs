@@ -7,13 +7,6 @@ using System.Collections.Generic;
 
 namespace Server.Items
 {
-	public enum ClothingQuality
-	{
-		Low,
-		Regular,
-		Exceptional
-	}
-
 	public interface IArcaneEquip
 	{
 		bool IsArcane { get; }
@@ -21,7 +14,7 @@ namespace Server.Items
 		int MaxArcaneCharges { get; set; }
 	}
 
-	public abstract class BaseClothing : Item, IDyable, IScissorable, IFactionItem, ICraftable, IWearableDurability
+	public abstract class BaseClothing : Item, IDyable, IScissorable, IFactionItem, ICraftable, IWearableDurability, IQuality
 	{
 		#region Factions
 		private FactionItem m_FactionState;
@@ -48,7 +41,7 @@ namespace Server.Items
 		private int m_MaxHitPoints;
 		private int m_HitPoints;
 		private Mobile m_Crafter;
-		private ClothingQuality m_Quality;
+		private ItemQuality m_Quality;
 		private bool m_PlayerConstructed;
 		protected CraftResource m_Resource;
 		private int m_StrReq = -1;
@@ -104,7 +97,7 @@ namespace Server.Items
 		}
 
 		[CommandProperty(AccessLevel.GameMaster)]
-		public ClothingQuality Quality
+		public ItemQuality Quality
 		{
 			get => m_Quality;
 			set { m_Quality = value; InvalidateProperties(); }
@@ -503,7 +496,7 @@ namespace Server.Items
 			Hue = hue;
 
 			m_Resource = DefaultResource;
-			m_Quality = ClothingQuality.Regular;
+			m_Quality = ItemQuality.Regular;
 
 			m_HitPoints = m_MaxHitPoints = Utility.RandomMinMax(InitMinHits, InitMaxHits);
 
@@ -650,7 +643,7 @@ namespace Server.Items
 			}
 			#endregion
 
-			if (m_Quality == ClothingQuality.Exceptional)
+			if (m_Quality == ItemQuality.Exceptional)
 			{
 				list.Add(1060636); // exceptional
 			}
@@ -874,7 +867,7 @@ namespace Server.Items
 			}
 			#endregion
 
-			if (m_Quality == ClothingQuality.Exceptional)
+			if (m_Quality == ItemQuality.Exceptional)
 			{
 				attrs.Add(new EquipInfoAttribute(1018305 - (int)m_Quality));
 			}
@@ -928,7 +921,7 @@ namespace Server.Items
 			SetSaveFlag(ref flags, SaveFlag.HitPoints, m_HitPoints != 0);
 			SetSaveFlag(ref flags, SaveFlag.PlayerConstructed, m_PlayerConstructed != false);
 			SetSaveFlag(ref flags, SaveFlag.Crafter, m_Crafter != null);
-			SetSaveFlag(ref flags, SaveFlag.Quality, m_Quality != ClothingQuality.Regular);
+			SetSaveFlag(ref flags, SaveFlag.Quality, m_Quality != ItemQuality.Regular);
 			SetSaveFlag(ref flags, SaveFlag.StrReq, m_StrReq != -1);
 
 			writer.WriteEncodedInt((int)flags);
@@ -1058,11 +1051,11 @@ namespace Server.Items
 
 						if (GetSaveFlag(flags, SaveFlag.Quality))
 						{
-							m_Quality = (ClothingQuality)reader.ReadEncodedInt();
+							m_Quality = (ItemQuality)reader.ReadEncodedInt();
 						}
 						else
 						{
-							m_Quality = ClothingQuality.Regular;
+							m_Quality = ItemQuality.Regular;
 						}
 
 						if (GetSaveFlag(flags, SaveFlag.StrReq))
@@ -1104,13 +1097,13 @@ namespace Server.Items
 				case 1:
 					{
 						m_Crafter = reader.ReadMobile();
-						m_Quality = (ClothingQuality)reader.ReadInt();
+						m_Quality = (ItemQuality)reader.ReadInt();
 						break;
 					}
 				case 0:
 					{
 						m_Crafter = null;
-						m_Quality = ClothingQuality.Regular;
+						m_Quality = ItemQuality.Regular;
 						break;
 					}
 			}
@@ -1239,11 +1232,11 @@ namespace Server.Items
 			InvalidateProperties();
 		}
 
-		#region ICraftable Members
+		#region ICraftable
 
-		public virtual int OnCraft(int quality, bool makersMark, Mobile from, CraftSystem craftSystem, Type typeRes, BaseTool tool, CraftItem craftItem, int resHue)
+		public virtual int OnCraft(int quality, bool makersMark, Mobile from, ICraftSystem craftSystem, Type typeRes, ICraftTool tool, ICraftItem craftItem, int resHue)
 		{
-			Quality = (ClothingQuality)quality;
+			Quality = (ItemQuality)quality;
 
 			if (makersMark)
 			{
@@ -1254,9 +1247,9 @@ namespace Server.Items
 			{
 				var resourceType = typeRes;
 
-				if (resourceType == null)
+				if (resourceType == null && craftItem is CraftItem ci)
 				{
-					resourceType = craftItem.Resources.GetAt(0).ItemType;
+					resourceType = ci.Resources.GetAt(0).ItemType;
 				}
 
 				Resource = CraftResources.GetFromType(resourceType);
@@ -1268,11 +1261,14 @@ namespace Server.Items
 
 			PlayerConstructed = true;
 
-			var context = craftSystem.GetContext(from);
-
-			if (context != null && context.DoNotColor)
+			if (craftSystem is CraftSystem cs)
 			{
-				Hue = 0;
+				var context = cs.GetContext(from);
+
+				if (context != null && context.DoNotColor)
+				{
+					Hue = 0;
+				}
 			}
 
 			return quality;

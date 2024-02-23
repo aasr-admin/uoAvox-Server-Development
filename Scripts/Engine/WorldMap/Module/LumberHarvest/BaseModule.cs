@@ -1,17 +1,13 @@
 ﻿//#define CUSTOM_TREE_GRAPHICS
 
-using Server;
-using Server.Engine.Facet;
 using Server.Engines.Harvest;
 using Server.Items;
-using Server.Network;
-using Server.Regions;
 using Server.Targeting;
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 #region Developer Notations
 
@@ -101,144 +97,98 @@ using System.IO;
 
 namespace Server.Engine.Facet.Module.LumberHarvest
 {
-	public class FacetModule_Lumberjacking : HarvestSystem
+	public static class FacetModule_Lumberjacking
 	{
-
 		//List contains an entry for each map, each entry contains all the locations where trees have been chopped down
-		public static Dictionary<int, Dictionary<Point3D, int>> RegrowthMasterLookupTable = new Dictionary<int, Dictionary<Point3D, int>>();
-		public static DateTime LastGrowth = DateTime.UtcNow;
+		public static Dictionary<int, Dictionary<Point3D, int>> RegrowthMasterLookupTable { get; } = new();
 
+		public static DateTime LastGrowth { get; private set; } = DateTime.UtcNow;
 
 		//This is the minimum time between regrowths, but the regrowths will only happen on world saves
-		public static TimeSpan TimeBetweenRegrowth = TimeSpan.FromMinutes(1);
-
-		public static void Initialize()
-		{
-
-			List<int> tiles = new List<int>(BaseTreeHarvestPhase.MasterHarvestablePhaseLookupByItemIdList.Keys); /// Server.Engine.Facet.Module.LumberHarvest.BaseTreeHarvestPhase.MasterHarvestablePhaseLookupByItemIdList.Keys
-			for (int i = 0; i < tiles.Count; ++i)
-			{
-				tiles[i] += 0x4000;
-			}
-
-			int[] tileNums = tiles.ToArray();
-			Array.Sort(tileNums);
-			HarvestDefinition lumber = new HarvestDefinition();
-			lumber.Tiles = tileNums;
-
-			// Players must be within 2 tiles to harvest
-			lumber.MaxRange = 2;
-
-			// Skill checking is done on the Lumberjacking skill
-			lumber.Skill = SkillName.Lumberjacking;
-
-			// The chopping effect
-			lumber.EffectActions = new int[] { 13 };
-			lumber.EffectSounds = new int[] { 0x13E };
-			lumber.EffectCounts = (Core.AOS ? new int[] { 1 } : new int[] { 1, 2, 2, 2, 3 });
-			lumber.EffectDelay = TimeSpan.FromSeconds(1.6);
-			lumber.EffectSoundDelay = TimeSpan.FromSeconds(0.9);
-
-			lumber.NoResourcesMessage = 500493; // There's not enough wood here to harvest.
-			lumber.FailMessage = 500495; // You hack at the tree for a while, but fail to produce any useable wood.
-			lumber.OutOfRangeMessage = 500446; // That is too far away.
-			lumber.PackFullMessage = 500497; // You can't place any wood into your backpack!
-			lumber.ToolBrokeMessage = 500499; // You broke your axe.
-
-			//not used
-			lumber.RaceBonus = Core.ML;
-			lumber.RandomizeVeins = Core.ML;
-			lumber.BankWidth = 4;
-			lumber.BankHeight = 3;
-			lumber.MinTotal = 20;
-			lumber.MaxTotal = 45;
-			lumber.Resources = new HarvestResource[] { new HarvestResource(00.0, 00.0, 100.0, 500498, typeof(Log)) };
-			lumber.BonusResources = new BonusHarvestResource[] { new BonusHarvestResource(0, 83.9, null, null) };
-			lumber.Veins = new HarvestVein[] { new HarvestVein(49.0, 0.0, lumber.Resources[0], null) };
-			System.Definitions.Add(lumber);
-		}
+		public static TimeSpan TimeBetweenRegrowth { get; set; } = TimeSpan.FromMinutes(1);
 
 		public static void Configure()
 		{
-			foreach (Map m in Map.AllMaps)
+			foreach (var m in Map.AllMaps)
 			{
-				RegrowthMasterLookupTable.Add(m.MapID, new Dictionary<Point3D, int>());
+				RegrowthMasterLookupTable[m.MapID] = new();
 			}
 
-			EventSink.WorldSave += new WorldSaveEventHandler(OnSave);
-			EventSink.WorldLoad += new WorldLoadEventHandler(OnLoad);
+			EventSink.WorldSave += OnSave;
+			EventSink.WorldLoad += OnLoad;
+
+			if (FacetEditingSettings.LumberHarvestModuleEnabled)
+			{
+				ModifyLumberjacking();
+			}
 		}
 
 		public static void OnLoad()
 		{
-			for (int mapId = 0; mapId < RegrowthMasterLookupTable.Count; ++mapId)
+			for (var mapId = 0; mapId < RegrowthMasterLookupTable.Count; ++mapId)
 			{
-				string filename = Path.Combine(FacetEditingSettings.LumberHarvestFallenTreeSaveLocation, "TreeLocations." + mapId);
-				FileInfo treeFileInfo = new FileInfo(filename);
+				var filename = Path.Combine(FacetEditingSettings.LumberHarvestFallenTreeSaveLocation, $"TreeLocations.{mapId}");
 
-				if (treeFileInfo.Exists)
+				if (File.Exists(filename))
 				{
-					using (FileStream fs = new FileStream(filename, FileMode.Open))
-					{
-						using (BinaryReader br = new BinaryReader(fs))
-						{
-							GenericReader reader = new BinaryFileReader(br);
+					using var fs = new FileStream(filename, FileMode.Open);
+					using var br = new BinaryReader(fs);
 
-							while (fs.Position < fs.Length)
-							{
-								Point3D p = reader.ReadPoint3D();
-								int itemId = reader.ReadInt();
-								if (!RegrowthMasterLookupTable[mapId].ContainsKey(p))
-								{
-									RegrowthMasterLookupTable[mapId].Add(p, itemId);
-								}
-							}
+					var reader = new BinaryFileReader(br);
+
+					while (!reader.End())
+					{
+						var p = reader.ReadPoint3D();
+						var itemId = reader.ReadInt();
+
+						if (!RegrowthMasterLookupTable.TryGetValue(mapId, out var list))
+						{
+							RegrowthMasterLookupTable[mapId] = list = new Dictionary<Point3D, int>();
 						}
+
+						list[p] = itemId;
 					}
+
+					reader.Close();
 				}
 			}
 		}
 
 		public static void OnSave(WorldSaveEventArgs e)
 		{
-			if (!Directory.Exists(FacetEditingSettings.LumberHarvestFallenTreeSaveLocation))
-			{
-				Directory.CreateDirectory(FacetEditingSettings.LumberHarvestFallenTreeSaveLocation);
-			}
+			_ = Directory.CreateDirectory(FacetEditingSettings.LumberHarvestFallenTreeSaveLocation);
 
-			bool updateRegrowthTime = false;
+			var updateRegrowthTime = false;
 
 			//foreach map in the lookup table
-			foreach (Map m in Map.AllMaps)
+			foreach (var map in Map.AllMaps)
 			{
-				if (RegrowthMasterLookupTable.ContainsKey(m.MapID))
+				if (RegrowthMasterLookupTable.TryGetValue(map.MapID, out var mapLookupTable))
 				{
 					#region Regrowth
 					if (DateTime.UtcNow > LastGrowth + TimeBetweenRegrowth)
 					{
 						updateRegrowthTime = true;
-						Dictionary<Point3D, int> mapLookupTable = RegrowthMasterLookupTable[m.MapID];
+
 						MapOperationSeries mapOperations = null;
 
-						List<Point3D> locationsToRemove = new List<Point3D>();
+						var locationsToRemove = new HashSet<Point3D>();
 
 						//for each tree location in the lookup table
-						foreach (KeyValuePair<Point3D, int> treeLocationKvp in mapLookupTable)
+						foreach (var treeLocationKvp in mapLookupTable)
 						{
 							if (BaseHarvestablePhase.MasterHarvestablePhaseLookupByItemIdList.ContainsKey(treeLocationKvp.Value))
 							{
 								//look up the current phase
-								bool existingTileFound = false;
-								foreach (StaticTile tile in m.Tiles.GetStaticTiles(treeLocationKvp.Key.X, treeLocationKvp.Key.Y))
+								var existingTileFound = false;
+
+								foreach (var tile in map.Tiles.GetStaticTiles(treeLocationKvp.Key.X, treeLocationKvp.Key.Y))
 								{
 									if (tile.Z == treeLocationKvp.Key.Z) // if the z altitude matches
 									{
-										if (BaseHarvestablePhase.MasterHarvestablePhaseLookupByItemIdList.ContainsKey(tile.ID)) //if the item id is linked to a phase
+										if (BaseHarvestablePhase.MasterHarvestablePhaseLookupByItemIdList.TryGetValue(tile.ID, out var currentPhase)) //if the item id is linked to a phase
 										{
-
-											BaseHarvestablePhase currentPhase = BaseHarvestablePhase.MasterHarvestablePhaseLookupByItemIdList[tile.ID];
-
-											foreach (GraphicAsset[] assetSet in currentPhase.BaseAssetSets)
+											foreach (var assetSet in currentPhase.BaseAssetSets)
 											{
 												if (assetSet.Length > 0 && assetSet[0].ItemID == tile.ID)
 												{
@@ -246,7 +196,7 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 												}
 											}
 
-											if (existingTileFound && !currentPhase.grow(treeLocationKvp.Key, m, ref mapOperations))
+											if (existingTileFound && !currentPhase.Grow(treeLocationKvp.Key, map, ref mapOperations))
 											{
 												locationsToRemove.Add(treeLocationKvp.Key);
 											}
@@ -260,55 +210,53 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 								if (!existingTileFound)
 								{
 									//lookup original phase that was saved
-									BaseHarvestablePhase grownPhase = BaseHarvestablePhase.MasterHarvestablePhaseLookupByItemIdList[treeLocationKvp.Value];
+									var grownPhase = BaseHarvestablePhase.MasterHarvestablePhaseLookupByItemIdList[treeLocationKvp.Value];
 
 									//cleanup final harvest graphics
-									if (grownPhase.FinalHarvestPhase != null && BaseHarvestablePhase.MasterHarvestablePhaseLookupByTypeList.ContainsKey(grownPhase.FinalHarvestPhase))
+									if (grownPhase.FinalHarvestPhase != null && BaseHarvestablePhase.MasterHarvestablePhaseLookupByTypeList.TryGetValue(grownPhase.FinalHarvestPhase, out var phase1))
 									{
-										BaseHarvestablePhase.MasterHarvestablePhaseLookupByTypeList[grownPhase.FinalHarvestPhase].Teardown(treeLocationKvp.Key, m, ref mapOperations);
+										phase1.Teardown(treeLocationKvp.Key, map, ref mapOperations);
 									}
 
-									if (grownPhase.StartingGrowthPhase != null && BaseHarvestablePhase.MasterHarvestablePhaseLookupByTypeList.ContainsKey(grownPhase.StartingGrowthPhase))
+									if (grownPhase.StartingGrowthPhase != null && BaseHarvestablePhase.MasterHarvestablePhaseLookupByTypeList.TryGetValue(grownPhase.StartingGrowthPhase, out var phase2))
 									{
 										//remove stump
-										BaseTreeHarvestPhase maturePhase = grownPhase as BaseTreeHarvestPhase;
-										if (maturePhase != null)
+										if (grownPhase is BaseTreeHarvestPhase maturePhase)
 										{
 											if (mapOperations != null)
 											{
-												mapOperations.Add(new DeleteStatic(m.MapID, new StaticTarget(treeLocationKvp.Key, maturePhase.StumpGraphic)));
+												mapOperations.Add(new DeleteStatic(map.MapID, new StaticTarget(treeLocationKvp.Key, maturePhase.StumpGraphic)));
 											}
 											else
 											{
-												mapOperations = new MapOperationSeries(new DeleteStatic(m.MapID, new StaticTarget(treeLocationKvp.Key, maturePhase.StumpGraphic)), m.MapID);
+												mapOperations = new MapOperationSeries(new DeleteStatic(map.MapID, new StaticTarget(treeLocationKvp.Key, maturePhase.StumpGraphic)), map.MapID);
 											}
 										}
 
-										BaseHarvestablePhase.MasterHarvestablePhaseLookupByTypeList[grownPhase.StartingGrowthPhase].Construct(treeLocationKvp.Key, m, ref mapOperations);
+										_ = phase2.Construct(treeLocationKvp.Key, map, ref mapOperations);
 									}
 								}
 							}
 						}
 
-						if (mapOperations != null)
-						{
-							mapOperations.DoOperation();
-						}
+						mapOperations?.DoOperation();
 
-						foreach (Point3D p in locationsToRemove)
+						foreach (var p in locationsToRemove)
 						{
-							RegrowthMasterLookupTable[m.MapID].Remove(p);
+							_ = RegrowthMasterLookupTable[map.MapID].Remove(p);
 						}
 					}
 					#endregion
 
-					GenericWriter writer = new BinaryFileWriter(Path.Combine(FacetEditingSettings.LumberHarvestFallenTreeSaveLocation, "TreeLocations." + m.MapID), true);
+					using var writer = new BinaryFileWriter(Path.Combine(FacetEditingSettings.LumberHarvestFallenTreeSaveLocation, "TreeLocations." + map.MapID), true);
 
-					foreach (KeyValuePair<Point3D, int> kvp in RegrowthMasterLookupTable[m.MapID])
+					foreach (var kvp in mapLookupTable)
 					{
 						writer.Write(kvp.Key);
 						writer.Write(kvp.Value);
 					}
+
+					writer.Flush();
 					writer.Close();
 				}
 			}
@@ -319,95 +267,84 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 			}
 		}
 
-		private static FacetModule_Lumberjacking m_System;
-
-		public static FacetModule_Lumberjacking System
+		private static void ModifyLumberjacking()
 		{
-			get
-			{
-				if (m_System == null)
-					m_System = new FacetModule_Lumberjacking();
+			var def = Lumberjacking.System.Definition;
 
-				return m_System;
+			var tiles = BaseHarvestablePhase.MasterHarvestablePhaseLookupByItemIdList.Keys.ToArray();
+
+			for (var i = 0; i < tiles.Length; ++i)
+			{
+				tiles[i] += 0x4000;
 			}
+
+			Array.Sort(tiles);
+
+			def.Tiles = tiles;
+
+			def.Resources = new[]
+			{
+				new HarvestResource(00.0, 00.0, 100.0, 500498, typeof(Log)),
+			};
+
+			def.BonusResources = new[]
+			{
+				new BonusHarvestResource(0, 83.9, null, null),
+			};
+
+			def.Veins = new[]
+			{
+				new HarvestVein(49.0, 0.0, def.Resources[0], null),
+			};
 		}
 
-		public override void FinishHarvesting(Mobile from, Item tool, HarvestDefinition def, object toHarvest, object locked)
+		public static bool SpecialHarvest(Mobile from, IHarvestTool tool, HarvestDefinition def, object toHarvest, int tileID, Map map, Point3D loc)
 		{
-			from.EndAction(locked);
-
-			if (!CheckHarvest(from, tool))
-				return;
-
-			int tileID;
-			Map map;
-			Point3D loc;
-
-			if (!GetHarvestDetails(from, tool, toHarvest, out tileID, out map, out loc))
+			if (!FacetEditingSettings.LumberHarvestModuleEnabled)
 			{
-				OnBadHarvestTarget(from, tool, toHarvest);
-				return;
-			}
-			else if (!def.Validate(tileID))
-			{
-				OnBadHarvestTarget(from, tool, toHarvest);
-				return;
+				return false;
 			}
 
-			if (!CheckRange(from, tool, def, map, loc, true))
-				return;
-			else if (!CheckHarvest(from, tool, def, toHarvest))
-				return;
-
-			double skillBase = from.Skills[def.Skill].Base;
-			double skillValue = from.Skills[def.Skill].Value;
-
-			StaticTarget harvestTarget = toHarvest as StaticTarget;
-
-			if (harvestTarget != null)
+			if (from.CheckSkill(def.Skill, 0, 120))
 			{
-				if (from.CheckSkill(def.Skill, 0, 120))
+				var hTreePhase = BaseHarvestablePhase.LookupPhase(tileID);
+
+				_ = hTreePhase.Harvest(from, tileID, tool, loc, map);
+
+				if (tool is IUsesRemaining toolWithUses)
 				{
-					if (tool is IUsesRemaining)
+					toolWithUses.ShowUsesRemaining = true;
+
+					if (toolWithUses.UsesRemaining > 0)
 					{
-						IUsesRemaining toolWithUses = (IUsesRemaining)tool;
+						--toolWithUses.UsesRemaining;
+					}
 
-						toolWithUses.ShowUsesRemaining = true;
+					if (toolWithUses.UsesRemaining < 1)
+					{
+						tool.Delete();
 
-						if (toolWithUses.UsesRemaining > 0)
-						{
-							--toolWithUses.UsesRemaining;
-						}
-						if (toolWithUses.UsesRemaining < 1)
-						{
-							tool.Delete();
-							def.SendMessageTo(from, def.ToolBrokeMessage);
-						}
+						def.SendMessageTo(from, def.ToolBrokeMessage);
 					}
 				}
-
-				BaseHarvestablePhase hTreePhase = BaseHarvestablePhase.LookupPhase(harvestTarget.ItemID);
-
-				if (hTreePhase != null && hTreePhase is BaseTreeHarvestPhase)
-				{
-					hTreePhase.Harvest(from, harvestTarget.ItemID, harvestTarget.Location, map);
-				}
 			}
+
+			return true;
 		}
 	}
 
-	public class GraphicAsset
+	public class HarvestGraphicAsset
 	{
 		public int ItemID;
-		public Int16 XOffset;
-		public Int16 YOffset;
+		public short XOffset;
+		public short YOffset;
 		public int HarvestResourceBaseAmount = 0;
 		public int BonusResourceBaseAmount = 0;
 
 		//Graphics are linked to bonus resources only. Regular harvest resources should be assigned at the phase level.
-		public Dictionary<int, BonusHarvestResource[]> BonusResources = new Dictionary<int, BonusHarvestResource[]>();
+		public Dictionary<int, BonusHarvestResource[]> BonusResources = new();
 
-		public GraphicAsset(int itemId, Int16 xOff, Int16 yOff)
+		public HarvestGraphicAsset(int itemId, short xOff, short yOff)
 		{
 			ItemID = itemId;
 			XOffset = xOff;
@@ -422,7 +359,7 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 		//The bonus resource list can be specified at the phase level by using this overloaded method.
 		public static List<Item> ReapBonusResources(int hue, Mobile from, int bonusResourceAmount, Dictionary<int, BonusHarvestResource[]> bonusList)
 		{
-			List<Item> bonusItems = new List<Item>();
+			var bonusItems = new List<Item>();
 			BonusHarvestResource[] bonusResourceList = null;
 
 			if (bonusResourceAmount > 0)
@@ -438,24 +375,23 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 
 				if (bonusResourceList != null && bonusResourceList.Length > 0)
 				{
-					double skillBase = from.Skills[SkillName.Lumberjacking].Base;
+					var skillBase = from.Skills[SkillName.Lumberjacking].Base;
 
-					foreach (BonusHarvestResource resource in bonusResourceList)
+					foreach (var resource in bonusResourceList)
 					{
 						if (skillBase >= resource.ReqSkill && Utility.RandomDouble() <= resource.Chance)
 						{
 							try
 							{
-								Item item = Activator.CreateInstance(resource.Type) as Item;
-								if (item != null)
+								if (Activator.CreateInstance(resource.Type) is Item item)
 								{
 									item.Amount = bonusResourceAmount;
+
 									bonusItems.Add(item);
 								}
 							}
 							catch
 							{
-								Console.WriteLine("exception caught when trying to create bonus resource");
 							}
 						}
 					}
@@ -472,28 +408,27 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 		public const int FALLING_LEAF_HUE = 1436;
 
 		public BaseLeafHandlingPhase()
-		  : base()
 		{
 		}
 
-		public override bool Harvest(Mobile from, int itemId, Point3D harvestTargetLocation, Map map)
+		public override bool Harvest(Mobile from, int itemId, IHarvestTool tool, Point3D harvestTargetLocation, Map map)
 		{
-			Point3D trunkLocation = LookupOriginLocation(harvestTargetLocation, itemId);
+			var trunkLocation = LookupOriginLocation(harvestTargetLocation, itemId);
 
 			//search for leaves
 			MapOperationSeries mapActions = null;
-			List<KeyValuePair<int, GraphicAsset>> leavesRemoved = RemoveAssets(map, trunkLocation, ref mapActions, LeafSets);
+			var leavesRemoved = RemoveAssets(map, trunkLocation, ref mapActions, LeafSets);
 
 			if (mapActions != null)
 			{
 				//handle falling leaves
 
-				int numLeaves = Utility.Random(5);
+				var numLeaves = Utility.Random(5);
 				Effects.SendMovingParticles(new Entity(Serial.Zero, new Point3D(trunkLocation.X, trunkLocation.Y, trunkLocation.Z + 20), map),
 						  new Entity(Serial.Zero, new Point3D(trunkLocation.X, trunkLocation.Y, trunkLocation.Z), map),
 						  0x1B1F, 1, 0, false, false, FALLING_LEAF_HUE, 0, 0, 1, 0, EffectLayer.Waist, 0x486);
 
-				for (int i = 0; i < numLeaves + 9; i++)
+				for (var i = 0; i < numLeaves + 9; i++)
 				{
 					new FadingLeaf().MoveToWorld(new Point3D(trunkLocation.X + Utility.Random(4) - 2, trunkLocation.Y + Utility.Random(4) - 2, trunkLocation.Z), map);
 					Effects.SendMovingParticles(new Entity(Serial.Zero, new Point3D(trunkLocation.X + Utility.Random(4) - 2, trunkLocation.Y + Utility.Random(4) - 2, trunkLocation.Z + 20), map),
@@ -502,23 +437,20 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 				}
 
 				//give out leaf bonus asset resources
-				foreach (KeyValuePair<int, GraphicAsset> assetPair in leavesRemoved)
+				foreach (var assetPair in leavesRemoved)
 				{
-					foreach (Item itm in assetPair.Value.ReapBonusResources(assetPair.Key, from))
+					foreach (var itm in assetPair.Value.ReapBonusResources(assetPair.Key, from))
 					{
-						from.AddToBackpack(itm);
+						_ = from.AddToBackpack(itm);
 					}
 				}
 			}
 			else //if there are no leaves left, then remove the trunk pieces and call nextPhase.construct
 			{
-				base.Harvest(from, itemId, harvestTargetLocation, map, ref mapActions);
+				_ = Harvest(from, itemId, tool, harvestTargetLocation, map, ref mapActions);
 			}
 
-			if (mapActions != null)
-			{
-				mapActions.DoOperation();
-			}
+			mapActions?.DoOperation();
 
 			return false;
 		}
@@ -528,17 +460,17 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 	{
 		public const int LEAF_HUE = 0;
 
-		public virtual int StumpGraphic { get { return 0xE57; } }
-		public virtual bool AddStump { get { return true; } }
+		public virtual int StumpGraphic => 0xE57;
+		public virtual bool AddStump => true;
 
-		public List<GraphicAsset[]> LeafSets = new List<GraphicAsset[]>();
+		public List<HarvestGraphicAsset[]> LeafSets = new();
 
 		public override void RegisterBasicPhaseTiles()
 		{
 			base.RegisterBasicPhaseTiles();
 
 			//Add all the leaf graphics for this phase
-			foreach (GraphicAsset[] leafSet in LeafSets)
+			foreach (var leafSet in LeafSets)
 			{
 				RegisterAssetSet(leafSet);
 			}
@@ -546,25 +478,18 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 
 		public override Point3D LookupOriginLocation(Point3D harvestTargetLocation, int harvestTargetItemId)
 		{
-			Point3D originLocation = base.LookupOriginLocation(harvestTargetLocation, harvestTargetItemId);
+			var originLocation = base.LookupOriginLocation(harvestTargetLocation, harvestTargetItemId);
 
 			if (originLocation == Point3D.Zero)
 			{
-				bool found = false;
-				foreach (GraphicAsset[] leafSet in LeafSets)
+				foreach (var leafSet in LeafSets)
 				{
-					foreach (GraphicAsset asset in leafSet)
+					foreach (var asset in leafSet)
 					{
 						if (asset.ItemID == harvestTargetItemId)
 						{
-							originLocation = new Point3D(harvestTargetLocation.X + asset.XOffset, harvestTargetLocation.Y + asset.YOffset, harvestTargetLocation.Z - TileData.ItemTable[harvestTargetItemId].CalcHeight);
-							found = true;
-							break;
+							return new Point3D(harvestTargetLocation.X + asset.XOffset, harvestTargetLocation.Y + asset.YOffset, harvestTargetLocation.Z - TileData.ItemTable[harvestTargetItemId].CalcHeight);
 						}
-					}
-					if (found)
-					{
-						break;
 					}
 				}
 			}
@@ -574,9 +499,9 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 
 		public override int Construct(Point3D location, Map map, ref MapOperationSeries mapOperationSeries)
 		{
-			int trunkHue = base.Construct(location, map, ref mapOperationSeries);
+			var trunkHue = base.Construct(location, map, ref mapOperationSeries);
 
-			GraphicAsset[] leafSet = null;
+			HarvestGraphicAsset[] leafSet = null;
 
 			if (LeafSets != null && LeafSets.Count > 0)
 			{
@@ -586,17 +511,18 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 
 			if (leafSet != null)
 			{
-				foreach (GraphicAsset asset in leafSet)
+				foreach (var asset in leafSet)
 				{
 					//come back and add a usestatic boolean to this class and add it into the constructor too
-					AddStatic addStatic = new AddStatic(map.MapID, asset.ItemID, location.Z, location.X + asset.XOffset, location.Y + asset.YOffset, LEAF_HUE);
-					if (mapOperationSeries == null)
+					var addStatic = new AddStatic(map.MapID, asset.ItemID, location.Z, location.X + asset.XOffset, location.Y + asset.YOffset, LEAF_HUE);
+
+					if (mapOperationSeries != null)
 					{
-						mapOperationSeries = new MapOperationSeries(addStatic, map.MapID);
+						mapOperationSeries.Add(addStatic);
 					}
 					else
 					{
-						mapOperationSeries.Add(addStatic);
+						mapOperationSeries = new MapOperationSeries(addStatic, map.MapID);
 					}
 				}
 			}
@@ -607,57 +533,48 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 		public override void Teardown(Point3D originLocation, Map map, ref MapOperationSeries mapActions)
 		{
 			base.Teardown(originLocation, map, ref mapActions);
-			List<KeyValuePair<int, GraphicAsset>> leavesRemoved = RemoveAssets(map, originLocation, ref mapActions, LeafSets);
+
+			_ = RemoveAssets(map, originLocation, ref mapActions, LeafSets);
 		}
 
-		public override bool Harvest(Mobile from, int itemId, Point3D harvestTargetLocation, Map map)
+		public override bool Harvest(Mobile from, int itemId, IHarvestTool tool, Point3D harvestTargetLocation, Map map)
 		{
-			bool successfulHarvest = false;
 			MapOperationSeries mapActions = null;
 
-			successfulHarvest = Harvest(from, itemId, harvestTargetLocation, map, ref mapActions);
+			var successfulHarvest = Harvest(from, itemId, tool, harvestTargetLocation, map, ref mapActions);
 
-			if (mapActions != null)
-			{
-				mapActions.DoOperation();
-			}
+			mapActions?.DoOperation();
+
 			return successfulHarvest;
 		}
-
 
 		//This only gets called if the NextHarvestPhase is not null
 		public virtual void RecordTreeLocationAndGraphic(int mapId, int itemId, Point3D trunkLocation)
 		{
-			if (!FacetModule_Lumberjacking.RegrowthMasterLookupTable.ContainsKey(mapId))
+			if (!FacetModule_Lumberjacking.RegrowthMasterLookupTable.TryGetValue(mapId, out var table) || table == null)
 			{
-				FacetModule_Lumberjacking.RegrowthMasterLookupTable.Add(mapId, new Dictionary<Point3D, int>());
+				FacetModule_Lumberjacking.RegrowthMasterLookupTable[mapId] = table = new Dictionary<Point3D, int>();
 			}
 
-			if (!FacetModule_Lumberjacking.RegrowthMasterLookupTable[mapId].ContainsKey(trunkLocation))
-			{
-				FacetModule_Lumberjacking.RegrowthMasterLookupTable[mapId].Add(trunkLocation, itemId);
-			}
-			else
-			{
-				FacetModule_Lumberjacking.RegrowthMasterLookupTable[mapId][trunkLocation] = itemId;
-			}
+			table[trunkLocation] = itemId;
 		}
 
-		public bool Harvest(Mobile from, int itemId, Point3D harvestTargetLocation, Map map, ref MapOperationSeries operationSeries)
+		public bool Harvest(Mobile from, int itemId, IHarvestTool tool, Point3D harvestTargetLocation, Map map, ref MapOperationSeries operationSeries)
 		{
-			Point3D trunkLocation = LookupOriginLocation(harvestTargetLocation, itemId);
+			var trunkLocation = LookupOriginLocation(harvestTargetLocation, itemId);
 
-			List<KeyValuePair<int, GraphicAsset>> phasePiecesRemoved = null;
+			List<KeyValuePair<int, HarvestGraphicAsset>> phasePiecesRemoved;
 
 			//If the next phase is not null, tear it all down and construct the next phase
 			if (NextHarvestPhase != null)
 			{
 				phasePiecesRemoved = RemoveAssets(map, trunkLocation, ref operationSeries, BaseAssetSets);
-				int constructedTreeHue = 0;
 
-				if (MasterHarvestablePhaseLookupByTypeList.ContainsKey(NextHarvestPhase))
+				var constructedTreeHue = 0;
+
+				if (MasterHarvestablePhaseLookupByTypeList.TryGetValue(NextHarvestPhase, out var next))
 				{
-					constructedTreeHue = MasterHarvestablePhaseLookupByTypeList[NextHarvestPhase].Construct(trunkLocation, map, ref operationSeries);
+					constructedTreeHue = next.Construct(trunkLocation, map, ref operationSeries);
 				}
 
 				if (operationSeries != null)
@@ -669,129 +586,132 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 						operationSeries.Add(new AddStatic(map.MapID, StumpGraphic, trunkLocation.Z, trunkLocation.X, trunkLocation.Y, constructedTreeHue));
 					}
 				}
-
 			}
 			else //the next phase is not null, so destroy one asset at a time
 			{
-				GraphicAsset asset = LookupAsset(itemId);
-				List<GraphicAsset[]> assetsToRemove = new List<GraphicAsset[]>();
-				assetsToRemove.Add(new GraphicAsset[] { asset });
+				var asset = LookupAsset(itemId);
+
+				var assetsToRemove = new List<HarvestGraphicAsset[]>
+				{
+					new HarvestGraphicAsset[] { asset }
+				};
+
 				phasePiecesRemoved = RemoveAssets(map, trunkLocation, ref operationSeries, assetsToRemove);
 			}
 
-			int hue = 0;
+			var system = tool?.HarvestSystem as HarvestSystem ?? Lumberjacking.System;
+
+			var hue = 0;
 
 			//give out phase resource for each graphic asset removed
-			foreach (KeyValuePair<int, GraphicAsset> assetPair in phasePiecesRemoved)
+			foreach (var assetPair in phasePiecesRemoved)
 			{
 				hue = assetPair.Key;
 
-				Item itm = this.ReapResource(assetPair.Key, from, assetPair.Value.HarvestResourceBaseAmount);
+				var item = ReapResource(assetPair.Key, from, assetPair.Value.HarvestResourceBaseAmount, system, tool, harvestTargetLocation, map);
 
-				if (itm != null)
+				if (item != null)
 				{
-					from.AddToBackpack(itm);
+					var itemAmount = item.Amount;
+
+					if (system.Give(from, item, true))
+					{
+						EventSink.InvokeHarvestedItem(new HarvestedItemEventArgs(from, item, itemAmount, system, tool));
+					}
+					else
+					{
+						item.Delete();
+					}
 				}
 			}
 
 			//give out asset bonus resources
-			foreach (Item itm in this.ReapBonusResources(hue, from))
+			foreach (var item in ReapBonusResources(hue, from))
 			{
-				from.AddToBackpack(itm);
+				var itemAmount = item.Amount;
+
+				if (system.Give(from, item, true))
+				{
+					EventSink.InvokeHarvestedItem(new HarvestedItemEventArgs(from, item, itemAmount, system, tool));
+				}
+				else
+				{
+					item.Delete();
+				}
 			}
 
-			bool returnValue = false;
-
-			if (operationSeries != null)
-			{
-				returnValue = true;
-			}
-
-			return returnValue;
+			return operationSeries != null;
 		}
 	}
 
 	public abstract class BaseHarvestablePhase
 	{
 		public const int STATIC_TILE_SEARCH_Z_TOLERANCE = 5;
-		public virtual Type FinalHarvestPhase { get { return null; } }
-		public virtual Type StartingGrowthPhase { get { return null; } }
-		public virtual Type NextHarvestPhase { get { return null; } }
-		public virtual Type NextGrowthPhase { get { return null; } }
-		public virtual bool ConstructUsingHues { get { return false; } }
-		public virtual int HarvestResourceBaseAmount { get { return 0; } }
-		public virtual int BonusResourceBaseAmount { get { return 0; } }
-		public virtual SkillName HarvestSkill { get { return SkillName.Lumberjacking; } }
 
-		public Dictionary<int, HarvestResource> PhaseResources = new Dictionary<int, HarvestResource>();
-		public Dictionary<int, BonusHarvestResource[]> BonusResources = new Dictionary<int, BonusHarvestResource[]>();
-		public List<GraphicAsset[]> BaseAssetSets = new List<GraphicAsset[]>();
+		public virtual Type FinalHarvestPhase => null;
+		public virtual Type StartingGrowthPhase => null;
+		public virtual Type NextHarvestPhase => null;
+		public virtual Type NextGrowthPhase => null;
+		public virtual bool ConstructUsingHues => false;
+		public virtual int HarvestResourceBaseAmount => 0;
+		public virtual int BonusResourceBaseAmount => 0;
+		public virtual SkillName HarvestSkill => SkillName.Lumberjacking;
+
+		public Dictionary<int, HarvestResource> PhaseResources { get; } = new();
+		public Dictionary<int, BonusHarvestResource[]> BonusResources { get; } = new();
+		public List<HarvestGraphicAsset[]> BaseAssetSets { get; } = new();
 
 		public BaseHarvestablePhase()
 		{
 		}
 
+		public delegate void UpdateTilesEventHandler(int[] newTiles);
+
+		public static event UpdateTilesEventHandler UpdatedTilesEvent;
+
 		/// Registration and Asset Lookup
-		public static Dictionary<int, GraphicAsset> MasterHarvestableAssetlookup = new Dictionary<int, GraphicAsset>();
-		public static Dictionary<int, BaseHarvestablePhase> MasterHarvestablePhaseLookupByItemIdList = new Dictionary<int, BaseHarvestablePhase>();
-		public static Dictionary<Type, BaseHarvestablePhase> MasterHarvestablePhaseLookupByTypeList = new Dictionary<Type, BaseHarvestablePhase>();
+		public static Dictionary<int, HarvestGraphicAsset> MasterHarvestableAssetlookup { get; } = new();
+		public static Dictionary<int, BaseHarvestablePhase> MasterHarvestablePhaseLookupByItemIdList { get; } = new();
+		public static Dictionary<Type, BaseHarvestablePhase> MasterHarvestablePhaseLookupByTypeList { get; } = new();
 
 		public static bool RegisterHarvestablePhase(BaseHarvestablePhase phase)
 		{
-			bool alreadyRegistered = true;
-			if (!MasterHarvestablePhaseLookupByTypeList.ContainsKey(phase.GetType()))
+			var alreadyRegistered = true;
+
+			var type = phase.GetType();
+
+			if (!MasterHarvestablePhaseLookupByTypeList.TryGetValue(type, out var existingPhase) || existingPhase == null)
 			{
-				MasterHarvestablePhaseLookupByTypeList.Add(phase.GetType(), phase);
+				MasterHarvestablePhaseLookupByTypeList[type] = phase;
+
 				alreadyRegistered = false;
+
 				phase.RegisterBasicPhaseTiles();
 
 				//send out update tiles event
-				if (UpdatedTilesEvent != null)
-				{
-					List<int> tiles = new List<int>(BaseTreeHarvestPhase.MasterHarvestablePhaseLookupByItemIdList.Keys); /// Server.Engine.Facet.Module.LumberHarvest.BaseTreeHarvestPhase.MasterHarvestablePhaseLookupByItemIdList.Keys
-					UpdatedTilesEvent(tiles.ToArray());
-				}
+				UpdatedTilesEvent?.Invoke(MasterHarvestablePhaseLookupByItemIdList.Keys.ToArray());
 			}
 			else
 			{
-				Console.WriteLine("NOT Registering " + phase.GetType());
+				Console.WriteLine($"NOT Registering {type}");
 			}
 
 			return alreadyRegistered;
 		}
 
-		public delegate void UpdateTilesEventHandler(int[] newTiles);
-		public static event UpdateTilesEventHandler UpdatedTilesEvent;
-
-		public virtual void RegisterAssetSet(GraphicAsset[] assetSet)
+		public virtual void RegisterAssetSet(HarvestGraphicAsset[] assetSet)
 		{
-			foreach (GraphicAsset treeAsset in assetSet)
+			foreach (var treeAsset in assetSet)
 			{
-				if (!MasterHarvestablePhaseLookupByItemIdList.ContainsKey(treeAsset.ItemID))
-				{
-					MasterHarvestablePhaseLookupByItemIdList.Add(treeAsset.ItemID, this);
-				}
-				else
-				{
-					Console.WriteLine(this.GetType().ToString() + " tried to add a graphic 0x" + treeAsset.ItemID.ToString("X") + " to the MasterHarvestablePhaseLookupByItemIdList table that is already in use.");
-				}
-
-				if (!MasterHarvestableAssetlookup.ContainsKey(treeAsset.ItemID))
-				{
-					MasterHarvestableAssetlookup.Add(treeAsset.ItemID, treeAsset);
-				}
-				else
-				{
-					Console.WriteLine(this.GetType().ToString() + " tried to add a graphic 0x" + treeAsset.ItemID.ToString("X") + " to the MasterHarvestableAssetlookup table that is already in use.");
-				}
-
+				MasterHarvestablePhaseLookupByItemIdList[treeAsset.ItemID] = this;
+				MasterHarvestableAssetlookup[treeAsset.ItemID] = treeAsset;
 			}
 		}
 
 		public virtual void RegisterBasicPhaseTiles()
 		{
 			//Add all the trunk graphics for this phase
-			foreach (GraphicAsset[] assetSet in BaseAssetSets)
+			foreach (var assetSet in BaseAssetSets)
 			{
 				RegisterAssetSet(assetSet);
 			}
@@ -800,111 +720,88 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 		/// Lookups
 		public virtual Point3D LookupOriginLocation(Point3D harvestTargetLocation, int harvestTargetItemId)
 		{
-			Point3D trunkLocation = Point3D.Zero;
-
-			bool found = false;
-
-			foreach (GraphicAsset[] trunkSet in BaseAssetSets)
+			foreach (var trunkSet in BaseAssetSets)
 			{
-				foreach (GraphicAsset asset in trunkSet)
+				foreach (var asset in trunkSet)
 				{
 					if (asset.ItemID == harvestTargetItemId)
 					{
-						trunkLocation = new Point3D(harvestTargetLocation.X - asset.XOffset, harvestTargetLocation.Y - asset.YOffset, harvestTargetLocation.Z - TileData.ItemTable[harvestTargetItemId].CalcHeight);
-						found = true;
-						break;
+						return new Point3D(harvestTargetLocation.X - asset.XOffset, harvestTargetLocation.Y - asset.YOffset, harvestTargetLocation.Z - TileData.ItemTable[harvestTargetItemId].CalcHeight);
 					}
 				}
-
-				if (found)
-				{
-					break;
-				}
 			}
 
-			return trunkLocation;
+			return Point3D.Zero;
 		}
 
-		public static GraphicAsset LookupAsset(int itemId)
+		public static HarvestGraphicAsset LookupAsset(int itemId)
 		{
-			GraphicAsset asset = null;
-
-			if (MasterHarvestableAssetlookup.ContainsKey(itemId))
-			{
-				asset = MasterHarvestableAssetlookup[itemId];
-			}
+			MasterHarvestableAssetlookup.TryGetValue(itemId, out var asset);
 
 			return asset;
 		}
 
 		public static BaseHarvestablePhase LookupPhase(int itemId)
 		{
-			BaseHarvestablePhase phase = null;
-
-			if (MasterHarvestablePhaseLookupByItemIdList.ContainsKey(itemId))
-			{
-				phase = MasterHarvestablePhaseLookupByItemIdList[itemId];
-			}
+			MasterHarvestablePhaseLookupByItemIdList.TryGetValue(itemId, out var phase);
 
 			return phase;
 		}
 
 		public static int LookupStaticHue(Map map, Point3D staticLocation, int itemId)
 		{
-			int hue = 0;
-			foreach (StaticTile tile in map.Tiles.GetStaticTiles(staticLocation.X, staticLocation.Y))
+			var hue = 0;
+
+			foreach (var tile in map.Tiles.GetStaticTiles(staticLocation.X, staticLocation.Y))
 			{
 				if (tile.Z >= staticLocation.Z - STATIC_TILE_SEARCH_Z_TOLERANCE && tile.Z <= staticLocation.Z + STATIC_TILE_SEARCH_Z_TOLERANCE)
 				{
 					if (tile.ID == itemId)
 					{
 						hue = tile.Hue;
-
-						continue;
 					}
 				}
 			}
+
 			return hue;
 		}
 
 		public static bool LookupStaticTile(Map map, Point3D staticLocation, int itemId, ref StaticTile tileResult)
 		{
-			bool found = false;
-
-			foreach (StaticTile tile in map.Tiles.GetStaticTiles(staticLocation.X, staticLocation.Y))
+			foreach (var tile in map.Tiles.GetStaticTiles(staticLocation.X, staticLocation.Y))
 			{
 				if (tile.Z >= staticLocation.Z - STATIC_TILE_SEARCH_Z_TOLERANCE && tile.Z <= staticLocation.Z + STATIC_TILE_SEARCH_Z_TOLERANCE)
 				{
 					if (tile.ID == itemId)
 					{
 						tileResult = tile;
-						found = true;
-						continue;
+						return true;
 					}
 				}
 			}
-			return found;
+
+			return false;
 		}
 
 		/// Construction / Teardown
-		public static List<KeyValuePair<int, GraphicAsset>> RemoveAssets(Map map, Point3D trunkLocation, ref MapOperationSeries deleteTreePartsOperationSeries, List<GraphicAsset[]> assetList)
+		public static List<KeyValuePair<int, HarvestGraphicAsset>> RemoveAssets(Map map, Point3D trunkLocation, ref MapOperationSeries deleteTreePartsOperationSeries, List<HarvestGraphicAsset[]> assetList)
 		{
-			List<KeyValuePair<int, GraphicAsset>> treePartsRemoved = new List<KeyValuePair<int, GraphicAsset>>();
+			var treePartsRemoved = new List<KeyValuePair<int, HarvestGraphicAsset>>();
 
-			foreach (GraphicAsset[] assetSet in assetList)
+			foreach (var assetSet in assetList)
 			{
-				foreach (GraphicAsset treeAsset in assetSet)
+				foreach (var treeAsset in assetSet)
 				{
-					int leafX = trunkLocation.X + treeAsset.XOffset;
-					int leafY = trunkLocation.Y + treeAsset.YOffset;
+					var leafX = trunkLocation.X + treeAsset.XOffset;
+					var leafY = trunkLocation.Y + treeAsset.YOffset;
 
-					foreach (StaticTile tile in map.Tiles.GetStaticTiles(leafX, leafY))
+					foreach (var tile in map.Tiles.GetStaticTiles(leafX, leafY))
 					{
 						if (tile.Z >= trunkLocation.Z - STATIC_TILE_SEARCH_Z_TOLERANCE && tile.Z <= trunkLocation.Z + STATIC_TILE_SEARCH_Z_TOLERANCE)
 						{
 							if (tile.ID == treeAsset.ItemID)
 							{
-								Point3D leafLocation = new Point3D(leafX, leafY, tile.Z);
+								var leafLocation = new Point3D(leafX, leafY, tile.Z);
 
 								if (deleteTreePartsOperationSeries == null)
 								{
@@ -915,7 +812,7 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 									deleteTreePartsOperationSeries.Add(new DeleteStatic(map.MapID, new StaticTarget(leafLocation, treeAsset.ItemID)));
 								}
 
-								treePartsRemoved.Add(new KeyValuePair<int, GraphicAsset>(tile.Hue, treeAsset));
+								treePartsRemoved.Add(new KeyValuePair<int, HarvestGraphicAsset>(tile.Hue, treeAsset));
 
 								continue;
 							}
@@ -930,14 +827,13 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 		public void Construct(Point3D location, Map map)
 		{
 			MapOperationSeries series = null;
-			Construct(location, map, ref series);
-			if (series != null)
-			{
-				series.DoOperation();
-			}
+
+			_ = Construct(location, map, ref series);
+
+			series?.DoOperation();
 		}
 
-		public virtual void onBeforeConstruct(Point3D location, Map map, ref MapOperationSeries mapOperationSeries)
+		public virtual void OnBeforeConstruct(Point3D location, Map map, ref MapOperationSeries mapOperationSeries)
 		{
 		}
 
@@ -946,18 +842,18 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 		 */
 		public virtual int Construct(Point3D location, Map map, ref MapOperationSeries mapOperationSeries)
 		{
-			onBeforeConstruct(location, map, ref mapOperationSeries);
+			OnBeforeConstruct(location, map, ref mapOperationSeries);
 
-			GraphicAsset[] trunkSet = null;
+			HarvestGraphicAsset[] trunkSet = null;
 
 			if (BaseAssetSets != null && BaseAssetSets.Count > 0)
 			{
 				trunkSet = BaseAssetSets[Utility.Random(BaseAssetSets.Count)];
 			}
 
-			int hue = 0;
+			var hue = 0;
 
-			List<int> possibleHues = new List<int>(PhaseResources.Keys);
+			var possibleHues = new List<int>(PhaseResources.Keys);
 
 			if (ConstructUsingHues && possibleHues.Count > 0)
 			{
@@ -966,10 +862,11 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 
 			if (trunkSet != null)
 			{
-				foreach (GraphicAsset asset in trunkSet)
+				foreach (var asset in trunkSet)
 				{
 					//come back and add a usestatic boolean to this class and add it into the constructor too
-					AddStatic addStatic = new AddStatic(map.MapID, asset.ItemID, location.Z, location.X + asset.XOffset, location.Y + asset.YOffset, hue);
+					var addStatic = new AddStatic(map.MapID, asset.ItemID, location.Z, location.X + asset.XOffset, location.Y + asset.YOffset, hue);
+
 					if (mapOperationSeries == null)
 					{
 						mapOperationSeries = new MapOperationSeries(addStatic, map.MapID);
@@ -987,20 +884,19 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 		public void Teardown(Point3D originLocation, Map map)
 		{
 			MapOperationSeries series = null;
+
 			Teardown(originLocation, map, ref series);
-			if (series != null)
-			{
-				series.DoOperation();
-			}
+
+			series?.DoOperation();
 		}
 
 		public virtual void Teardown(Point3D originLocation, Map map, ref MapOperationSeries mapActions)
 		{
-			List<KeyValuePair<int, GraphicAsset>> basePiecesRemoved = RemoveAssets(map, originLocation, ref mapActions, BaseAssetSets);
+			_ = RemoveAssets(map, originLocation, ref mapActions, BaseAssetSets);
 		}
 
 		/// Resource Reap Methods
-		public virtual Item ReapResource(int hue, Mobile from, int amount)
+		public virtual Item ReapResource(int hue, Mobile from, int amount, HarvestSystem system, IHarvestTool tool, Point3D loc, Map map)
 		{
 			Item resourceItem = null;
 			HarvestResource resource = null;
@@ -1018,16 +914,17 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 
 				if (resource != null)
 				{
-					double skillBase = from.Skills[HarvestSkill].Base;
+					var skillBase = from.Skills[HarvestSkill].Base;
 
 					if (skillBase >= resource.ReqSkill)
 					{
 						try
 						{
+							var type = resource.Types[Utility.Random(resource.Types.Length)];
 
-							Type type = resource.Types[Utility.Random(resource.Types.Length)];
-							Item item = Activator.CreateInstance(type) as Item;
-							if (item != null)
+							type = from.Region.GetResource(from, tool, map, loc, system, type);
+
+							if (Activator.CreateInstance(type) is Item item)
 							{
 								item.Amount = amount;
 								resourceItem = item;
@@ -1035,7 +932,6 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 						}
 						catch
 						{
-							Console.WriteLine("exception caught when trying to create bonus resource");
 						}
 					}
 					else
@@ -1051,7 +947,7 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 
 		public virtual List<Item> ReapBonusResources(int hue, Mobile from)
 		{
-			return GraphicAsset.ReapBonusResources(hue, from, BonusResourceBaseAmount, BonusResources);
+			return HarvestGraphicAsset.ReapBonusResources(hue, from, BonusResourceBaseAmount, BonusResources);
 		}
 
 		#region Developer Notations
@@ -1077,7 +973,7 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 
 		#endregion
 
-		public virtual bool Harvest(Mobile from, int itemId, Point3D location, Map map)
+		public virtual bool Harvest(Mobile from, int itemId, IHarvestTool tool, Point3D location, Map map)
 		{
 			return false;
 		}
@@ -1101,23 +997,24 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 		public virtual bool Grow(Point3D originLocation, Map map)
 		{
 			MapOperationSeries series = null;
-			bool grew = grow(originLocation, map, ref series);
-			if (series != null)
-			{
-				series.DoOperation();
-			}
+
+			var grew = Grow(originLocation, map, ref series);
+
+			series?.DoOperation();
 
 			return grew;
 		}
 
-		public virtual bool grow(Point3D originLocation, Map map, ref MapOperationSeries series)
+		public virtual bool Grow(Point3D originLocation, Map map, ref MapOperationSeries series)
 		{
-			bool grew = false;
+			var grew = false;
 
 			if (NextGrowthPhase != null)
 			{
 				Teardown(originLocation, map, ref series);
+
 				MasterHarvestablePhaseLookupByTypeList[NextGrowthPhase].Construct(originLocation, map); //this is the transition to the next phase
+
 				grew = true;
 			}
 
@@ -1129,69 +1026,60 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 	public class FadingLeaf : Item
 	{
 		[Constructable]
-		public FadingLeaf() : this(Utility.RandomList(0x1B1F, 0x1B20, 0x1B21, 0x1B22, 0x1B23, 0x1B24, 0x1B25))
+		public FadingLeaf() 
+			: this(Utility.RandomList(0x1B1F, 0x1B20, 0x1B21, 0x1B22, 0x1B23, 0x1B24, 0x1B25))
 		{
 		}
 
 		[Constructable]
-		public FadingLeaf(int itemID) : base(itemID)
+		public FadingLeaf(int itemID) 
+			: base(itemID)
 		{
 			Movable = false;
 			Hue = 1436;
-			new InternalTimer(this).Start();
+
+			Timer.DelayCall(TimeSpan.FromSeconds(5.0), Delete);
 		}
 
-		public FadingLeaf(Serial serial) : base(serial)
+		public FadingLeaf(Serial serial) 
+			: base(serial)
 		{
-			new InternalTimer(this).Start();
 		}
 
 		public override void Serialize(GenericWriter writer)
 		{
 			base.Serialize(writer);
 
-			writer.Write((int)0); // version
+			writer.Write(0); // version
 		}
 
 		public override void Deserialize(GenericReader reader)
 		{
 			base.Deserialize(reader);
 
-			int version = reader.ReadInt();
-		}
+			_ = reader.ReadInt();
 
-		private class InternalTimer : Timer
-		{
-			private Item m_Leaf;
-
-			public InternalTimer(Item leaf) : base(TimeSpan.FromSeconds(5.0))
-			{
-				Priority = TimerPriority.OneSecond;
-
-				m_Leaf = leaf;
-			}
-
-			protected override void OnTick()
-			{
-				m_Leaf.Delete();
-			}
+			Timer.DelayCall(Delete);
 		}
 	}
 
 	/// Chopped Fallen Tree
 	public class SmallFallenTreeNorthSouth : BaseTreeHarvestPhase
 	{
-		public static void Configure() { RegisterHarvestablePhase(new SmallFallenTreeNorthSouth()); }
-
-		public SmallFallenTreeNorthSouth()
+		public static void Configure()
 		{
-			HarvestResource logResource = new HarvestResource(00.0, 00.0, 100.0, 1072540, typeof(Log));
-			HarvestResource oakResource = new HarvestResource(65.0, 25.0, 105.0, 1072541, typeof(OakLog));
-			HarvestResource ashResource = new HarvestResource(80.0, 40.0, 120.0, 1072542, typeof(AshLog));
-			HarvestResource yewResource = new HarvestResource(95.0, 55.0, 135.0, 1072543, typeof(YewLog));
-			HarvestResource heartwoodResource = new HarvestResource(100.0, 60.0, 140.0, 1072544, typeof(HeartwoodLog));
-			HarvestResource bloodwoodResource = new HarvestResource(100.0, 60.0, 140.0, 1072545, typeof(BloodwoodLog));
-			HarvestResource frostwoodResource = new HarvestResource(100.0, 60.0, 140.0, 1072546, typeof(FrostwoodLog));
+			_ = RegisterHarvestablePhase(new SmallFallenTreeNorthSouth());
+		}
+
+		private SmallFallenTreeNorthSouth()
+		{
+			var logResource = new HarvestResource(00.0, 00.0, 100.0, 1072540, typeof(Log));
+			var oakResource = new HarvestResource(65.0, 25.0, 105.0, 1072541, typeof(OakLog));
+			var ashResource = new HarvestResource(80.0, 40.0, 120.0, 1072542, typeof(AshLog));
+			var yewResource = new HarvestResource(95.0, 55.0, 135.0, 1072543, typeof(YewLog));
+			var heartwoodResource = new HarvestResource(100.0, 60.0, 140.0, 1072544, typeof(HeartwoodLog));
+			var bloodwoodResource = new HarvestResource(100.0, 60.0, 140.0, 1072545, typeof(BloodwoodLog));
+			var frostwoodResource = new HarvestResource(100.0, 60.0, 140.0, 1072546, typeof(FrostwoodLog));
 
 			PhaseResources.Add(0, logResource);
 			PhaseResources.Add(350, oakResource);
@@ -1201,29 +1089,36 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 			PhaseResources.Add(339, bloodwoodResource);
 			PhaseResources.Add(688, frostwoodResource);
 
-			GraphicAsset asset1 = new GraphicAsset(0xCF4, 0, -1);
-			asset1.HarvestResourceBaseAmount = 10;
+			var asset1 = new HarvestGraphicAsset(0xCF4, 0, -1)
+			{
+				HarvestResourceBaseAmount = 10
+			};
 
-			GraphicAsset asset2 = new GraphicAsset(0xCF3, 0, -2);
-			asset2.HarvestResourceBaseAmount = 10;
+			var asset2 = new HarvestGraphicAsset(0xCF3, 0, -2)
+			{
+				HarvestResourceBaseAmount = 10
+			};
 
-			BaseAssetSets.Add(new GraphicAsset[] { asset1, asset2 });
+			BaseAssetSets.Add(new HarvestGraphicAsset[] { asset1, asset2 });
 		}
 	}
 
 	public class SmallFallenTreeEastWest : BaseTreeHarvestPhase
 	{
-		public static void Configure() { RegisterHarvestablePhase(new SmallFallenTreeEastWest()); }
-
-		public SmallFallenTreeEastWest()
+		public static void Configure()
 		{
-			HarvestResource logResource = new HarvestResource(00.0, 00.0, 100.0, 1072540, typeof(Log));
-			HarvestResource oakResource = new HarvestResource(65.0, 25.0, 105.0, 1072541, typeof(OakLog));
-			HarvestResource ashResource = new HarvestResource(80.0, 40.0, 120.0, 1072542, typeof(AshLog));
-			HarvestResource yewResource = new HarvestResource(95.0, 55.0, 135.0, 1072543, typeof(YewLog));
-			HarvestResource heartwoodResource = new HarvestResource(100.0, 60.0, 140.0, 1072544, typeof(HeartwoodLog));
-			HarvestResource bloodwoodResource = new HarvestResource(100.0, 60.0, 140.0, 1072545, typeof(BloodwoodLog));
-			HarvestResource frostwoodResource = new HarvestResource(100.0, 60.0, 140.0, 1072546, typeof(FrostwoodLog));
+			_ = RegisterHarvestablePhase(new SmallFallenTreeEastWest());
+		}
+
+		private SmallFallenTreeEastWest()
+		{
+			var logResource = new HarvestResource(00.0, 00.0, 100.0, 1072540, typeof(Log));
+			var oakResource = new HarvestResource(65.0, 25.0, 105.0, 1072541, typeof(OakLog));
+			var ashResource = new HarvestResource(80.0, 40.0, 120.0, 1072542, typeof(AshLog));
+			var yewResource = new HarvestResource(95.0, 55.0, 135.0, 1072543, typeof(YewLog));
+			var heartwoodResource = new HarvestResource(100.0, 60.0, 140.0, 1072544, typeof(HeartwoodLog));
+			var bloodwoodResource = new HarvestResource(100.0, 60.0, 140.0, 1072545, typeof(BloodwoodLog));
+			var frostwoodResource = new HarvestResource(100.0, 60.0, 140.0, 1072546, typeof(FrostwoodLog));
 
 			PhaseResources.Add(0, logResource);
 			PhaseResources.Add(350, oakResource);
@@ -1233,49 +1128,63 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 			PhaseResources.Add(339, bloodwoodResource);
 			PhaseResources.Add(688, frostwoodResource);
 
-			GraphicAsset asset1 = new GraphicAsset(0xCF5, -3, 0);
-			asset1.HarvestResourceBaseAmount = 10;
+			var asset1 = new HarvestGraphicAsset(0xCF5, -3, 0)
+			{
+				HarvestResourceBaseAmount = 10
+			};
 
-			GraphicAsset asset2 = new GraphicAsset(0xCF6, -2, 0);
-			asset2.HarvestResourceBaseAmount = 10;
+			var asset2 = new HarvestGraphicAsset(0xCF6, -2, 0)
+			{
+				HarvestResourceBaseAmount = 10
+			};
 
-			GraphicAsset asset3 = new GraphicAsset(0xCF7, -1, 0);
-			asset3.HarvestResourceBaseAmount = 10;
+			var asset3 = new HarvestGraphicAsset(0xCF7, -1, 0)
+			{
+				HarvestResourceBaseAmount = 10
+			};
 
-			BaseAssetSets.Add(new GraphicAsset[] { asset1, asset2, asset3 });
+			BaseAssetSets.Add(new HarvestGraphicAsset[] { asset1, asset2, asset3 });
 		}
 	}
 
 	/// Tree ReGrowth Phases
 	public class SmallSaplingTreePhase1 : BaseTreeHarvestPhase
 	{
-		public override bool AddStump { get { return false; } }
-		public static void Configure() { RegisterHarvestablePhase(new SmallSaplingTreePhase1()); }
-		public override Type NextGrowthPhase { get { return typeof(SmallSaplingTreePhase2); } }
-		public override Type StartingGrowthPhase { get { return typeof(SmallSaplingTreePhase1); } }
+		public static void Configure()
+		{
+			_ = RegisterHarvestablePhase(new SmallSaplingTreePhase1());
+		}
+
+		public override bool AddStump => false;
+
+		public override Type NextGrowthPhase => typeof(SmallSaplingTreePhase2);
+		public override Type StartingGrowthPhase => typeof(SmallSaplingTreePhase1);
+
+		private SmallSaplingTreePhase1()
+		{
+			BaseAssetSets.Add(new HarvestGraphicAsset[] { new HarvestGraphicAsset(0xCEA, 0, 0) });
+		}
 
 		public override void RecordTreeLocationAndGraphic(int mapId, int itemId, Point3D trunkLocation)
 		{
 			//don't record it
 		}
-
-		public SmallSaplingTreePhase1()
-		  : base()
-		{
-			BaseAssetSets.Add(new GraphicAsset[] { new GraphicAsset(0xCEA, 0, 0) });
-		}
 	}
 
 	public class SmallSaplingTreePhase2 : BaseTreeHarvestPhase
 	{
-		public override bool AddStump { get { return false; } }
-		public static void Configure() { RegisterHarvestablePhase(new SmallSaplingTreePhase2()); }
-		public override Type StartingGrowthPhase { get { return typeof(SmallSaplingTreePhase1); } }
-
-		public SmallSaplingTreePhase2()
-		  : base()
+		public static void Configure()
 		{
-			BaseAssetSets.Add(new GraphicAsset[] { new GraphicAsset(0xCE9, 0, 0) });
+			_ = RegisterHarvestablePhase(new SmallSaplingTreePhase2());
+		}
+
+		public override bool AddStump => false;
+
+		public override Type StartingGrowthPhase => typeof(SmallSaplingTreePhase1);
+
+		private SmallSaplingTreePhase2()
+		{
+			BaseAssetSets.Add(new HarvestGraphicAsset[] { new HarvestGraphicAsset(0xCE9, 0, 0) });
 		}
 
 		public override void RecordTreeLocationAndGraphic(int mapId, int itemId, Point3D trunkLocation)
@@ -1283,19 +1192,17 @@ namespace Server.Engine.Facet.Module.LumberHarvest
 			//don't record it, if it gets harvested, we want to leave the original location that was written by the full grown tree
 		}
 
-		public override bool grow(Point3D originLocation, Map map, ref MapOperationSeries series)
+		public override bool Grow(Point3D originLocation, Map map, ref MapOperationSeries series)
 		{
-			bool grew = false;
+			var grew = false;
 
-			if (FacetModule_Lumberjacking.RegrowthMasterLookupTable.ContainsKey(map.MapID))
+			if (FacetModule_Lumberjacking.RegrowthMasterLookupTable.TryGetValue(map.MapID, out var mapRegrowthLookupTable))
 			{
-				Dictionary<Point3D, int> mapRegrowthLookupTable = FacetModule_Lumberjacking.RegrowthMasterLookupTable[map.MapID];
-
 				//if we can't find the original lookup, then we don't grow
-				if (mapRegrowthLookupTable.ContainsKey(originLocation))
+				if (mapRegrowthLookupTable.TryGetValue(originLocation, out var originalItemId))
 				{
 					Teardown(originLocation, map, ref series);
-					int originalItemId = mapRegrowthLookupTable[originLocation];
+
 					MasterHarvestablePhaseLookupByItemIdList[originalItemId].Construct(originLocation, map);
 				}
 			}

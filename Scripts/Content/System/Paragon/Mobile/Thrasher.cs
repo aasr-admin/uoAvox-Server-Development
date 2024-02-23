@@ -46,13 +46,6 @@ namespace Server.Mobiles
 			return WeaponAbility.ArmorIgnore;
 		}
 
-		public override void OnDeath(Container c)
-		{
-			base.OnDeath(c);
-
-			c.DropItem(new ThrashersTail());
-		}
-
 		public override bool GivesMLMinorArtifact => true;
 		public override int Hides => 48;
 		public override int Meat => 1;

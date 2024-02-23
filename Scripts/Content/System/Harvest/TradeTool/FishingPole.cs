@@ -6,8 +6,12 @@ using System.Collections.Generic;
 
 namespace Server.Items
 {
-	public class FishingPole : Item
+	public class FishingPole : Item, IHarvestTool
 	{
+		public virtual HarvestSystem HarvestSystem => Fishing.System;
+
+		IHarvestSystem IHarvestTool.HarvestSystem => HarvestSystem;
+
 		[Constructable]
 		public FishingPole() : base(0x0DC0)
 		{
@@ -25,7 +29,7 @@ namespace Server.Items
 			}
 			else
 			{
-				Fishing.System.BeginHarvesting(from, this);
+				HarvestSystem?.BeginHarvesting(from, this);
 			}
 		}
 

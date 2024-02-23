@@ -356,7 +356,7 @@ namespace Server.Items
 		private static void OnMapCommand(NetState state, PacketReader pvSrc)
 		{
 			var from = state.Mobile;
-			var map = World.FindItem(pvSrc.ReadInt32()) as MapItem;
+			var map = pvSrc.ReadItem() as MapItem;
 
 			if (map == null)
 			{
@@ -445,9 +445,10 @@ namespace Server.Items
 			{
 			}
 		}
-		#region ICraftable Members
 
-		public int OnCraft(int quality, bool makersMark, Mobile from, CraftSystem craftSystem, Type typeRes, BaseTool tool, CraftItem craftItem, int resHue)
+		#region ICraftable
+
+		public virtual int OnCraft(int quality, bool makersMark, Mobile from, ICraftSystem craftSystem, Type typeRes, ICraftTool tool, ICraftItem craftItem, int resHue)
 		{
 			CraftInit(from);
 			return 1;

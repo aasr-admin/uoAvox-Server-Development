@@ -1106,7 +1106,7 @@ namespace Server.Mobiles
 
 						for (var i = 0; i < count; ++i)
 						{
-							var e = World.FindEntity(reader.ReadInt()) as ISpawnable;
+							var e = reader.ReadEntity<ISpawnable>();
 
 							if (e != null)
 							{

@@ -412,8 +412,12 @@ namespace Server.SkillHandlers
 								m_Creature.Owners.Add(m_Tamer);
 							}
 
-							m_Creature.SetControlMaster(m_Tamer);
-							m_Creature.IsBonded = false;
+							if (m_Creature.SetControlMaster(m_Tamer))
+							{
+								m_Creature.IsBonded = false;
+
+								EventSink.InvokeCreatureTamed(new CreatureTamedEventArgs(m_Tamer, m_Creature));
+							}
 						}
 						else
 						{
